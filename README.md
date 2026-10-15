@@ -347,7 +347,7 @@ and shows in Settings → About.
 | Split pane | `Ctrl+\`; Ctrl+Enter in the palette or Ctrl-click a link in preview opens it there |
 | Inspector (local graph, outline, mentions, links) | the right-most button in the tab bar |
 | Graph | Ctrl+G, or the graph icon in the rail. Click a dot to inspect it, double-click to open; `/` filters; Forces adjusts the layout |
-| Canvas | the squares icon in the rail; right-click a folder → New canvas here |
+| Canvas | the squares icon in the rail; right-click a folder → New canvas here. The toolbar at the bottom draws boxes, ellipses, diamonds, arrows and pen lines in six colours (keys V T R O D A P); double-click a shape or an arrow to label it; Ctrl+Z undoes |
 | Open in a new tab | Ctrl-click or middle-click in the file tree or search results |
 | Switch / close tabs | Ctrl+Tab, Ctrl+Shift+Tab (or Ctrl+PageDown / PageUp); Ctrl+W |
 | Follow a link (Source) | Ctrl-click it, or put the cursor in it and press Ctrl+Enter |

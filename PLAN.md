@@ -404,8 +404,8 @@ colours come from the prototype's own source, not from eyeballing.
 | H | AI across the vault: ask my notes with citations, semantic search, AI database columns | ✅ done |
 | I | Import from Notion, Evernote, OneNote | ✅ done |
 | J | Encrypted notes and folders | ✅ done |
-| K | Drawing and shapes on canvases | next |
-| L | Publish a folder as a static website | |
+| K | Drawing and shapes on canvases | ✅ done |
+| L | Publish a folder as a static website | next |
 | M | CSS snippets and plugins | |
 
 ## Phase E — what shipped
@@ -537,3 +537,23 @@ colours come from the prototype's own source, not from eyeballing.
   a save refused as LOCKED shows *Unlock and save*; *Lock all notes now*
   saves, forgets the keys and closes notes that need a password. Embeds and
   canvas cards of locked notes say so; the note header shows *Locked*.
+
+## Phase K — what shipped
+
+* Canvas toolbar (`canvas.ts`): select, text card, rectangle, ellipse,
+  diamond, arrow, pen (V T R O D A P), six JSON Canvas colours ("1"–"6")
+  plus none, three pen widths, undo / redo.
+* Storage stays JSON Canvas, readable by Obsidian:
+  * shapes are text nodes with `shape: rect | ellipse | diamond`; the label
+    is the node's `text`, so Obsidian shows a text card with it;
+  * pen strokes and free arrows are text nodes with `ink: {w, h, size,
+    points, arrow?}` (points relative to the node box, drawn scaled to the
+    node's size) and a text saying the drawing was made in Marrow.
+* Pen strokes are simplified (Ramer–Douglas–Peucker) and drawn as
+  quadratic curves through midpoints; arrows draw their head as two lines.
+* Colours apply to the selection (cards, shapes, strokes, connections) and
+  to what's drawn next. Shapes get a tinted fill.
+* Double-click a shape (or Enter) edits its label in place; a second click
+  on a selected connection edits its label.
+* Undo keeps up to 100 states (changes within 0.8 s count as one); it resets
+  when the canvas is loaded or changes on disk.

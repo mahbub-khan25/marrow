@@ -5,6 +5,12 @@
 // connect them, drag the corner to resize. Drag the background (or scroll)
 // to pan, Ctrl+scroll to zoom. Double-click the background for a text card,
 // double-click a note card to open the note. Drop notes from the sidebar.
+//
+// The toolbar also draws: rectangles, ellipses and diamonds (with a label),
+// arrows, and freehand pen strokes, in six colours. They're stored as text
+// cards with extra fields (`shape`, `ink`), so Obsidian still opens the file:
+// it shows a shape as a text card with its label, and a drawing as a card
+// saying it was drawn in Marrow.
 
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -27,7 +33,25 @@ interface CNode {
   url?: string;
   label?: string;
   color?: string;
+  /** Marrow: draw this text card as a shape. */
+  shape?: ShapeKind;
+  /** Marrow: a pen stroke or a free arrow. */
+  ink?: Ink;
   [k: string]: unknown;
+}
+
+type ShapeKind = "rect" | "ellipse" | "diamond";
+type Tool = "select" | "text" | ShapeKind | "arrow" | "pen";
+
+interface Ink {
+  /** The box the points were drawn in (the card scales it). */
+  w: number;
+  h: number;
+  /** Line width. */
+  size: number;
+  /** "x,y x,y …" inside that box. */
+  points: string;
+  arrow?: boolean;
 }
 
 interface CEdge {
@@ -39,6 +63,7 @@ interface CEdge {
   fromEnd?: "none" | "arrow";
   toEnd?: "none" | "arrow";
   label?: string;
+  color?: string;
   [k: string]: unknown;
 }
 
@@ -56,6 +81,34 @@ export interface CanvasApp {
 
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 const SVGNS = "http://www.w3.org/2000/svg";
+/** JSON Canvas colours "1"–"6" (red, orange, yellow, green, cyan, purple). */
+const PALETTE: [string, string, string][] = [
+  ["1", "Red", "#e03e3e"],
+  ["2", "Orange", "#e8780c"],
+  ["3", "Yellow", "#d4a106"],
+  ["4", "Green", "#2f9e44"],
+  ["5", "Cyan", "#0b8cb5"],
+  ["6", "Purple", "#8e44ad"],
+];
+const colorOf = (c?: string) => (c ? (PALETTE.find((p) => p[0] === c)?.[2] ?? (/^#[0-9a-f]{3,8}$/i.test(c) ? c : null)) : null);
+const INK_TEXT = "✏️ Drawing — open this canvas in Marrow to see it.";
+const isInk = (n: CNode) => n.type === "text" && !!n.ink && typeof n.ink === "object" && typeof n.ink.points === "string";
+const isShape = (n: CNode) => n.type === "text" && (n.shape === "rect" || n.shape === "ellipse" || n.shape === "diamond");
+const svgEl = (tag: string, attrs: Record<string, string | number>) => {
+  const el = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+  return el;
+};
+const TOOLS: [Tool, string, string, string][] = [
+  ["select", "cursor", "Select and move", "V"],
+  ["text", "text-t", "Text card", "T"],
+  ["rect", "square", "Rectangle", "R"],
+  ["ellipse", "circle", "Ellipse", "O"],
+  ["diamond", "diamond", "Diamond", "D"],
+  ["arrow", "arrow-up-right", "Arrow", "A"],
+  ["pen", "pencil-simple", "Pen", "P"],
+];
+const PEN_SIZES = [2, 4, 8];
 const newId = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, "0")).join("");
 
 export class CanvasView {
@@ -70,6 +123,17 @@ export class CanvasView {
   private views = new Map<string, { k: number; tx: number; ty: number }>();
   private selected = new Set<string>();
   private selectedEdge: string | null = null;
+  private tool: Tool = "select";
+  private color: string | undefined;
+  private penSize = 4;
+  /** Undo: the canvas as JSON before each change, and after undoing. */
+  private past: string[] = [];
+  private future: string[] = [];
+  private base = "";
+  private lastRecord = 0;
+  private edgeClick = 0;
+  private toolbar: HTMLElement;
+  private draftG: SVGGElement;
 
   private world: HTMLElement;
   private edgesSvg: SVGSVGElement;
@@ -81,6 +145,7 @@ export class CanvasView {
     | { kind: "move"; x: number; y: number; moved: boolean; start: Map<string, { x: number; y: number }> }
     | { kind: "resize"; id: string; x: number; y: number; w: number; h: number }
     | { kind: "connect"; from: string; x: number; y: number; target: string | null }
+    | { kind: "draw"; tool: ShapeKind | "arrow" | "pen"; pts: { x: number; y: number }[]; x: number; y: number }
     | null = null;
 
   constructor(
@@ -94,7 +159,10 @@ export class CanvasView {
     this.edgesSvg.setAttribute("height", "1");
     this.edgesSvg.innerHTML =
       '<defs><marker id="cv-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:color-mix(in srgb,var(--color-text) 55%,transparent)"/></marker></defs>';
+    this.draftG = svgEl("g", { class: "draw-draft" }) as SVGGElement;
+    this.edgesSvg.append(this.draftG);
     this.world.append(this.edgesSvg);
+    this.toolbar = this.makeToolbar();
     this.nameEl = h("div.name");
     this.zoomLabel = h("span");
     host.append(
@@ -104,13 +172,9 @@ export class CanvasView {
         null,
         h("div.smallcaps", null, "Canvas"),
         this.nameEl,
-        h("div.canvas-hint", null, "Drag cards to arrange · double-click a note to open it · drop notes here from the sidebar"),
+        h("div.canvas-hint", null, "Drag cards to arrange · double-click a note to open it · drop notes here from the sidebar · draw with the tools below"),
       ),
-      h(
-        "div.canvas-tools",
-        null,
-        h("button.btn.btn-secondary", { onclick: () => this.addText() }, icon("text-t"), "Add text card"),
-      ),
+      this.toolbar,
       h(
         "div.canvas-zoom",
         null,
@@ -134,6 +198,7 @@ export class CanvasView {
     this.path = path;
     this.lastSaved = text;
     this.data = parse(text);
+    this.resetUndo();
     this.selected.clear();
     this.selectedEdge = null;
     this.nameEl.textContent = displayName(path);
@@ -152,6 +217,7 @@ export class CanvasView {
     if (text === null || text === this.lastSaved) return;
     this.lastSaved = text;
     this.data = parse(text);
+    this.resetUndo();
     this.renderAll();
   }
 
@@ -161,8 +227,58 @@ export class CanvasView {
   }
 
   private changed() {
+    this.record();
+    this.scheduleSave();
+  }
+
+  private scheduleSave() {
     window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => void this.flush(), 600);
+  }
+
+  // ------------------------------------------------------------------ undo
+
+  private resetUndo() {
+    this.past = [];
+    this.future = [];
+    this.base = JSON.stringify(this.data);
+  }
+
+  /** Remembers the state before this change (quick runs of changes count as one). */
+  private record() {
+    const now = JSON.stringify(this.data);
+    if (now === this.base) return;
+    if (Date.now() - this.lastRecord > 800 || this.past.length === 0) {
+      this.past.push(this.base);
+      if (this.past.length > 100) this.past.shift();
+    }
+    this.lastRecord = Date.now();
+    this.base = now;
+    this.future = [];
+  }
+
+  undo() {
+    const prev = this.past.pop();
+    if (prev === undefined) return;
+    this.future.push(this.base);
+    this.restore(prev);
+  }
+
+  redo() {
+    const next = this.future.pop();
+    if (next === undefined) return;
+    this.past.push(this.base);
+    this.restore(next);
+  }
+
+  private restore(json: string) {
+    this.base = json;
+    this.lastRecord = 0;
+    this.data = parse(json);
+    this.selected.clear();
+    this.selectedEdge = null;
+    this.renderAll();
+    this.scheduleSave();
   }
 
   async flush() {
@@ -199,7 +315,11 @@ export class CanvasView {
 
   private card(n: CNode): HTMLElement {
     let el: HTMLElement;
-    if (n.type === "text") {
+    if (isInk(n)) {
+      el = this.inkCard(n);
+    } else if (isShape(n)) {
+      el = this.shapeCard(n);
+    } else if (n.type === "text") {
       const ta = h("textarea", { spellcheck: false, placeholder: "Write something…" }) as HTMLTextAreaElement;
       ta.value = n.text ?? "";
       ta.addEventListener("input", () => {
@@ -251,7 +371,10 @@ export class CanvasView {
     }
     el.dataset.id = n.id;
     this.place(el, n);
-    if (n.type !== "group") el.append(h("div.card-handle", { title: "Drag to another card to connect" }));
+    const c = colorOf(n.color);
+    if (c) el.style.setProperty("--c", c);
+    el.classList.toggle("has-color", !!c);
+    if (n.type !== "group" && !isInk(n)) el.append(h("div.card-handle", { title: "Drag to another card to connect" }));
     el.append(h("div.card-resize"));
     el.classList.toggle("is-selected", this.selected.has(n.id));
     this.cards.set(n.id, el);
@@ -268,6 +391,66 @@ export class CanvasView {
     if (ex) ex.style.setProperty("-webkit-line-clamp", String(Math.max(1, Math.floor((n.height - 84) / 21))));
   }
 
+  /** A rectangle, ellipse or diamond with a label (double-click to edit it). */
+  private shapeCard(n: CNode): HTMLElement {
+    const svg = svgEl("svg", { class: "shape-svg", viewBox: "0 0 100 100", preserveAspectRatio: "none" });
+    const attrs = { class: "shape-fill", "vector-effect": "non-scaling-stroke" };
+    svg.append(
+      n.shape === "ellipse"
+        ? svgEl("ellipse", { ...attrs, cx: 50, cy: 50, rx: 49, ry: 49 })
+        : n.shape === "diamond"
+          ? svgEl("polygon", { ...attrs, points: "50,1 99,50 50,99 1,50" })
+          : svgEl("rect", { ...attrs, x: 1, y: 1, width: 98, height: 98, rx: 4, ry: 4 }),
+    );
+    const label = h("div.shape-label", { spellcheck: false });
+    label.textContent = n.text ?? "";
+    label.addEventListener("input", () => {
+      n.text = label.innerText.replace(/\n$/, "");
+      this.changed();
+    });
+    label.addEventListener("pointerdown", (e) => {
+      if (label.isContentEditable) e.stopPropagation();
+    });
+    label.addEventListener("keydown", (e) => {
+      e.stopPropagation(); // typing, not tool shortcuts
+      if (e.key === "Escape" || (e.key === "Enter" && (e.ctrlKey || e.metaKey))) {
+        e.preventDefault();
+        label.blur();
+        this.host.focus({ preventScroll: true });
+      }
+    });
+    label.addEventListener("blur", () => {
+      label.contentEditable = "false";
+      window.getSelection()?.removeAllRanges();
+    });
+    return h("div.card.card-shape", { dataset: { shape: n.shape ?? "rect" } }, svg, label);
+  }
+
+  private editLabel(id: string) {
+    const label = this.cards.get(id)?.querySelector<HTMLElement>(".shape-label");
+    if (!label) return;
+    try {
+      label.contentEditable = "plaintext-only";
+    } catch {
+      label.contentEditable = "true";
+    }
+    label.focus();
+    const r = document.createRange();
+    r.selectNodeContents(label);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(r);
+  }
+
+  /** A pen stroke or an arrow, drawn in its own box. */
+  private inkCard(n: CNode): HTMLElement {
+    const ink = n.ink!;
+    const svg = svgEl("svg", { class: "ink-svg", viewBox: `0 0 ${ink.w} ${ink.h}`, preserveAspectRatio: "none" });
+    const d = inkPath(ink);
+    svg.append(svgEl("path", { class: "ink-line", d, "stroke-width": ink.size }), svgEl("path", { class: "ink-hit", d }));
+    return h("div.card.card-ink", null, svg);
+  }
+
   private assetUrl(path: string) {
     const root = this.app.vaultRoot();
     const sep = root.includes("\\") ? "\\" : "/";
@@ -280,7 +463,7 @@ export class CanvasView {
 
   private renderEdges(draft?: { from: CNode; x: number; y: number }) {
     const svg = this.edgesSvg;
-    for (const el of [...svg.querySelectorAll("path, text")]) el.remove();
+    for (const el of [...svg.querySelectorAll(":scope > path, :scope > text")]) el.remove();
     const mk = (d: string, cls: string, edge?: CEdge) => {
       const p = document.createElementNS(SVGNS, "path");
       p.setAttribute("d", d);
@@ -288,9 +471,12 @@ export class CanvasView {
       if (edge) {
         const from = this.node(edge.fromNode);
         const to = this.node(edge.toNode);
-        if (from?.type === "text" || to?.type === "text") p.setAttribute("stroke-dasharray", "5 5");
+        const plainText = (n?: CNode) => n?.type === "text" && !isShape(n);
+        if (plainText(from) || plainText(to)) p.setAttribute("stroke-dasharray", "5 5");
         if ((edge.toEnd ?? "arrow") === "arrow") p.setAttribute("marker-end", "url(#cv-arrow)");
         if (edge.fromEnd === "arrow") p.setAttribute("marker-start", "url(#cv-arrow)");
+        const c = colorOf(edge.color);
+        if (c && cls !== "sel") p.style.stroke = c;
       }
       svg.append(p);
       return p;
@@ -304,9 +490,17 @@ export class CanvasView {
       const d = curve(anchor(a, fs), fs, anchor(b, ts), ts);
       mk(d, e.id === this.selectedEdge ? "sel" : "", e);
       const hit = mk(d, "hit");
+      hit.dataset.edge = e.id;
       hit.addEventListener("pointerdown", (ev) => {
         ev.stopPropagation();
-        this.selectEdge(e.id);
+        // A second click on the same arrow edits its label (the arrow is
+        // redrawn on the first click, so dblclick wouldn't reach it).
+        const again = this.selectedEdge === e.id && Date.now() - this.edgeClick < 450;
+        this.edgeClick = Date.now();
+        if (again) {
+          ev.preventDefault();
+          this.editEdgeLabel(e.id);
+        } else if (this.selectedEdge !== e.id) this.selectEdge(e.id);
       });
       if (e.label) {
         const m = mid(anchor(a, fs), anchor(b, ts));
@@ -316,7 +510,7 @@ export class CanvasView {
         t.setAttribute("text-anchor", "middle");
         t.setAttribute("style", "font-size:13px;fill:var(--color-text);paint-order:stroke;stroke:var(--color-bg);stroke-width:4px");
         t.textContent = e.label;
-        svg.append(t);
+        svg.insertBefore(t, this.draftG);
       }
     }
     if (draft) {
@@ -372,6 +566,91 @@ export class CanvasView {
     return { x: (cx - r.left - this.tx) / this.k, y: (cy - r.top - this.ty) / this.k };
   }
 
+  // ---------------------------------------------------------------- toolbar
+
+  private makeToolbar(): HTMLElement {
+    const tools = TOOLS.map(([t, ic, label, key]) =>
+      h("button.cv-tool", { type: "button", title: `${label} (${key})`, dataset: { tool: t }, onclick: () => this.setTool(t) }, icon(ic)),
+    );
+    const swatches = [
+      h("button.cv-swatch.is-none", { type: "button", title: "No colour", dataset: { color: "" }, onclick: () => this.setColor(undefined) }),
+      ...PALETTE.map(([id, name, hex]) =>
+        h("button.cv-swatch", { type: "button", title: name, dataset: { color: id }, style: `--sw:${hex}`, onclick: () => this.setColor(id) }),
+      ),
+    ];
+    const sizes = PEN_SIZES.map((sz) =>
+      h(
+        "button.cv-size",
+        { type: "button", title: `Line ${sz === 2 ? "thin" : sz === 4 ? "medium" : "thick"}`, dataset: { size: String(sz) }, onclick: () => this.setPenSize(sz) },
+        h("span", { style: `width:${sz + 3}px;height:${sz + 3}px` }),
+      ),
+    );
+    const bar = h(
+      "div.canvas-tools",
+      null,
+      h("div.cv-bar", null, ...tools),
+      h("div.cv-bar", null, ...swatches, h("span.cv-pen-sizes", null, h("span.cv-sep"), ...sizes)),
+      h(
+        "div.cv-bar",
+        null,
+        h("button.cv-tool", { type: "button", title: "Undo (Ctrl+Z)", onclick: () => this.undo() }, icon("arrow-counter-clockwise")),
+        h("button.cv-tool", { type: "button", title: "Redo (Ctrl+Shift+Z)", onclick: () => this.redo() }, icon("arrow-clockwise")),
+      ),
+    );
+    queueMicrotask(() => this.syncToolbar());
+    return bar;
+  }
+
+  private syncToolbar() {
+    for (const b of this.toolbar.querySelectorAll<HTMLElement>(".cv-tool[data-tool]")) b.classList.toggle("is-on", b.dataset.tool === this.tool);
+    // The swatch shows the selection's colour, or the colour for new drawings.
+    const first = [...this.selected].map((id) => this.node(id)).find(Boolean);
+    const edge = this.selectedEdge ? this.data.edges.find((e) => e.id === this.selectedEdge) : undefined;
+    const shown = first ? (first.color ?? "") : edge ? (edge.color ?? "") : (this.color ?? "");
+    for (const b of this.toolbar.querySelectorAll<HTMLElement>(".cv-swatch")) b.classList.toggle("is-on", b.dataset.color === shown);
+    for (const b of this.toolbar.querySelectorAll<HTMLElement>(".cv-size")) b.classList.toggle("is-on", Number(b.dataset.size) === this.penSize);
+    this.toolbar.classList.toggle("is-pen", this.tool === "pen");
+    for (const t of TOOLS) this.host.classList.toggle(`tool-${t[0]}`, t[0] === this.tool);
+  }
+
+  setTool(t: Tool) {
+    this.tool = t;
+    this.syncToolbar();
+  }
+
+  private setPenSize(sz: number) {
+    this.penSize = sz;
+    this.setTool("pen");
+  }
+
+  /** Colours what's selected, and what's drawn next. */
+  private setColor(c: string | undefined) {
+    this.color = c;
+    let touched = false;
+    for (const id of this.selected) {
+      const n = this.node(id);
+      if (!n) continue;
+      if (c) n.color = c;
+      else delete n.color;
+      touched = true;
+    }
+    const edge = this.selectedEdge ? this.data.edges.find((e) => e.id === this.selectedEdge) : undefined;
+    if (edge) {
+      if (c) edge.color = c;
+      else delete edge.color;
+      touched = true;
+    }
+    if (touched) {
+      const keep = [...this.selected];
+      const keepEdge = this.selectedEdge;
+      this.renderAll();
+      if (keepEdge) this.selectEdge(keepEdge);
+      else this.select(keep);
+      this.changed();
+    }
+    this.syncToolbar();
+  }
+
   // ---------------------------------------------------------------- editing
 
   addText(at?: { x: number; y: number }) {
@@ -407,6 +686,7 @@ export class CanvasView {
     this.selectedEdge = null;
     for (const [id, el] of this.cards) el.classList.toggle("is-selected", this.selected.has(id));
     this.renderEdges();
+    this.syncToolbar();
   }
 
   private selectEdge(id: string) {
@@ -414,6 +694,116 @@ export class CanvasView {
     for (const el of this.cards.values()) el.classList.remove("is-selected");
     this.selectedEdge = id;
     this.renderEdges();
+    this.syncToolbar();
+  }
+
+  private selectAll() {
+    this.select(this.data.nodes.map((n) => n.id));
+  }
+
+  /** Finishes a shape, an arrow or a pen stroke. */
+  private finishDrawing(tool: ShapeKind | "arrow" | "pen", pts: { x: number; y: number }[]) {
+    this.draftG.replaceChildren();
+    const a = pts[0];
+    const b = pts[pts.length - 1];
+    let n: CNode | null = null;
+    if (tool === "pen" || tool === "arrow") {
+      let ps = tool === "arrow" ? [a, b] : simplify(pts, 0.8 / this.k);
+      if (tool === "arrow" && Math.hypot(b.x - a.x, b.y - a.y) < 8) return;
+      if (ps.length === 1) ps = [ps[0], { x: ps[0].x + 0.5, y: ps[0].y + 0.5 }];
+      const size = tool === "arrow" ? 2.5 : this.penSize;
+      const pad = size + (tool === "arrow" ? 12 : 4);
+      const x0 = Math.min(...ps.map((p) => p.x)) - pad;
+      const y0 = Math.min(...ps.map((p) => p.y)) - pad;
+      const w = Math.max(...ps.map((p) => p.x)) + pad - x0;
+      const hgt = Math.max(...ps.map((p) => p.y)) + pad - y0;
+      const r = (v: number) => Math.round(v * 10) / 10;
+      n = {
+        id: newId(),
+        type: "text",
+        text: INK_TEXT,
+        x: Math.round(x0),
+        y: Math.round(y0),
+        width: Math.max(1, Math.round(w)),
+        height: Math.max(1, Math.round(hgt)),
+        ink: {
+          w: Math.max(1, Math.round(w)),
+          h: Math.max(1, Math.round(hgt)),
+          size,
+          points: ps.map((p) => `${r(p.x - Math.round(x0))},${r(p.y - Math.round(y0))}`).join(" "),
+          ...(tool === "arrow" ? { arrow: true } : {}),
+        },
+      };
+    } else {
+      const small = Math.abs(b.x - a.x) < 8 && Math.abs(b.y - a.y) < 8;
+      const box = small
+        ? { x: a.x - 80, y: a.y - 50, w: 160, h: 100 }
+        : { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
+      n = { id: newId(), type: "text", text: "", shape: tool, x: Math.round(box.x), y: Math.round(box.y), width: Math.max(40, Math.round(box.w)), height: Math.max(30, Math.round(box.h)) };
+    }
+    if (this.color) n.color = this.color;
+    this.data.nodes.push(n);
+    this.world.append(this.card(n));
+    this.changed();
+    if (tool === "pen") return; // keep drawing
+    this.select([n.id]);
+    this.setTool("select");
+    if (isShape(n)) requestAnimationFrame(() => this.editLabel(n!.id));
+  }
+
+  private drawDraft(tool: ShapeKind | "arrow" | "pen", pts: { x: number; y: number }[]) {
+    const a = pts[0];
+    const b = pts[pts.length - 1];
+    const c = colorOf(this.color) ?? "";
+    let el: SVGElement;
+    if (tool === "pen") {
+      el = svgEl("path", { d: smooth(pts), class: "ink-draft", "stroke-width": this.penSize });
+    } else if (tool === "arrow") {
+      el = svgEl("path", { d: arrowPath(a, b, 2.5), class: "ink-draft", "stroke-width": 2.5 });
+    } else {
+      const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y), w = Math.abs(b.x - a.x), hh = Math.abs(b.y - a.y);
+      el =
+        tool === "ellipse"
+          ? svgEl("ellipse", { cx: x + w / 2, cy: y + hh / 2, rx: w / 2, ry: hh / 2, class: "shape-draft" })
+          : tool === "diamond"
+            ? svgEl("polygon", { points: `${x + w / 2},${y} ${x + w},${y + hh / 2} ${x + w / 2},${y + hh} ${x},${y + hh / 2}`, class: "shape-draft" })
+            : svgEl("rect", { x, y, width: w, height: hh, rx: 4, class: "shape-draft" });
+    }
+    if (c) el.style.stroke = c;
+    this.draftG.replaceChildren(el);
+  }
+
+  /** A label on an arrow between cards: a box at its middle. */
+  private editEdgeLabel(id: string) {
+    const e = this.data.edges.find((x) => x.id === id);
+    const a = e && this.node(e.fromNode);
+    const b = e && this.node(e.toNode);
+    if (!e || !a || !b) return;
+    const m = mid(anchor(a, e.fromSide ?? bestSide(a, b)), anchor(b, e.toSide ?? bestSide(b, a)));
+    const input = h("input.cv-edge-input", { value: e.label ?? "", placeholder: "Label", spellcheck: false, style: `left:${m.x}px;top:${m.y}px` }) as HTMLInputElement;
+    let done = false;
+    const finish = (save: boolean) => {
+      if (done) return;
+      done = true;
+      input.remove();
+      if (save && input.value.trim() !== (e.label ?? "")) {
+        if (input.value.trim()) e.label = input.value.trim();
+        else delete e.label;
+        this.renderEdges();
+        this.changed();
+      }
+      this.host.focus({ preventScroll: true });
+    };
+    input.addEventListener("keydown", (ev) => {
+      ev.stopPropagation();
+      if (ev.key === "Enter") finish(true);
+      else if (ev.key === "Escape") finish(false);
+    });
+    input.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    input.addEventListener("blur", () => finish(true));
+    this.world.append(input);
+    input.focus();
+    input.select();
   }
 
   private deleteSelection() {
@@ -442,8 +832,21 @@ export class CanvasView {
       if (e.button !== 0) return;
       const t = e.target as HTMLElement;
       if (t.closest(".canvas-tools, .canvas-zoom, a")) return;
-      const cardEl = t.closest<HTMLElement>(".card");
       host.focus({ preventScroll: true });
+      if (this.tool !== "select") {
+        const w = this.toWorld(e.clientX, e.clientY);
+        if (this.tool === "text") {
+          this.addText(w);
+          this.setTool("select");
+        } else {
+          this.select([]);
+          this.drag = { kind: "draw", tool: this.tool, pts: [w], x: e.clientX, y: e.clientY };
+          host.setPointerCapture(e.pointerId);
+        }
+        e.preventDefault();
+        return;
+      }
+      const cardEl = t.closest<HTMLElement>(".card");
       if (!cardEl) {
         this.select([]);
         this.drag = { kind: "pan", x: e.clientX, y: e.clientY, moved: false };
@@ -478,6 +881,16 @@ export class CanvasView {
       if (!d) return;
       const dx = e.clientX - d.x;
       const dy = e.clientY - d.y;
+      if (d.kind === "draw") {
+        const w = this.toWorld(e.clientX, e.clientY);
+        const last = d.pts[d.pts.length - 1];
+        if (d.tool === "pen") {
+          if (Math.hypot(w.x - last.x, w.y - last.y) * this.k < 1.5) return;
+          d.pts.push(w);
+        } else d.pts[1] = w;
+        this.drawDraft(d.tool, d.pts);
+        return;
+      }
       if (d.kind === "pan") {
         this.tx += dx;
         this.ty += dy;
@@ -501,8 +914,9 @@ export class CanvasView {
         this.renderEdges();
       } else if (d.kind === "resize") {
         const n = this.node(d.id)!;
-        n.width = Math.max(140, Math.round(d.w + dx / this.k));
-        n.height = Math.max(70, Math.round(d.h + dy / this.k));
+        const [minW, minH] = isInk(n) ? [8, 8] : isShape(n) ? [40, 30] : [140, 70];
+        n.width = Math.max(minW, Math.round(d.w + dx / this.k));
+        n.height = Math.max(minH, Math.round(d.h + dy / this.k));
         this.place(this.cards.get(d.id)!, n);
         this.renderEdges();
       } else if (d.kind === "connect") {
@@ -522,6 +936,10 @@ export class CanvasView {
       this.drag = null;
       host.classList.remove("is-panning");
       if (!d) return;
+      if (d.kind === "draw") {
+        this.finishDrawing(d.tool, d.pts);
+        return;
+      }
       if (d.kind === "move") {
         for (const id of d.start.keys()) this.cards.get(id)?.classList.remove("is-dragging");
         if (d.moved) this.changed();
@@ -562,25 +980,61 @@ export class CanvasView {
     host.addEventListener("dblclick", (e) => {
       // Pointer capture retargets clicks to the host; look at what's really there.
       const t = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null) ?? (e.target as HTMLElement);
-      if (t.closest(".canvas-tools, .canvas-zoom")) return;
+      if (t.closest(".canvas-tools, .canvas-zoom, input, textarea, [contenteditable='true'], [contenteditable='plaintext-only']")) return;
+      if (this.tool !== "select") return;
+      const edgeId = (t.closest("[data-edge]") as HTMLElement | null)?.dataset.edge;
+      if (edgeId) {
+        this.editEdgeLabel(edgeId);
+        return;
+      }
       const cardEl = t.closest<HTMLElement>(".card");
       if (!cardEl) {
         this.addText(this.toWorld(e.clientX, e.clientY));
         return;
       }
       const n = this.node(cardEl.dataset.id!);
+      if (n && isShape(n)) {
+        this.select([n.id]);
+        this.editLabel(n.id);
+        return;
+      }
       if (n?.type === "file" && n.file && /\.(md|canvas)$/i.test(n.file)) this.app.openPath(n.file, e.ctrlKey || e.metaKey);
     });
     host.addEventListener("keydown", (e) => {
-      if ((e.target as HTMLElement).closest("textarea, input")) {
+      if ((e.target as HTMLElement).closest("textarea, input") || (e.target as HTMLElement).isContentEditable) {
         if (e.key === "Escape") host.focus({ preventScroll: true }); // keeps the card selected
         return;
       }
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         this.deleteSelection();
       } else if (e.key === "Escape") {
-        this.select([]);
+        if (this.tool !== "select") this.setTool("select");
+        else this.select([]);
+      } else if (mod && key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) this.redo();
+        else this.undo();
+      } else if (mod && key === "y") {
+        e.preventDefault();
+        this.redo();
+      } else if (mod && key === "a") {
+        e.preventDefault();
+        this.selectAll();
+      } else if (e.key === "Enter" && this.selected.size === 1) {
+        const n = this.node([...this.selected][0]);
+        if (n && isShape(n)) {
+          e.preventDefault();
+          this.editLabel(n.id);
+        }
+      } else if (!mod && !e.altKey) {
+        const t = TOOLS.find((x) => x[3].toLowerCase() === key);
+        if (t) {
+          e.preventDefault();
+          this.setTool(t[0]);
+        }
       }
     });
     host.addEventListener("dragover", (e) => {
@@ -652,3 +1106,54 @@ function curve(a: { x: number; y: number }, as: Side, b: { x: number; y: number 
 }
 
 const mid = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+/** Drops points that barely change the line (Ramer–Douglas–Peucker). */
+function simplify(pts: { x: number; y: number }[], eps: number): { x: number; y: number }[] {
+  if (pts.length < 3) return pts;
+  const [a, b] = [pts[0], pts[pts.length - 1]];
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  let far = 0;
+  let at = 0;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p = pts[i];
+    const d = Math.abs((b.y - a.y) * p.x - (b.x - a.x) * p.y + b.x * a.y - b.y * a.x) / len;
+    if (d > far) {
+      far = d;
+      at = i;
+    }
+  }
+  if (far <= eps) return [a, b];
+  return [...simplify(pts.slice(0, at + 1), eps).slice(0, -1), ...simplify(pts.slice(at), eps)];
+}
+
+/** A smooth line through the points (curves between midpoints). */
+function smooth(pts: { x: number; y: number }[]): string {
+  if (pts.length === 0) return "";
+  if (pts.length < 3) return `M${pts[0].x},${pts[0].y} ` + pts.slice(1).map((p) => `L${p.x},${p.y}`).join(" ");
+  let d = `M${pts[0].x},${pts[0].y}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const m = mid(pts[i], pts[i + 1]);
+    d += ` Q${pts[i].x},${pts[i].y} ${m.x},${m.y}`;
+  }
+  const last = pts[pts.length - 1];
+  return d + ` L${last.x},${last.y}`;
+}
+
+/** A straight arrow from a to b, with its head drawn as two short lines. */
+function arrowPath(a: { x: number; y: number }, b: { x: number; y: number }, size: number): string {
+  const ang = Math.atan2(b.y - a.y, b.x - a.x);
+  const l = Math.max(12, size * 5);
+  const p = (t: number) => `${b.x - l * Math.cos(ang + t)},${b.y - l * Math.sin(ang + t)}`;
+  return `M${a.x},${a.y} L${b.x},${b.y} M${p(0.45)} L${b.x},${b.y} L${p(-0.45)}`;
+}
+
+function inkPath(ink: Ink): string {
+  const pts = ink.points
+    .trim()
+    .split(/\s+/)
+    .map((pair) => pair.split(",").map(Number))
+    .filter((p) => p.length === 2 && p.every(Number.isFinite))
+    .map(([x, y]) => ({ x, y }));
+  if (pts.length === 0) return "";
+  return ink.arrow && pts.length >= 2 ? arrowPath(pts[0], pts[pts.length - 1], ink.size) : smooth(pts);
+}
