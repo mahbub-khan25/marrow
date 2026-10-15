@@ -183,6 +183,27 @@ space in the file tree) brings notes in from:
 Everything goes into a new folder (“Notion”, “Evernote”…); the files you
 pick are only read.
 
+## Publish as a website
+
+Right-click a folder (or the empty space in the file tree, for the whole
+vault) → **Publish as a website…**, or use the command palette.
+
+* Pick a site title and an empty folder outside the vault. Marrow writes
+  one page per note, with working links, images, maths, diagrams, code
+  colours, callouts and embedded sections, plus a sidebar of pages,
+  "Linked from" lists, a search box (press `/`) and a phone-friendly menu.
+* A note called *Index*, *Home*, *README* or *Welcome* at the top becomes
+  the home page; otherwise the home page lists every page.
+* Left out: locked notes, notes with `publish: false` in their properties,
+  and — if you tick *Only notes marked publish: true* — every note without
+  that property. Links to notes that aren't published stay as plain words.
+* Publish again to update the site; pages for notes you removed are deleted
+  from it. Marrow only ever removes files it wrote.
+* Nothing is uploaded. To put it online, drag the folder onto Cloudflare
+  Pages or Netlify ("deploy manually"), or push it to a GitHub Pages repo.
+  Search needs the site to be served from a web address; everything else
+  also works when you open `index.html` straight from the folder.
+
 ## AI (bring your own)
 
 Marrow has no AI of its own and sends nothing anywhere until you connect one in

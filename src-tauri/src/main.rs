@@ -7,6 +7,7 @@ mod import;
 mod locks;
 mod commands;
 mod portable;
+mod publish;
 mod recall;
 mod sync;
 
@@ -51,6 +52,11 @@ fn main() {
             locks::lock_folder,
             locks::remove_lock,
             locks::lock_now,
+            publish::site_begin,
+            publish::site_write,
+            publish::site_copy,
+            publish::site_finish,
+            publish::site_open,
             commands::write_note,
             commands::backup_for,
             commands::discard_backup,

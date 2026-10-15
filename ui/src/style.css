@@ -1973,3 +1973,11 @@ body.block-dragging, body.block-dragging * { cursor: grabbing !important; user-s
   font-size: 13px; color: var(--ink-78); background: var(--color-surface); border: 1px solid var(--color-divider);
 }
 .lock-chip > i { font-size: 13px; }
+
+/* ------------------------------------------------------------- publishing */
+
+.pub-row { display: flex; gap: 8px; }
+.pub-row .input { flex: 1; min-width: 0; }
+.pub-check { display: flex; align-items: center; gap: 6px; font-size: 15px; }
+.pub-check code { font-size: 13px; }
+.pub-note { margin: -8px 0 0; }
