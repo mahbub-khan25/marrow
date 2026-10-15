@@ -21,6 +21,7 @@
 //! | `history` | earlier versions of each note, thinned out over time       |
 //! | `import`  | Notion, Evernote, Word/OneNote and web pages into notes      |
 //! | `vectors` | embeddings of note chunks, for search by meaning             |
+//! | `lock`    | password-locked notes (Argon2id + XChaCha20-Poly1305)        |
 
 pub mod backup;
 pub mod cache;
@@ -31,6 +32,7 @@ pub mod error;
 pub mod history;
 pub mod import;
 pub mod links;
+pub mod lock;
 pub mod merge;
 pub mod mirror;
 pub mod parse;

@@ -20,6 +20,8 @@ export interface Prefs {
   wordGoal: 0 | 250 | 500 | 1000 | 2000;
   /** System-wide quick-capture shortcut ("" = off). */
   captureKey: "" | "CommandOrControl+Alt+N" | "CommandOrControl+Alt+Space" | "CommandOrControl+Shift+Space";
+  /** Lock unlocked notes again after this many idle minutes (0: when Marrow closes). */
+  lockAfter: 0 | 5 | 15 | 60;
 }
 
 const DEFAULTS: Prefs = {
@@ -33,6 +35,7 @@ const DEFAULTS: Prefs = {
   toolbar: true,
   wordGoal: 0,
   captureKey: "CommandOrControl+Alt+N",
+  lockAfter: 15,
 };
 
 export const prefs: Prefs = { ...DEFAULTS, ...storage<Partial<Prefs>>("marrow.prefs", {}) };

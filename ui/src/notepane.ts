@@ -9,6 +9,7 @@ import type { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
 import { api, displayName, parentOf, type NoteInfo } from "./api";
+import { isLockedNote, lockedFolderOf } from "./lock";
 import { ATTACHMENT_FOLDER, draggingFiles, filesIn, pasteClipboardImage, saveFiles } from "./attach";
 import { CALLOUTS } from "./callouts";
 import { anyDocChanged, Doc, edit, findDoc, replaceText, type Origin } from "./docs";
@@ -983,6 +984,16 @@ export class NotePane {
       .filter(Boolean)
       .join(" · ");
     parts.push(h("span.stats", null, stats));
+    if (isLockedNote(doc.path) || lockedFolderOf(doc.path) !== null) {
+      parts.unshift(
+        h(
+          "span.lock-chip",
+          { title: "Locked with a password: this note is encrypted on disk. Use “Lock all notes now” (Ctrl+K) to close it until the password is entered again." },
+          icon("lock-simple"),
+          "Locked",
+        ),
+      );
+    }
     this.meta.replaceChildren(...parts);
   }
 
@@ -1151,7 +1162,17 @@ export class NotePane {
         box.replaceWith(h("p.embed-missing", null, `Missing note: ${target}`));
         continue;
       }
-      const text = findDoc(path)?.text ?? (await api.readNote(path).catch(() => null));
+      let locked = false;
+      const text =
+        findDoc(path)?.text ??
+        (await api.readNote(path).catch((e) => {
+          locked = String(e) === "LOCKED";
+          return null;
+        }));
+      if (locked) {
+        box.replaceWith(h("p.embed-missing", null, icon("lock-simple"), ` ${displayName(path)} is locked.`));
+        continue;
+      }
       if (text === null) continue;
       const range = embedRange(text, sub);
       if (!range) {

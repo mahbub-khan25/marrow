@@ -185,9 +185,10 @@ pub fn tree(state: State<AppState>) -> CmdResult<TreeNode> {
 // --------------------------------------------------------------- notes
 
 #[tauri::command]
-pub fn read_note(state: State<AppState>, path: String) -> CmdResult<String> {
+pub fn read_note(state: State<AppState>, locks: State<crate::locks::Locks>, path: String) -> CmdResult<String> {
     let p = vp(&path)?;
-    with_engine(&state, |e| e.read_note(&p).map_err(err))
+    let text = with_engine(&state, |e| e.read_note(&p).map_err(err))?;
+    crate::locks::reveal(&locks, text)
 }
 
 /// A new version is kept at most this often while a note is being edited.
@@ -197,6 +198,7 @@ const HISTORY_GAP_MS: i64 = 5 * 60 * 1000;
 pub fn write_note(
     app: AppHandle,
     state: State<AppState>,
+    locks: State<crate::locks::Locks>,
     path: String,
     text: String,
     expected: Option<String>,
@@ -205,17 +207,18 @@ pub fn write_note(
     let backups = backup_store(&app)?;
     let result = with_engine(&state, |e| {
         let root = e.vault().root().to_path_buf();
+        let disk = e.read_note(&p).ok();
         // Refuse to overwrite a version we haven't seen: another app may have
         // written in the moment before the watcher told us.
-        if let Some(expected) = &expected {
-            if let Ok(current) = e.read_note(&p) {
-                if &current != expected {
-                    return Err(CHANGED_ON_DISK.to_string());
-                }
+        if let (Some(expected), Some(current)) = (&expected, &disk) {
+            if &crate::locks::reveal(&locks, current.clone())? != expected {
+                return Err(CHANGED_ON_DISK.to_string());
             }
         }
+        // A locked note (or one in a locked folder) is written sealed.
+        let text = crate::locks::conceal(&locks, &root, p.as_str(), disk.as_deref(), &text)?;
         // Keep the text being replaced as a version, every few minutes at most.
-        if let Ok(old) = e.read_note(&p) {
+        if let Some(old) = disk {
             let h = marrow_core::history::History::for_vault(&root);
             let _ = h.before_save(p.as_str(), &old, &text, marrow_core::history::now_ms(), HISTORY_GAP_MS);
         }
@@ -273,10 +276,16 @@ fn backup_store(app: &AppHandle) -> CmdResult<BackupStore> {
 pub fn backup_for(
     app: AppHandle,
     state: State<AppState>,
+    locks: State<crate::locks::Locks>,
     path: String,
 ) -> CmdResult<Option<Backup>> {
     let store = backup_store(&app)?;
-    with_engine(&state, |e| Ok(store.get(e.vault().root(), &path)))
+    let found = with_engine(&state, |e| Ok(store.get(e.vault().root(), &path)))?;
+    // A locked note's backup is sealed; offer it only when it can be read.
+    Ok(found.and_then(|mut b| {
+        b.text = crate::locks::reveal(&locks, std::mem::take(&mut b.text)).ok()?;
+        Some(b)
+    }))
 }
 
 #[tauri::command]
@@ -399,6 +408,7 @@ pub fn rename(
         let result = e.rename_with_links(&from, &to).map_err(err)?;
         backup_store(&app)?.rename(e.vault().root(), from.as_str(), to.as_str());
         let _ = marrow_core::history::History::for_vault(e.vault().root()).moved(from.as_str(), to.as_str());
+        crate::locks::moved(e.vault().root(), from.as_str(), to.as_str());
         Ok(result)
     })?;
     emit_events(&app, events, None);
@@ -432,6 +442,7 @@ pub fn move_path(
         let result = e.rename_with_links(&from, &to).map_err(err)?;
         backup_store(&app)?.rename(e.vault().root(), from.as_str(), to.as_str());
         let _ = marrow_core::history::History::for_vault(e.vault().root()).moved(from.as_str(), to.as_str());
+        crate::locks::moved(e.vault().root(), from.as_str(), to.as_str());
         Ok(result)
     })?;
     emit_events(&app, events, None);
@@ -817,16 +828,20 @@ pub fn history_list(state: State<AppState>, path: String) -> CmdResult<Vec<marro
 }
 
 #[tauri::command]
-pub fn history_read(state: State<AppState>, path: String, time_ms: i64) -> CmdResult<String> {
+pub fn history_read(state: State<AppState>, locks: State<crate::locks::Locks>, path: String, time_ms: i64) -> CmdResult<String> {
     let p = vp(&path)?;
-    with_engine(&state, |e| marrow_core::history::History::for_vault(e.vault().root()).read(p.as_str(), time_ms).map_err(err))
+    let text = with_engine(&state, |e| marrow_core::history::History::for_vault(e.vault().root()).read(p.as_str(), time_ms).map_err(err))?;
+    crate::locks::reveal(&locks, text)
 }
 
 /// Keeps the note's current text as a version now (before a restore, say).
 #[tauri::command]
-pub fn history_snapshot(state: State<AppState>, path: String, text: String) -> CmdResult<()> {
+pub fn history_snapshot(state: State<AppState>, locks: State<crate::locks::Locks>, path: String, text: String) -> CmdResult<()> {
     let p = vp(&path)?;
     with_engine(&state, |e| {
+        // Versions of a locked note are kept sealed too.
+        let disk = e.read_note(&p).ok();
+        let text = crate::locks::conceal(&locks, e.vault().root(), p.as_str(), disk.as_deref(), &text)?;
         marrow_core::history::History::for_vault(e.vault().root())
             .snapshot(p.as_str(), &text, marrow_core::history::now_ms())
             .map(|_| ())

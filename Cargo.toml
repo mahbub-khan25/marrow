@@ -32,3 +32,16 @@ base64 = "0.22"
 md-5 = "0.10"
 csv = "1"
 percent-encoding = "2"
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+zeroize = "1"
+
+# Password hashing is far too slow unoptimised; keep it fast in debug builds.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+[profile.dev.package.chacha20poly1305]
+opt-level = 3
+[profile.dev.package.chacha20]
+opt-level = 3

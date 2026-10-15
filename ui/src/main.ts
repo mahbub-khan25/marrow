@@ -32,6 +32,20 @@ import { openCapture } from "./capture";
 import { TasksView } from "./tasks";
 import { openImport } from "./import";
 import {
+  initLocks,
+  isLockedError,
+  isLockedNote,
+  lockedFolderOf,
+  lockFolderFlow,
+  lockNoteFlow,
+  onLockList,
+  refreshLocked,
+  removeLockFlow,
+  setLockAll,
+  stopIdleLock,
+  unlockPath,
+} from "./lock";
+import {
   adoptDoc,
   allDocs,
   Doc,
@@ -447,13 +461,8 @@ async function openNote(path: string, how: OpenHow = "replace", at?: At, opts: {
     await activateTab(existing, { at, focusTitle: opts.focusTitle });
     return;
   }
-  let doc: Doc;
-  try {
-    doc = await openDoc(path);
-  } catch (e) {
-    toast(`Couldn't open ${path}: ${e}`, "error");
-    return;
-  }
+  const doc = await openDocAsking(path);
+  if (!doc) return;
   stashActive();
   const tab: NoteTab = { kind: "note", doc, state: null, scrollTop: 0, mode: opts.mode ?? prefs.defaultMode };
   if (how === "replace" && activeTab()?.kind === "note") {
@@ -470,15 +479,85 @@ async function openNote(path: string, how: OpenHow = "replace", at?: At, opts: {
   void releaseUnused(docsInUse());
 }
 
+/** Opens a note's doc, asking for the password first if it's locked. */
+async function openDocAsking(path: string): Promise<Doc | null> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await openDoc(path);
+    } catch (e) {
+      if (isLockedError(e) && attempt === 0) {
+        if (await unlockPath(path)) continue;
+        return null;
+      }
+      toast(`Couldn't open ${path}: ${e}`, "error");
+      return null;
+    }
+  }
+}
+
+// ------------------------------------------------------------ locked notes
+
+/** Locks a note (or folder) with a password, from the tree or the palette. */
+async function lockPath(path: string, isFolder: boolean) {
+  const prepare = async () => {
+    await saveAll();
+  };
+  try {
+    if (isFolder) {
+      const n = await lockFolderFlow(path, prepare);
+      if (n !== null) toast(n === 1 ? "Locked the folder and its note." : `Locked the folder and its ${n} notes.`);
+    } else if (await lockNoteFlow(path, prepare)) {
+      toast(`Locked “${displayName(path)}”.`);
+    }
+  } catch (e) {
+    toast(`Couldn't lock it: ${e}`, "error");
+  }
+  void refreshTree();
+}
+
+async function unlockRemove(path: string, isFolder: boolean) {
+  try {
+    await saveAll();
+    const n = await removeLockFlow(path, isFolder);
+    if (n !== null) toast(isFolder ? `Removed the folder's lock (${n} ${n === 1 ? "note" : "notes"}).` : `“${displayName(path)}” is no longer locked.`);
+  } catch (e) {
+    toast(`Couldn't remove the lock: ${e}`, "error");
+  }
+  void refreshTree();
+}
+
+/**
+ * Forgets every password: saves first, then closes notes that need one.
+ * (Run by the palette and after the idle time in Settings.)
+ */
+async function lockAllNow(quiet = false) {
+  stashActive();
+  await saveAll();
+  await api.lockNow();
+  stopIdleLock();
+  await refreshLocked();
+  const locked = (p: string) => isLockedNote(p) || lockedFolderOf(p) !== null;
+  let closed = 0;
+  if (split && locked(split.doc.path)) {
+    closeSplit();
+    closed++;
+  }
+  for (let i = tabs.length - 1; i >= 0; i--) {
+    const t = tabs[i];
+    if (t.kind === "note" && locked(t.doc.path)) {
+      t.doc.dirty = false;
+      await closeTab(i);
+      closed++;
+    }
+  }
+  for (const d of allDocs()) if (locked(d.path)) forget(d.path);
+  if (!quiet || closed) toast(closed ? "Locked. Notes that need a password were closed." : "Locked. Passwords are needed again.");
+}
+
 async function openInSplit(path: string, at?: At): Promise<void> {
   if (!isNotePath(path)) return openPath(path, "tab", at);
-  let doc: Doc;
-  try {
-    doc = await openDoc(path);
-  } catch (e) {
-    toast(`Couldn't open ${path}: ${e}`, "error");
-    return;
-  }
+  const doc = await openDocAsking(path);
+  if (!doc) return;
   const mode = split?.doc === doc ? split.mode : prefs.defaultMode;
   split = { doc, mode };
   if (!activeNote()) {
@@ -1170,6 +1249,7 @@ async function onEngineEvents(events: EngineEvent[]) {
   window.clearTimeout(refreshTimer);
   refreshTimer = window.setTimeout(() => {
     if (treeChanged) void refreshTree();
+    void refreshLocked();
     void primary.refresh();
     if (split) void splitPane.refresh();
     const t = activeNote();
@@ -1218,6 +1298,18 @@ function commands(): Command[] {
       if (d) void showHistory(d.path);
       else toast("Open a note first.");
     }),
+    cmd("Lock this note with a password…", "lock-simple", () => {
+      const d = focusedPane().doc;
+      if (!d) return toast("Open a note first.");
+      if (isLockedNote(d.path)) return toast("This note is already locked.");
+      void lockPath(d.path, false);
+    }),
+    cmd("Remove the lock from this note…", "lock-simple-open", () => {
+      const d = focusedPane().doc;
+      if (!d || !isLockedNote(d.path)) return toast("This note isn't locked.");
+      void unlockRemove(d.path, false);
+    }),
+    cmd("Lock all notes now", "lock-key", () => void lockAllNow()),
     cmd("Star / unstar this note", "star", () => {
       const t = activeTab();
       const p = t?.kind === "note" ? t.doc.path : t?.kind === "canvas" ? t.path : null;
@@ -1504,6 +1596,8 @@ async function openVault(path: string) {
   tagsView.selected = null;
   graphPanel?.destroy();
   graphPanel = null;
+  await api.lockNow().catch(() => {});
+  await refreshLocked();
   await refreshTree();
   void refreshStats();
   await restoreSession();
@@ -1637,6 +1731,13 @@ let editTimer: number | undefined;
 
 async function boot() {
   applyPrefs();
+  initLocks();
+  setLockAll(() => lockAllNow(true));
+  onLockList(() => {
+    tree.render();
+    primary.renderMeta();
+    if (split) splitPane.renderMeta();
+  });
   initDocs({
     onState: updateSaveState,
     banner: showBanner,
@@ -1644,6 +1745,7 @@ async function boot() {
       if ($("banner").dataset.kind === "error") hideBanner();
     },
     toast,
+    unlock: (path, folder) => unlockPath(path, folder),
   });
 
   const paneApp = {
@@ -1707,6 +1809,8 @@ async function boot() {
     starred: () => vaultSettings.starred ?? [],
     toggleStar,
     importNotes,
+    lock: (path, isFolder) => void lockPath(path, isFolder),
+    unlockRemove: (path, isFolder) => void unlockRemove(path, isFolder),
     history: (path) => void (async () => {
       await openPath(path, "replace");
       await showHistory(path);

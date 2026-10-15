@@ -350,7 +350,9 @@ impl Mirror {
                     return Ok(());
                 }
                 let texts = (is_note(key))
-                    .then(|| (String::from_utf8(lb.clone()).ok(), String::from_utf8(rb.clone()).ok()));
+                    .then(|| (String::from_utf8(lb.clone()).ok(), String::from_utf8(rb.clone()).ok()))
+                    // Locked notes can't be merged line by line: keep both versions.
+                    .filter(|(l, r)| ![l, r].iter().any(|t| t.as_deref().is_some_and(crate::lock::is_locked)));
                 if let Some((Some(lt), Some(rt))) = texts {
                     // Merge, with the last synced text as the base when we have it.
                     let base = state.files.get(key).and_then(|s| self.read_base(&s.hash));
@@ -717,6 +719,33 @@ mod tests {
         assert_eq!(read(&l.join(copy)), "local v2");
         assert_eq!(read(&r.join(copy)), "local v2");
         assert!(!m.sync(false).unwrap().changed());
+    }
+
+    #[test]
+    fn locked_notes_keep_both_versions() {
+        use crate::lock::{derive, seal, Cost};
+        let k = derive("pw", [1u8; 16], Cost { m: 64, t: 1, p: 1 }).unwrap();
+        let (_t, l, r, m) = setup();
+        write(&l.join("Secret.md"), &seal("one", &k, None));
+        m.sync(false).unwrap();
+        tick();
+        write(&l.join("Secret.md"), &seal("local", &k, None));
+        tick();
+        let remote = seal("remote", &k, None);
+        write(&r.join("Secret.md"), &remote);
+        let rep = m.sync(false).unwrap();
+        assert!(rep.merged.is_empty());
+        assert_eq!(rep.conflict_copies.len(), 1);
+        assert_eq!(read(&l.join("Secret.md")), remote);
+        assert!(crate::lock::is_locked(&read(&l.join(&rep.conflict_copies[0]))));
+    }
+
+    #[test]
+    fn locked_notes_are_not_indexed() {
+        use crate::lock::{derive, seal, Cost};
+        let k = derive("pw", [1u8; 16], Cost { m: 64, t: 1, p: 1 }).unwrap();
+        let meta = crate::parse::parse(&seal("# Heading\n[[Link]] #tag\n- [ ] task", &k, None));
+        assert!(meta.links.is_empty() && meta.tags.is_empty() && meta.headings.is_empty());
     }
 
     #[test]

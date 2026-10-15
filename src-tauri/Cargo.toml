@@ -25,6 +25,9 @@ tokio = { version = "1", features = ["time"] }
 arboard = { version = "3", default-features = false, features = ["image-data"] }
 png = "0.17"
 
+[dev-dependencies]
+tempfile = { workspace = true }
+
 # API keys for AI providers go in the system's credential store.
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3", features = ["windows-native"] }
