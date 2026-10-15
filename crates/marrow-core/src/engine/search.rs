@@ -147,6 +147,8 @@ pub(super) struct CachedText {
     size: u64,
     pub(super) text: Arc<str>,
     pub(super) lower: Arc<str>,
+    /// A password-locked note (its text is left out).
+    pub(super) locked: bool,
 }
 
 #[derive(Default)]
@@ -164,6 +166,14 @@ impl Engine {
     /// Drops the cached text of a path so the next search re-reads it.
     pub(super) fn forget_text(&mut self, p: &VaultPath) {
         self.texts.forget(p);
+    }
+
+    /// Notes locked with a password, as of now.
+    pub fn locked_notes(&mut self) -> Vec<VaultPath> {
+        self.refresh_texts();
+        let mut out: Vec<VaultPath> = self.texts.entries.iter().filter(|(_, c)| c.locked).map(|(p, _)| p.clone()).collect();
+        out.sort();
+        out
     }
 
     /// Loads all note text now, so the first search doesn't pause.
@@ -190,6 +200,9 @@ impl Engine {
             .into_par_iter()
             .filter_map(|(p, mtime_ms, size)| {
                 let text = vault.read_text(&p).ok()?;
+                // Locked notes aren't searched (nor used for tasks, mentions or AI).
+                let locked = crate::lock::is_locked(&text);
+                let text = if locked { String::new() } else { text };
                 let lower = text.to_lowercase();
                 Some((
                     p,
@@ -198,6 +211,7 @@ impl Engine {
                         size,
                         text: text.into(),
                         lower: lower.into(),
+                        locked,
                     },
                 ))
             })

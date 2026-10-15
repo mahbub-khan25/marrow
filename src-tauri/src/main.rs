@@ -4,6 +4,7 @@
 mod ai;
 mod capture;
 mod import;
+mod locks;
 mod commands;
 mod portable;
 mod recall;
@@ -33,6 +34,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(capture::plugin())
+        .manage(locks::Locks::default())
         .manage(AppState {
             service: Mutex::new(None),
             mirror: Mutex::new(None),
@@ -42,6 +44,13 @@ fn main() {
             commands::open_vault,
             commands::tree,
             commands::read_note,
+            locks::lock_info,
+            locks::locked_paths,
+            locks::unlock,
+            locks::lock_note,
+            locks::lock_folder,
+            locks::remove_lock,
+            locks::lock_now,
             commands::write_note,
             commands::backup_for,
             commands::discard_backup,

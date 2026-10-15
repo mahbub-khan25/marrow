@@ -106,6 +106,16 @@ impl History {
         self.snapshot(path, old, now).map(|_| ())
     }
 
+    /// Deletes every version of `path` (a note just locked mustn't keep
+    /// readable copies of itself here).
+    pub fn forget(&self, path: &str) -> io::Result<()> {
+        let d = self.note_dir(path);
+        if d.exists() && d != self.dir {
+            fs::remove_dir_all(d)?;
+        }
+        Ok(())
+    }
+
     /// Follows a rename or move (of a note or a whole folder).
     pub fn moved(&self, from: &str, to: &str) -> io::Result<()> {
         let a = self.note_dir(from);

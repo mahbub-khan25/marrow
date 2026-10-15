@@ -3,6 +3,7 @@
 // everything can be renamed (F2), trashed (Delete) or dragged to a folder.
 
 import { displayName, isCanvasPath, isNotePath, parentOf, type TreeNode } from "./api";
+import { isLockedFolder, isLockedNote, lockedFolderOf } from "./lock";
 import { showMenu, type MenuItem } from "./menu";
 import { h, icon, storage, store } from "./util";
 
@@ -28,7 +29,12 @@ export interface TreeApp {
   history(path: string): void;
   /** Import from Notion, Evernote, OneNote… */
   importNotes(): void;
+  /** Lock a note or folder with a password, or remove its lock. */
+  lock(path: string, isFolder: boolean): void;
+  unlockRemove(path: string, isFolder: boolean): void;
 }
+
+const lockIcon = () => icon("lock-simple", "font-size:13px;flex:none;opacity:.65;margin-left:auto");
 
 export const DRAG_TYPE = "text/x-marrow-path";
 
@@ -172,6 +178,7 @@ export class Tree {
       { "aria-expanded": String(open), dataset: { path: f.path }, title: f.path },
       icon(open ? "caret-down" : "caret-right"),
       h("span.name", null, f.name),
+      isLockedFolder(f.path) ? icon("lock-simple", "font-size:13px;flex:none;opacity:.65") : null,
       h("span.count", null, String(this.count(f))),
     );
     head.addEventListener("click", () => {
@@ -197,6 +204,7 @@ export class Tree {
       h("i", { class: `ph-duotone ph-${open ? "caret-down" : "caret-right"} caret` }),
       icon(open ? "folder-simple-dashed" : "folder-simple", "font-size:15px;flex:none;opacity:.7"),
       h("span", null, n.name),
+      isLockedFolder(n.path) ? lockIcon() : null,
     );
     row.addEventListener("click", () => {
       this.setOpen(n.path, !open);
@@ -220,6 +228,7 @@ export class Tree {
       h("span", null, note || canvas ? displayName(n.path) : n.name),
     );
     for (const i of row.querySelectorAll("i")) i.classList.add("kind");
+    if (note && isLockedNote(n.path)) row.append(lockIcon());
     if (note || canvas) {
       row.addEventListener("click", (e) => this.app.open(n.path, e.ctrlKey || e.metaKey ? "tab" : "replace"));
       row.addEventListener("auxclick", (e) => {
@@ -271,6 +280,9 @@ export class Tree {
           { label: "Print…", icon: "printer", run: () => this.app.exportNote(n.path, "print") },
           "-",
           { label: "Version history…", icon: "clock-counter-clockwise", run: () => this.app.history(n.path) },
+          isLockedNote(n.path)
+            ? { label: "Remove lock…", icon: "lock-simple-open", run: () => this.app.unlockRemove(n.path, false) }
+            : { label: "Lock with password…", icon: "lock-simple", run: () => this.app.lock(n.path, false) },
           "-",
         );
       }
@@ -280,12 +292,20 @@ export class Tree {
       { label: "New canvas here", icon: "squares-four", run: () => this.app.newCanvas(folder) },
       { label: "New folder here", icon: "folder-simple-plus", run: () => this.app.newFolder(folder) },
       ...(isFolder ? [{ label: "View as database", icon: "database", run: () => this.app.newDatabase(folder) }] : []),
+      ...this.lockItems(n, isFolder),
       "-",
       { label: "Rename", icon: "pencil-simple", run: () => this.startRename(row, n) },
       { label: isFolder ? "Show in file manager" : "Show in file manager", icon: "arrow-square-out", run: () => this.app.reveal(n.path) },
       { label: "Move to trash", icon: "trash", danger: true, run: () => this.app.trash(n.path, isFolder) },
     );
     return items;
+  }
+
+  private lockItems(n: TreeNode, isFolder: boolean): MenuItem[] {
+    if (!isFolder) return [];
+    if (isLockedFolder(n.path)) return [{ label: "Remove folder lock…", icon: "lock-simple-open", run: () => this.app.unlockRemove(n.path, true) }];
+    if (lockedFolderOf(n.path) !== null) return [];
+    return [{ label: "Lock folder with password…", icon: "lock-simple", run: () => this.app.lock(n.path, true) }];
   }
 
   /** Swaps a row for a text box. */

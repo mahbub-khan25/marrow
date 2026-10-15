@@ -45,6 +45,8 @@ export interface DocHost {
   banner: (text: string, kind: "warn" | "error", actions?: { label: string; run: () => void }[]) => void;
   hideErrorBanner: () => void;
   toast: (text: string, kind?: "info" | "error") => void;
+  /** Asks for a locked note's (or folder's) password; true once entered. */
+  unlock: (path: string, folder: string | null) => Promise<boolean>;
 }
 
 const docs = new Map<string, Doc>();
@@ -171,6 +173,23 @@ async function write(d: Doc): Promise<void> {
         continue; // write the merged text
       }
       setState(d, "error");
+      const s = String(e);
+      if (s === "LOCKED" || s.startsWith("LOCKED_FOLDER:")) {
+        // Locked meanwhile, or a new note in a locked folder: the text waits here.
+        const folder = s.startsWith("LOCKED_FOLDER:") ? s.slice("LOCKED_FOLDER:".length) : null;
+        const unlockAndSave = () =>
+          void host.unlock(d.path, folder).then((ok) => {
+            if (ok) void save(d);
+          });
+        host.banner(
+          folder !== null
+            ? `“${d.name}” is in a locked folder. Enter the folder's password to save it — your text is safe here meanwhile.`
+            : `“${d.name}” is locked. Enter its password to save your changes.`,
+          "error",
+          [{ label: "Unlock and save", run: unlockAndSave }],
+        );
+        return;
+      }
       host.banner(`Couldn't save “${d.name}”: ${e}`, "error", [{ label: "Try again", run: () => void save(d) }]);
       return;
     }

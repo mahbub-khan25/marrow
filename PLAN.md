@@ -403,8 +403,8 @@ colours come from the prototype's own source, not from eyeballing.
 | G | All-tasks view across the vault; global quick-capture hotkey | ✅ done |
 | H | AI across the vault: ask my notes with citations, semantic search, AI database columns | ✅ done |
 | I | Import from Notion, Evernote, OneNote | ✅ done |
-| J | Encrypted notes and folders | next |
-| K | Drawing and shapes on canvases | |
+| J | Encrypted notes and folders | ✅ done |
+| K | Drawing and shapes on canvases | next |
 | L | Publish a folder as a static website | |
 | M | CSS snippets and plugins | |
 
@@ -507,3 +507,33 @@ colours come from the prototype's own source, not from eyeballing.
   writes, and tells the engine.
 * `ui/src/import.ts`: the dialog (source cards with how-to-export notes,
   progress, summary with warnings, *Show the notes*).
+
+## Phase J — what shipped
+
+* `marrow-core/src/lock.rs`: a locked note is a `.md` file holding a `%%`
+  notice and a ```` ```marrow-locked ```` fence: header line
+  `v1 argon2id m= t= p= salt= nonce=`, an optional `hint <base64>` line,
+  then base64 ciphertext. Argon2id (64 MiB, t=3) → 32-byte key;
+  XChaCha20-Poly1305 with the header lines as associated data, a fresh
+  nonce per save. Only a note that is *nothing but* the block counts as
+  locked. Absurd costs from a tampered header are refused. Tests.
+* Locked text is hidden from the index: `parse()` returns empty metadata and
+  the text cache stores "" (with a `locked` flag, so `locked_notes()` can
+  list them). Mirror sync never line-merges locked notes (both versions are
+  kept). `History::forget` drops plain versions when a note is locked.
+* `src-tauri/src/locks.rs`: keys by salt, in memory only. `reveal` /
+  `conceal` wrap `read_note`, `write_note` (including the expected-version
+  guard), `backup_for`, `history_read`, `history_snapshot` and
+  `resolve_conflict`, so the window sees plain text and the disk gets sealed
+  text. Locked folders: `.marrow/locked.json` with a sealed check string
+  per folder (one salt per folder, so one key unlocks all its notes); new
+  notes there are sealed on first save, or the save fails with
+  `LOCKED_FOLDER:<folder>`. Commands `lock_info`, `locked_paths`, `unlock`,
+  `lock_note`, `lock_folder`, `remove_lock`, `lock_now`; renames update the
+  folder list. Argon2 crates are built optimised in debug too.
+* `ui/src/lock.ts`: password dialogs (set with confirm + hint + warning;
+  unlock with hint), a confirm dialog, lock-icon sets, and the idle timer
+  (pref `lockAfter`, default 15 min). `openDocAsking` asks before opening;
+  a save refused as LOCKED shows *Unlock and save*; *Lock all notes now*
+  saves, forgets the keys and closes notes that need a password. Embeds and
+  canvas cards of locked notes say so; the note header shows *Locked*.

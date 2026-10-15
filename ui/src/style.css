@@ -1890,3 +1890,25 @@ body.block-dragging, body.block-dragging * { cursor: grabbing !important; user-s
 .imp-error { display: flex; align-items: flex-start; gap: 6px; margin: 0; color: var(--color-accent-2); }
 .imp-warn summary { cursor: pointer; font-size: 14px; color: var(--ink-70); }
 .imp-warn ul { margin: 6px 0 0; padding-left: 20px; font-size: 13px; color: var(--ink-70); max-height: 160px; overflow: auto; }
+
+/* ------------------------------------------------------------ locked notes */
+
+.lock-dlg .lock-pw { display: flex; gap: 6px; align-items: center; }
+.lock-dlg .lock-pw .input { flex: 1; }
+.lock-show {
+  flex: none; width: 36px; height: 36px; display: grid; place-items: center; border-radius: var(--radius-sm, 6px);
+  color: var(--ink-70); background: transparent; border: 1px solid var(--color-divider); cursor: pointer;
+}
+.lock-show:hover { color: var(--color-text); background: var(--color-surface); }
+.lock-hint { margin: -6px 0 0; font-size: 15px; color: var(--ink-78); }
+.lock-warn {
+  display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 10px 12px; border-radius: 8px;
+  font-size: 14px; line-height: 1.5; color: var(--ink-78);
+  background: color-mix(in srgb, var(--color-process-yellow, #e8b400) 14%, transparent);
+}
+.lock-warn > i { font-size: 18px; flex: none; margin-top: 1px; }
+.lock-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px 1px 6px; border-radius: 999px;
+  font-size: 13px; color: var(--ink-78); background: var(--color-surface); border: 1px solid var(--color-divider);
+}
+.lock-chip > i { font-size: 13px; }

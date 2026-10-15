@@ -228,7 +228,11 @@ export class CanvasView {
         void api
           .readNote(file)
           .then((t) => (ex.textContent = trunc(plainText(t), 220)))
-          .catch(() => {
+          .catch((e) => {
+            if (String(e) === "LOCKED") {
+              ex.textContent = "🔒 Locked note";
+              return;
+            }
             el.classList.add("missing");
             ex.textContent = "This note was moved or deleted.";
           });

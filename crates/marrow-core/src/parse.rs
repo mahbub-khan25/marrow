@@ -203,6 +203,10 @@ impl Lines {
 
 /// Parses one note. Never fails: malformed input yields partial metadata.
 pub fn parse(text: &str) -> NoteMeta {
+    // A locked note's links, tags and headings stay private.
+    if crate::lock::is_locked(text) {
+        return NoteMeta::default();
+    }
     let lines = Lines::new(text);
     let mut meta = NoteMeta::default();
 

@@ -139,6 +139,29 @@ All of these are plain Markdown, so the notes still open in Obsidian.
   makes a new note from it (in `folder:` if given), and `action: daily`
   adds it to today's note.
 
+## Locked notes
+
+Right-click a note → **Lock with password…**, or a folder → **Lock folder
+with password…** (also in the command palette).
+
+* On disk the note becomes unreadable text. Only someone with the password can
+  read it, in Marrow or anywhere else. Its file name stays visible.
+* Opening it asks for the password once. It then works like any other note
+  until you choose **Lock all notes now** (Ctrl+K), Marrow has been left
+  alone for the time set in Settings → Editor → *Locked notes* (15 minutes by
+  default), or you close Marrow.
+* In a locked folder every note shares the folder's password, and new notes
+  there are locked as soon as they're saved.
+* A locked note's text is left out of search, tasks, the graph, backlinks
+  and AI search, and its earlier versions are kept locked too. Attachments
+  (images, PDFs) aren't locked.
+* **Remove lock…** turns it back into plain Markdown.
+* There's no way to recover a forgotten password. The optional hint is shown
+  when Marrow asks for it.
+
+The encryption is Argon2id (64 MiB) for the password and XChaCha20-Poly1305
+for the text. Obsidian shows a locked note as a code block of letters.
+
 ## Import from other apps
 
 *Import notes…* (command palette, Settings → Vault, or right-click empty

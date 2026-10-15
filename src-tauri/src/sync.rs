@@ -276,15 +276,24 @@ pub fn conflict_copies(state: State<AppState>) -> CmdResult<Vec<ConflictCopy>> {
 /// Merges a conflict copy into its original and moves the copy to the trash.
 /// Returns how many places both versions were kept.
 #[tauri::command]
-pub fn resolve_conflict(app: AppHandle, state: State<AppState>, copy: String, original: String) -> CmdResult<usize> {
+pub fn resolve_conflict(
+    app: AppHandle,
+    state: State<AppState>,
+    locks: State<crate::locks::Locks>,
+    copy: String,
+    original: String,
+) -> CmdResult<usize> {
     let (cp, op) = (vp(&copy)?, vp(&original)?);
     let (conflicts, events) = with_engine(&state, |e| {
-        let a = e.read_note(&op).map_err(err)?;
-        let b = e.read_note(&cp).map_err(err)?;
+        // Locked notes are merged as plain text (needs the password) and sealed again.
+        let raw = e.read_note(&op).map_err(err)?;
+        let a = crate::locks::reveal(&locks, raw.clone())?;
+        let b = crate::locks::reveal(&locks, e.read_note(&cp).map_err(err)?)?;
         let merged = merge2(&a, &b);
         let mut events = vec![];
         if merged.text != a {
-            events.extend(e.write_note(&op, &merged.text).map_err(err)?);
+            let text = crate::locks::conceal(&locks, e.vault().root(), op.as_str(), Some(&raw), &merged.text)?;
+            events.extend(e.write_note(&op, &text).map_err(err)?);
         }
         events.extend(e.trash(&cp).map_err(err)?);
         Ok((merged.conflicts, events))

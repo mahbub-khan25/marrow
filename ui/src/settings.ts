@@ -180,6 +180,16 @@ function render() {
           ]),
         ),
         row(
+          "Locked notes",
+          "After you enter a locked note's password, lock it again when Marrow has been left alone this long.",
+          prefSeg("lockAfter", [
+            [5, "5 min"],
+            [15, "15 min"],
+            [60, "1 hour"],
+            [0, "When closed"],
+          ]),
+        ),
+        row(
           "Readable line length",
           "Holds the writing column near a comfortable measure.",
           prefSeg("width", [

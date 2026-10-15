@@ -164,7 +164,24 @@ export type EngineEvent =
   | { type: "metadata-changed"; path: string }
   | { type: "links-changed"; paths: string[] };
 
+export interface LockInfo {
+  /** The file on disk is encrypted. */
+  locked: boolean;
+  /** Its password (or its folder's) was entered this session. */
+  unlocked: boolean;
+  hint: string | null;
+  /** The locked folder it's in, or is. */
+  folder: string | null;
+}
+
 export const api = {
+  lockInfo: (path: string) => invoke<LockInfo>("lock_info", { path }),
+  lockedPaths: () => invoke<{ notes: string[]; folders: string[] }>("locked_paths"),
+  unlock: (path: string, password: string) => invoke<void>("unlock", { path, password }),
+  lockNote: (path: string, password: string, hint: string | null) => invoke<void>("lock_note", { path, password, hint }),
+  lockFolder: (path: string, password: string, hint: string | null) => invoke<number>("lock_folder", { path, password, hint }),
+  removeLock: (path: string) => invoke<number>("remove_lock", { path }),
+  lockNow: () => invoke<void>("lock_now"),
   lastVault: () => invoke<string | null>("last_vault"),
   openVault: (path: string) => invoke<VaultInfo>("open_vault", { path }),
   tree: () => invoke<TreeNode>("tree"),
@@ -359,6 +376,10 @@ export interface AiEvent {
   id: string;
   kind: "chunk" | "done" | "error";
   text: string;
+}
+
+export function onLocksChanged(cb: () => void): Promise<UnlistenFn> {
+  return listen("locks-changed", () => cb());
 }
 
 export function onAiEvent(cb: (e: AiEvent) => void): Promise<UnlistenFn> {
