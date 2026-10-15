@@ -405,8 +405,8 @@ colours come from the prototype's own source, not from eyeballing.
 | I | Import from Notion, Evernote, OneNote | ✅ done |
 | J | Encrypted notes and folders | ✅ done |
 | K | Drawing and shapes on canvases | ✅ done |
-| L | Publish a folder as a static website | next |
-| M | CSS snippets and plugins | |
+| L | Publish a folder as a static website | ✅ done |
+| M | CSS snippets and plugins | next |
 
 ## Phase E — what shipped
 
@@ -557,3 +557,34 @@ colours come from the prototype's own source, not from eyeballing.
   on a selected connection edits its label.
 * Undo keeps up to 100 states (changes within 0.8 s count as one); it resets
   when the canvas is loaded or changes on disk.
+
+## Phase L — what shipped
+
+* `ui/src/publish.ts`: the dialog (title, output folder — chosen or typed,
+  *only publish: true*), remembered per vault and folder.
+  * Notes: every `.md` under the folder; locked (read fails) and
+    `publish: false` notes are skipped.
+  * URLs: path segments slugged (accents folded, Unicode letters kept),
+    `-2` on clashes; a top-level Index/Home/README/Start here/Welcome note
+    becomes `index.html`, else a generated index lists the pages.
+  * Each page renders with `renderMarkdown`, then: heading ids; external
+    links get `href`; `[[links]]` resolve with the vault's rules to a
+    relative URL (with `#heading`), or to a copied attachment, or become a
+    plain span; `![[images]]` are copied to `assets/`; note embeds render one
+    level deep with a "from" link; tags become spans; buttons are dropped;
+    databases become a list of the published notes in their folder; code is
+    coloured and Mermaid drawn to SVG in advance.
+  * Layout: sticky header with search, sidebar tree (current page marked),
+    breadcrumbs, title (unless the note starts with the same H1), "Linked
+    from", updated date. `style.css` = the app rules that match any page's
+    content (ids stripped first, so app id rules don't leak in) + embedded
+    fonts + the site layout; `site.js` = menu toggle and search over
+    `search.json` (title + first 6000 characters of text).
+* `src-tauri/src/publish.rs`: `site_begin` (creates the folder; refuses one
+  inside the vault, holding the vault, or non-empty without a Marrow
+  manifest), `site_write`, `site_copy` (paths can't leave the folder),
+  `site_finish` (removes files from the previous manifest that weren't
+  written this time, tidies empty folders, writes the new manifest),
+  `site_open`. Tests.
+* Also fixed: exported HTML (Phase 1–3 batch) kept the app's
+  `html, body { overflow: hidden }`, so long notes couldn't scroll.

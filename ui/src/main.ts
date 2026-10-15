@@ -31,6 +31,7 @@ import { openHistory } from "./history";
 import { openCapture } from "./capture";
 import { TasksView } from "./tasks";
 import { openImport } from "./import";
+import { openPublish } from "./publish";
 import {
   initLocks,
   isLockedError,
@@ -552,6 +553,11 @@ async function lockAllNow(quiet = false) {
   }
   for (const d of allDocs()) if (locked(d.path)) forget(d.path);
   if (!quiet || closed) toast(closed ? "Locked. Notes that need a password were closed." : "Locked. Passwords are needed again.");
+}
+
+/** Publish a folder ("" = the whole vault) as a website. */
+function publishSite(folder: string) {
+  void saveAll().then(() => openPublish({ folder, files: tree.files(), vaultRoot, vaultName, toast }));
 }
 
 async function openInSplit(path: string, at?: At): Promise<void> {
@@ -1310,6 +1316,7 @@ function commands(): Command[] {
       void unlockRemove(d.path, false);
     }),
     cmd("Lock all notes now", "lock-key", () => void lockAllNow()),
+    cmd("Publish notes as a website…", "globe", () => publishSite("")),
     cmd("Star / unstar this note", "star", () => {
       const t = activeTab();
       const p = t?.kind === "note" ? t.doc.path : t?.kind === "canvas" ? t.path : null;
@@ -1811,6 +1818,7 @@ async function boot() {
     importNotes,
     lock: (path, isFolder) => void lockPath(path, isFolder),
     unlockRemove: (path, isFolder) => void unlockRemove(path, isFolder),
+    publish: (folder) => publishSite(folder),
     history: (path) => void (async () => {
       await openPath(path, "replace");
       await showHistory(path);

@@ -32,6 +32,8 @@ export interface TreeApp {
   /** Lock a note or folder with a password, or remove its lock. */
   lock(path: string, isFolder: boolean): void;
   unlockRemove(path: string, isFolder: boolean): void;
+  /** Publish a folder ("" = the vault) as a website. */
+  publish(folder: string): void;
 }
 
 const lockIcon = () => icon("lock-simple", "font-size:13px;flex:none;opacity:.65;margin-left:auto");
@@ -60,6 +62,7 @@ export class Tree {
         { label: "New folder", icon: "folder-simple-plus", run: () => app.newFolder("") },
         "-",
         { label: "Import notes…", icon: "tray-arrow-down", run: () => app.importNotes() },
+        { label: "Publish as a website…", icon: "globe", run: () => app.publish("") },
       ]);
     });
   }
@@ -293,6 +296,7 @@ export class Tree {
       { label: "New folder here", icon: "folder-simple-plus", run: () => this.app.newFolder(folder) },
       ...(isFolder ? [{ label: "View as database", icon: "database", run: () => this.app.newDatabase(folder) }] : []),
       ...this.lockItems(n, isFolder),
+      ...(isFolder ? [{ label: "Publish as a website…", icon: "globe", run: () => this.app.publish(n.path) }] : []),
       "-",
       { label: "Rename", icon: "pencil-simple", run: () => this.startRename(row, n) },
       { label: isFolder ? "Show in file manager" : "Show in file manager", icon: "arrow-square-out", run: () => this.app.reveal(n.path) },

@@ -78,7 +78,7 @@ function baseSelector(sel: string): string {
 }
 
 /** Keeps the style rules that touch something in the exported note. */
-function usedCss(content: HTMLElement): { css: string; fonts: CSSFontFaceRule[] } {
+export function usedCss(content: HTMLElement): { css: string; fonts: CSSFontFaceRule[] } {
   // A small stand-in document so selectors like ":root .preview h1" can match.
   const doc = document.implementation.createHTMLDocument("x");
   doc.documentElement.setAttribute("data-theme", "light");
@@ -131,7 +131,7 @@ function covers(range: string, code: number): boolean {
 }
 
 /** The @font-face rules the note uses, with the font files embedded. */
-async function usedFonts(fonts: CSSFontFaceRule[], content: HTMLElement): Promise<string> {
+export async function usedFonts(fonts: CSSFontFaceRule[], content: HTMLElement): Promise<string> {
   const hasMath = !!content.querySelector(".katex");
   const hasIcons = !!content.querySelector("[class*='ph-']");
   const out: string[] = [];
@@ -177,6 +177,7 @@ export async function noteHtml(title: string, el: HTMLElement): Promise<string> 
 <style>
 ${fontCss}
 ${css}
+html, body { height: auto; overflow: visible; }
 body { background: var(--color-bg, #fff); color: var(--color-text, #222); margin: 0; }
 .export-page { max-width: 46rem; margin: 0 auto; padding: 48px 24px 96px; }
 .export-page .preview { --note-size: 19px; }
