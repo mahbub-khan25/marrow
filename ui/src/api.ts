@@ -114,6 +114,17 @@ export interface VaultSettings {
   templateFolder: string;
   /** Starred notes, shown at the top of the file tree. */
   starred: string[];
+  /** CSS snippets that are on. */
+  snippets: string[];
+  /** Plugins that are on. */
+  plugins: string[];
+}
+
+export interface PluginInfo {
+  dir: string;
+  manifest: { id?: string; name?: string; version?: string; description?: string; author?: string; permissions?: string[] } | null;
+  code: string | null;
+  problem: string | null;
 }
 
 /** A to-do somewhere in the vault. */
@@ -182,6 +193,10 @@ export const api = {
   lockFolder: (path: string, password: string, hint: string | null) => invoke<number>("lock_folder", { path, password, hint }),
   removeLock: (path: string) => invoke<number>("remove_lock", { path }),
   lockNow: () => invoke<void>("lock_now"),
+  extrasDir: (kind: "snippets" | "plugins") => invoke<string>("extras_dir", { kind }),
+  snippetsList: () => invoke<{ name: string; css: string }[]>("snippets_list"),
+  pluginsList: () => invoke<PluginInfo[]>("plugins_list"),
+  extrasWrite: (kind: "snippets" | "plugins", rel: string, contents: string) => invoke<boolean>("extras_write", { kind, rel, contents }),
   siteBegin: (out: string) => invoke<void>("site_begin", { out }),
   siteWrite: (out: string, rel: string, contents: string) => invoke<void>("site_write", { out, rel, contents }),
   siteCopy: (out: string, rel: string, path: string) => invoke<void>("site_copy", { out, rel, path }),

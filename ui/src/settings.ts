@@ -1,9 +1,10 @@
-// Settings (Ctrl+,): Editor, Appearance, Hotkeys, Vault, AI.
+// Settings (Ctrl+,): Editor, Appearance, Hotkeys, Vault, AI, Customize.
 
 import { getVersion } from "@tauri-apps/api/app";
 
 import { api, type MirrorStatus, type VaultSettings } from "./api";
 import { renderAi } from "./ai-settings";
+import { renderCustomize, type CustomizeApp } from "./extras";
 import { providerIcon, syncLine } from "./cloud";
 import logoUrl from "./assets/logo-mark.svg";
 import { prefs, setPref, type Prefs } from "./prefs";
@@ -24,6 +25,8 @@ export interface SettingsApp {
   setupSync(): void;
   stopSync(): void;
   revealVault(): void;
+  /** CSS snippets and plugins. */
+  customize(): CustomizeApp;
 }
 
 /** Updates the sync status line, if Settings is showing it. */
@@ -32,13 +35,14 @@ export function updateSyncLine(text: string) {
   if (el) el.textContent = text;
 }
 
-type Tab = "editor" | "appearance" | "hotkeys" | "vault" | "ai" | "about";
+type Tab = "editor" | "appearance" | "hotkeys" | "vault" | "ai" | "customize" | "about";
 const TABS: [Tab, string, string][] = [
   ["editor", "Editor", "pencil-simple-line"],
   ["appearance", "Appearance", "text-aa"],
   ["hotkeys", "Hotkeys", "keyboard"],
   ["vault", "Vault", "vault"],
   ["ai", "AI", "sparkle"],
+  ["customize", "Customize", "paint-brush"],
   ["about", "About", "info"],
 ];
 
@@ -293,6 +297,8 @@ function render() {
     );
   } else if (tab === "ai") {
     renderAi(body, render);
+  } else if (tab === "customize") {
+    void renderCustomize(body, render, app.customize());
   } else {
     renderVault(body);
   }

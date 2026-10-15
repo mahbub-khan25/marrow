@@ -865,6 +865,10 @@ pub struct VaultSettings {
     pub template_folder: String,
     /// Starred notes, shown at the top of the file tree.
     pub starred: Vec<String>,
+    /// CSS snippets that are on (names in `.marrow/snippets`).
+    pub snippets: Vec<String>,
+    /// Plugins that are on (folders in `.marrow/plugins`).
+    pub plugins: Vec<String>,
 }
 
 impl Default for VaultSettings {
@@ -876,6 +880,8 @@ impl Default for VaultSettings {
             daily_folder: "Daily".into(),
             template_folder: "Templates".into(),
             starred: Vec::new(),
+            snippets: Vec::new(),
+            plugins: Vec::new(),
         }
     }
 }
