@@ -692,13 +692,13 @@ mark { background: var(--color-accent-100); color: var(--color-accent-900); padd
   background-color: var(--color-bg);
   background-image: radial-gradient(color-mix(in srgb, var(--color-text) 16%, transparent) 1px, transparent 1.4px);
   background-size: 22px 22px;
-  touch-action: none;
+  touch-action: none; user-select: none; -webkit-user-select: none;
 }
 .canvas-view.is-panning { cursor: grabbing; }
 .canvas-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .canvas-edges { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
-.canvas-edges path { fill: none; stroke: color-mix(in srgb, var(--color-text) 40%, transparent); stroke-width: 1.5; }
-.canvas-edges path.sel { stroke: var(--color-accent); stroke-width: 2.5; }
+.canvas-edges > path { fill: none; stroke: color-mix(in srgb, var(--color-text) 40%, transparent); stroke-width: 1.5; }
+.canvas-edges > path.sel { stroke: var(--color-accent); stroke-width: 2.5; }
 .canvas-edges .hit { stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
 .canvas-edges .draft { stroke: var(--color-accent); stroke-dasharray: 4 4; }
 .card {
@@ -734,9 +734,70 @@ mark { background: var(--color-accent-100); color: var(--color-accent-900); padd
 .card-resize { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize; }
 .canvas-over { position: absolute; left: 44px; top: 36px; pointer-events: none; }
 .canvas-over .name { font-family: var(--font-heading); font-weight: 600; font-size: 26px; }
-.canvas-tools { position: absolute; left: 24px; bottom: 20px; display: flex; gap: 8px; }
-.canvas-tools .btn { background: var(--color-bg); box-shadow: var(--shadow-sm); }
-.canvas-tools .btn:hover { background: var(--color-surface); }
+.canvas-tools { position: absolute; left: 24px; bottom: 20px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: calc(100% - 200px); }
+.cv-bar {
+  display: flex; align-items: center; gap: 2px; padding: 3px; background: var(--color-bg);
+  box-shadow: var(--shadow-sm); border-radius: var(--radius-md);
+}
+.cv-tool {
+  width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 6px;
+  background: none; color: var(--color-text); font-size: 18px; cursor: pointer;
+}
+.cv-tool:hover { background: var(--color-surface); }
+.cv-tool.is-on { background: var(--color-accent); color: var(--color-bg); }
+.cv-swatch {
+  width: 22px; height: 22px; margin: 0 3px; border-radius: 50%; border: 0; cursor: pointer;
+  background: var(--sw); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-text) 15%, transparent);
+}
+.cv-swatch.is-none { background: linear-gradient(135deg, transparent 45%, var(--color-accent-2-700, #c33) 46%, var(--color-accent-2-700, #c33) 54%, transparent 55%), var(--color-bg); }
+.cv-swatch.is-on { box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-text); }
+.cv-pen-sizes { display: none; align-items: center; }
+.canvas-tools.is-pen .cv-pen-sizes { display: flex; }
+.cv-sep { width: 1px; height: 22px; margin: 0 6px; background: var(--color-divider); }
+.cv-size { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 6px; background: none; cursor: pointer; }
+.cv-size span { display: block; border-radius: 50%; background: var(--color-text); }
+.cv-size.is-on { background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-divider); }
+.canvas-view.tool-pen, .canvas-view.tool-arrow, .canvas-view.tool-rect, .canvas-view.tool-ellipse, .canvas-view.tool-diamond { cursor: crosshair; }
+.canvas-view.tool-text { cursor: text; }
+.canvas-view:not(.tool-select) .card { cursor: inherit; }
+
+/* Coloured cards (JSON Canvas colours) */
+.card.has-color.card-note, .card.has-color.card-link { box-shadow: var(--shadow-md), inset 4px 0 0 var(--c); }
+.card.has-color.card-text { background: color-mix(in srgb, var(--c) 14%, var(--color-bg)); }
+.card.has-color.card-text .k { color: var(--c); }
+.card.has-color.card-group { background: color-mix(in srgb, var(--c) 8%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 45%, transparent); }
+.card.has-color.card-group .k { color: var(--c); }
+
+/* Shapes */
+.card-shape { background: none; display: grid; place-items: center; padding: 10px 14px; }
+.shape-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.shape-fill { fill: var(--color-bg); stroke: color-mix(in srgb, var(--color-text) 70%, transparent); stroke-width: 2; }
+.card-shape.has-color .shape-fill { fill: color-mix(in srgb, var(--c) 13%, var(--color-bg)); stroke: var(--c); }
+.card-shape[data-shape="diamond"] { padding: 18% 22%; }
+.card-shape[data-shape="ellipse"] { padding: 12% 16%; }
+.shape-label {
+  position: relative; max-width: 100%; max-height: 100%; overflow: hidden; text-align: center;
+  font-size: 17px; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; outline: none;
+}
+.shape-label[contenteditable="true"], .shape-label[contenteditable="plaintext-only"] { cursor: text; user-select: text; min-width: 2ch; }
+.card-shape.is-selected { outline-style: dashed; }
+
+/* Pen strokes and arrows */
+.card-ink { pointer-events: none; border-radius: 0; }
+.ink-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ink-line { fill: none; stroke: var(--c, color-mix(in srgb, var(--color-text) 85%, transparent)); stroke-linecap: round; stroke-linejoin: round; }
+.ink-hit { fill: none; stroke: transparent; stroke-width: 14; stroke-linecap: round; pointer-events: stroke; cursor: grab; }
+.canvas-view:not(.tool-select) .ink-hit { pointer-events: none; }
+.card-ink.is-selected { outline: 1px dashed var(--color-accent); outline-offset: 2px; }
+.card-ink .card-resize { pointer-events: auto; }
+.ink-draft { fill: none; stroke: color-mix(in srgb, var(--color-text) 85%, transparent); stroke-linecap: round; stroke-linejoin: round; }
+.shape-draft { fill: none; stroke: var(--color-accent); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.canvas-edges .draw-draft path, .canvas-edges .draw-draft ellipse, .canvas-edges .draw-draft rect, .canvas-edges .draw-draft polygon { pointer-events: none; }
+.cv-edge-input {
+  position: absolute; transform: translate(-50%, -50%); z-index: 5; width: 180px; padding: 4px 8px;
+  font: inherit; font-size: 14px; text-align: center; border: 1px solid var(--color-accent); border-radius: 6px;
+  background: var(--color-bg); color: var(--color-text);
+}
 .canvas-zoom { position: absolute; right: 24px; bottom: 20px; display: flex; gap: 2px; background: var(--color-bg); box-shadow: var(--shadow-sm); border-radius: var(--radius-md); }
 .canvas-zoom button { width: 34px; height: 34px; border: 0; background: none; display: grid; place-items: center; font-size: 16px; }
 .canvas-zoom button:hover { color: var(--color-accent); }
