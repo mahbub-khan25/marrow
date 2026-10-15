@@ -4,6 +4,7 @@
 mod ai;
 mod capture;
 mod import;
+mod extras;
 mod locks;
 mod commands;
 mod portable;
@@ -57,6 +58,10 @@ fn main() {
             publish::site_copy,
             publish::site_finish,
             publish::site_open,
+            extras::extras_dir,
+            extras::snippets_list,
+            extras::plugins_list,
+            extras::extras_write,
             commands::write_note,
             commands::backup_for,
             commands::discard_backup,

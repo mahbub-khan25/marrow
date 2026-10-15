@@ -183,6 +183,24 @@ space in the file tree) brings notes in from:
 Everything goes into a new folder (“Notion”, “Evernote”…); the files you
 pick are only read.
 
+## Customize: CSS snippets and plugins
+
+Settings → **Customize**.
+
+* **CSS snippets** restyle Marrow. They're `.css` files in the vault's
+  `.marrow/snippets` folder (so they travel with the vault); switch each one
+  on or off. *Example snippet* writes one to start from; *Reload* picks up
+  your edits.
+* **Plugins** add commands to the command palette. Each is a folder in
+  `.marrow/plugins` with a `manifest.json` and a `main.js`. *Example plugin*
+  adds "Writing tools" (insert the date, sort lines, Title Case, count
+  words) to copy from; the help under the list shows the whole API.
+  * A plugin runs in a sandbox: it can't reach the internet, Marrow's own
+    window or your files. It can only ask Marrow to do things through a small
+    API, and only what its manifest asks for and you allow when you turn it
+    on: `read` (read notes) and `write` (change and create notes).
+  * Locked notes are never shown to plugins.
+
 ## Publish as a website
 
 Right-click a folder (or the empty space in the file tree, for the whole

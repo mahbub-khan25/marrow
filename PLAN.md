@@ -406,7 +406,8 @@ colours come from the prototype's own source, not from eyeballing.
 | J | Encrypted notes and folders | ✅ done |
 | K | Drawing and shapes on canvases | ✅ done |
 | L | Publish a folder as a static website | ✅ done |
-| M | CSS snippets and plugins | next |
+| M | CSS snippets and plugins | ✅ done |
+| N | Spell check, presentation mode, Vim keys | next |
 
 ## Phase E — what shipped
 
@@ -588,3 +589,31 @@ colours come from the prototype's own source, not from eyeballing.
   `site_open`. Tests.
 * Also fixed: exported HTML (Phase 1–3 batch) kept the app's
   `html, body { overflow: hidden }`, so long notes couldn't scroll.
+
+## Phase M — what shipped
+
+* `src-tauri/src/extras.rs`: `extras_dir(kind)` (creates
+  `.marrow/snippets` or `.marrow/plugins`), `snippets_list` (name + CSS),
+  `plugins_list` (folder, parsed manifest, code, or a problem: missing or
+  invalid manifest, missing `main.js`), `extras_write` (examples; never
+  overwrites). Vault settings gain `snippets` and `plugins` (the ones on).
+* `ui/src/extras.ts`:
+  * Snippets: `<style data-snippet>` elements after the app's CSS,
+    re-applied on vault open, toggle and Reload.
+  * Plugins: each in a hidden `<iframe sandbox="allow-scripts">` (opaque
+    origin: no parent DOM, storage or Tauri IPC) whose `srcdoc` sets
+    `Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'`
+    (no network). A bootstrap script defines a frozen `marrow` object that
+    talks to the host by `postMessage`; the host matches `event.source` to
+    the plugin's frame and checks each call against the manifest's
+    `permissions` (read: note/notes/read; write: insert/setText/create).
+    Commands registered with `addCommand` join the palette as
+    "Plugin: Command". `ask()` shows a Marrow input dialog.
+  * Turning on a plugin that asks for permissions shows what it can do
+    first. Locked notes (and notes in locked folders) are refused.
+  * Settings → Customize: both lists with switches, Open folder, Example,
+    Reload, and a short API reference.
+* Tested in the app: the example plugin's commands (count words, insert at
+  the cursor, undo), and a probe plugin that tried to reach the parent
+  page, the network, Tauri and storage (all blocked) and to read a note
+  without permission (refused).

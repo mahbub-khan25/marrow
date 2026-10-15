@@ -32,6 +32,7 @@ import { openCapture } from "./capture";
 import { TasksView } from "./tasks";
 import { openImport } from "./import";
 import { openPublish } from "./publish";
+import { applySnippets, initPlugins, pluginCommands, startPlugins } from "./extras";
 import {
   initLocks,
   isLockedError,
@@ -109,6 +110,8 @@ let vaultSettings: VaultSettings = {
   dailyFolder: "Daily",
   templateFolder: "Templates",
   starred: [],
+  snippets: [],
+  plugins: [],
 };
 let tabs: Tab[] = [];
 let active = -1;
@@ -1278,6 +1281,7 @@ function commands(): Command[] {
     hint,
     run,
   });
+  const fromPlugins = pluginCommands().map((c) => cmd(c.label, c.icon, c.run));
   return [
     cmd("New note", "note-pencil", () => void newNote(), kbd("N")),
     cmd("Open today's daily note", "calendar-blank", () => void openToday(), kbd("D")),
@@ -1344,6 +1348,8 @@ function commands(): Command[] {
     cmd("Export this note to HTML…", "file-html", () => void exportNote("html")),
     cmd("Print this note…", "printer", () => void exportNote("print")),
     mirror ? cmd("Sync now", "arrows-clockwise", () => void api.syncNow()) : cmd("Sync with a cloud folder", "cloud", () => startSyncSetup()),
+    cmd("Customize: CSS snippets and plugins", "paint-brush", () => openSettings("customize")),
+    ...fromPlugins,
   ];
 }
 
@@ -1604,6 +1610,8 @@ async function openVault(path: string) {
   graphPanel?.destroy();
   graphPanel = null;
   await api.lockNow().catch(() => {});
+  void applySnippets(vaultSettings.snippets ?? []);
+  void startPlugins(vaultSettings.plugins ?? []);
   await refreshLocked();
   await refreshTree();
   void refreshStats();
@@ -1736,8 +1744,57 @@ function bindChrome() {
 
 let editTimer: number | undefined;
 
+/** What plugins can do (each call is checked against their permissions first). */
+function pluginHooks() {
+  const current = () => {
+    const pane = focusedPane();
+    if (pane.doc && (isLockedNote(pane.doc.path) || lockedFolderOf(pane.doc.path) !== null)) throw new Error("This note is locked, so plugins can't use it.");
+    return pane.doc ? { pane, doc: pane.doc } : null;
+  };
+  initPlugins({
+    note: () => {
+      const c = current();
+      if (!c) return null;
+      const sel = c.pane.mode === "source" ? c.pane.view.state.sliceDoc(c.pane.view.state.selection.main.from, c.pane.view.state.selection.main.to) : "";
+      return { path: c.doc.path, title: displayName(c.doc.path), text: c.doc.text, selection: sel };
+    },
+    insert: (text) => {
+      const c = current();
+      if (!c) return false;
+      if (c.pane.mode === "source") {
+        const r = c.pane.view.state.selection.main;
+        c.pane.view.dispatch({ changes: { from: r.from, to: r.to, insert: text }, selection: { anchor: r.from + text.length }, userEvent: "input.plugin", scrollIntoView: true });
+      } else {
+        const t = c.doc.text;
+        replaceText(c.doc, t + (t.endsWith("\n") || !t ? "" : "\n") + text + "\n");
+      }
+      return true;
+    },
+    setText: (text) => {
+      const c = current();
+      if (!c) return false;
+      replaceText(c.doc, text);
+      return true;
+    },
+    notes: () => tree.files().filter((p) => isNotePath(p) && !isLockedNote(p) && lockedFolderOf(p) === null).map((p) => ({ path: p, title: displayName(p) })),
+    read: async (path) => {
+      if (isLockedNote(path) || lockedFolderOf(path) !== null) throw new Error("That note is locked.");
+      return findDoc(path)?.text ?? (await api.readNote(path));
+    },
+    create: async (name, text) => {
+      const path = await api.createNote(newNoteFolder(), name.replace(/[\\/:*?"<>|]/g, "-").slice(0, 120));
+      if (text) await api.writeNote(path, text, "");
+      await refreshTree();
+      return path;
+    },
+    open: (path) => void openPath(path, "replace"),
+    toast,
+  });
+}
+
 async function boot() {
   applyPrefs();
+  pluginHooks();
   initLocks();
   setLockAll(() => lockAllNow(true));
   onLockList(() => {
@@ -1878,6 +1935,21 @@ async function boot() {
     setupSync: () => startSyncSetup(),
     stopSync: () => void stopSync(),
     revealVault: () => void revealItemInDir(vaultRoot).catch((e) => toast(String(e), "error")),
+    customize: () => ({
+      snippetsOn: () => vaultSettings.snippets ?? [],
+      pluginsOn: () => vaultSettings.plugins ?? [],
+      setSnippets: (on) => {
+        vaultSettings = { ...vaultSettings, snippets: [...new Set(on)] };
+        void api.setVaultSettings(vaultSettings).catch((e) => toast(`Couldn't save the setting: ${e}`, "error"));
+        void applySnippets(vaultSettings.snippets);
+      },
+      setPlugins: (on) => {
+        vaultSettings = { ...vaultSettings, plugins: [...new Set(on)] };
+        void api.setVaultSettings(vaultSettings).catch((e) => toast(`Couldn't save the setting: ${e}`, "error"));
+        void startPlugins(vaultSettings.plugins);
+      },
+      toast,
+    }),
   });
 
   applyCaptureKey();
