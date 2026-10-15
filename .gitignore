@@ -1,0 +1,9 @@
+target/
+*.redb
+.marrow/
+node_modules/
+dist/
+src-tauri/gen/
+
+# Portable builds
+/portable/

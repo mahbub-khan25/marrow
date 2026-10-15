@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Marrow</title>
+  </head>
+  <body>
+    <!-- Before a vault is open -->
+    <section id="welcome" hidden>
+      <div class="start-inner">
+        <span class="logo-mark logo-lg" aria-hidden="true"><img src="./src/assets/logo-mark.svg" alt="" /></span>
+        <h1 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(40px, 5.2vw, 68px); line-height: 1.02; letter-spacing: -0.02em; margin: 28px 0 22px">A quiet place for linked thinking.</h1>
+        <p class="lede" style="font-size: 21px; line-height: 1.55; max-width: 34em; margin: 0 0 40px; color: var(--ink-78)">
+          Marrow keeps every note as plain Markdown in a folder you choose. Open one you already have, such as an Obsidian vault, or create a new vault — on this computer or in Dropbox, OneDrive or Google Drive.
+        </p>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap">
+          <button id="open-vault" class="btn btn-primary" style="font-size: 16px; padding: 10px 18px"><i class="ph-duotone ph-folder-open"></i>Open folder</button>
+          <button id="create-vault" class="btn btn-secondary" style="font-size: 16px; padding: 10px 18px"><i class="ph-duotone ph-folder-simple-plus"></i>Create a vault</button>
+        </div>
+        <p id="welcome-error" class="welcome-error" role="alert" hidden></p>
+      </div>
+    </section>
+
+    <div id="app" class="shell" hidden>
+      <nav class="rail" aria-label="Views">
+        <span class="logo-mark" title="Marrow"><img src="./src/assets/logo-mark.svg" alt="Marrow" /></span>
+        <button class="rail-btn" id="rail-files" title="Files" aria-pressed="true"><i class="ph-duotone ph-files"></i></button>
+        <button class="rail-btn" id="rail-search" title="Search" aria-pressed="false"><i class="ph-duotone ph-magnifying-glass"></i></button>
+        <button class="rail-btn" id="rail-tags" title="Tags" aria-pressed="false"><i class="ph-duotone ph-hash"></i></button>
+        <button class="rail-btn" id="rail-tasks" title="Tasks" aria-pressed="false"><i class="ph-duotone ph-check-square"></i></button>
+        <div class="grow"></div>
+        <button class="rail-btn" id="rail-today" title="Today's note" aria-pressed="false"><i class="ph-duotone ph-calendar-blank"></i></button>
+        <button class="rail-btn" id="rail-graph" title="Graph view" aria-pressed="false"><i class="ph-duotone ph-graph"></i></button>
+        <button class="rail-btn" id="rail-canvas" title="Canvas" aria-pressed="false"><i class="ph-duotone ph-squares-four"></i></button>
+        <button class="rail-btn" id="rail-palette" title="Command palette" aria-pressed="false"><i class="ph-duotone ph-command"></i></button>
+        <button class="rail-btn" id="rail-settings" title="Settings" aria-pressed="false"><i class="ph-duotone ph-gear-six"></i></button>
+      </nav>
+
+      <aside class="sidebar" id="sidebar" aria-label="Sidebar">
+        <header class="side-head">
+          <div class="side-vault">
+            <button id="vault-name" class="vault-name" title="Open a different folder"></button>
+            <div id="vault-meta" class="vault-meta"></div>
+          </div>
+          <button id="new-note" class="icon-btn" title="New note"><i class="ph-duotone ph-note-pencil"></i></button>
+        </header>
+
+        <div id="side-files" class="side-view">
+          <nav id="tree" class="tree" aria-label="Files"></nav>
+        </div>
+
+        <div id="side-search" class="side-view" hidden>
+          <input id="search-input" class="input" type="search" placeholder="Search every note…" autocomplete="off" spellcheck="false" />
+          <div id="replace-row" class="replace-row" hidden>
+            <input id="replace-input" class="input" type="text" placeholder="Replace with…" autocomplete="off" spellcheck="false" />
+            <button id="replace-all" class="btn btn-secondary" type="button">Replace all</button>
+          </div>
+          <div id="search-summary" class="side-note"></div>
+          <div id="search-results" class="search-results"></div>
+        </div>
+
+        <div id="side-tasks" class="side-view" hidden>
+          <input id="task-input" class="input" type="text" placeholder="Add a task to today's note…" autocomplete="off" />
+          <div class="task-bar">
+            <span id="task-summary" class="side-note"></span>
+            <label class="task-done-toggle"><input id="task-show-done" type="checkbox" /> Show done</label>
+          </div>
+          <div id="task-list" class="task-list"></div>
+        </div>
+
+        <div id="side-tags" class="side-view" hidden>
+          <div id="tag-chips" class="tag-chips"></div>
+          <div class="tag-notes">
+            <div id="tag-heading" class="smallcaps"></div>
+            <div id="tag-list"></div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="tabbar">
+          <div id="tabs" class="tabs" role="tablist" aria-label="Open tabs"></div>
+          <button id="jump" class="jump"><i class="ph-duotone ph-magnifying-glass"></i><span>Search or jump to…</span><kbd id="jump-kbd"></kbd></button>
+          <button id="split-btn" class="icon-btn" aria-pressed="false"><i class="ph-duotone ph-columns"></i></button>
+          <button id="inspector-btn" class="icon-btn flip" title="Inspector" aria-pressed="true"><i class="ph-duotone ph-sidebar-simple"></i></button>
+        </div>
+        <div id="banner" role="status" hidden></div>
+        <div id="stage" class="stage">
+          <div id="start" class="start" hidden>
+            <div class="start-inner">
+              <div id="start-kicker" class="smallcaps"></div>
+              <h1>A quiet place for linked thinking.</h1>
+              <p class="lede">Marrow keeps every note as plain Markdown on your disk. Link ideas with double brackets and the structure finds itself — in the margin, in the graph, on the canvas.</p>
+              <div class="steps">
+                <div class="step"><div class="n">1</div><div class="h">Write</div><div class="d">Start anywhere. Everything saves as you type.</div></div>
+                <div class="step"><div class="n">2</div><div class="h">Link</div><div class="d">Type [[ to connect a thought. Backlinks gather on their own.</div></div>
+                <div class="step"><div class="n">3</div><div class="h">Wander</div><div class="d">Open the graph to see what your notes are really about.</div></div>
+              </div>
+              <div class="start-actions">
+                <button id="start-new" class="btn btn-primary"><i class="ph-duotone ph-note-pencil"></i>New note<span class="hint" data-kbd="N"></span></button>
+                <button id="start-today" class="btn btn-secondary"><i class="ph-duotone ph-calendar-blank"></i>Today’s note<span class="hint" data-kbd="D"></span></button>
+                <button id="start-search" class="btn btn-secondary"><i class="ph-duotone ph-magnifying-glass"></i>Search<span class="hint" data-kbd="K"></span></button>
+              </div>
+              <div id="recent" class="recent"></div>
+            </div>
+          </div>
+
+          <div id="panes" class="panes" hidden>
+            <div id="pane-primary" class="pane"></div>
+            <div id="pane-split" class="pane is-split" hidden></div>
+          </div>
+
+          <div id="graph-view" class="graph-view" hidden></div>
+
+          <div id="canvas-view" class="canvas-view" hidden></div>
+        </div>
+      </main>
+
+      <aside id="inspector" class="inspector" aria-label="Inspector">
+        <section class="insp-sec">
+          <div class="insp-head smallcaps"><i class="ph-duotone ph-graph"></i>Local graph</div>
+          <div id="local-graph" class="local-graph"></div>
+        </section>
+        <section class="insp-sec" style="gap: 6px">
+          <div class="insp-head smallcaps"><i class="ph-duotone ph-list-bullets"></i>Outline</div>
+          <div id="outline" class="outline"></div>
+        </section>
+        <section class="insp-sec" style="gap: 10px">
+          <div class="insp-head smallcaps"><i class="ph-duotone ph-arrow-bend-down-left"></i>Linked mentions<span id="mention-count" class="count"></span></div>
+          <div id="mentions"></div>
+        </section>
+        <section class="insp-sec" style="gap: 10px">
+          <div class="insp-head smallcaps"><i class="ph-duotone ph-link-break"></i>Unlinked mentions<span id="unlinked-count" class="count"></span></div>
+          <div id="unlinked"></div>
+        </section>
+        <section class="insp-sec" style="gap: 4px">
+          <div class="insp-head smallcaps" style="padding-bottom: 4px"><i class="ph-duotone ph-link-simple"></i>Outgoing links</div>
+          <div id="outgoing" class="outgoing"></div>
+        </section>
+      </aside>
+
+      <div id="focus-bar" class="focus-bar" hidden></div>
+      <footer class="statusbar">
+        <span id="vault-path" class="path"></span>
+        <span id="status" class="status"></span>
+        <button id="sync-state" class="sync-state" hidden></button>
+        <span id="save-state" class="save-state" data-state="saved"><span class="dot"></span><span class="label">Saved</span></span>
+      </footer>
+    </div>
+
+    <div id="palette" class="backdrop palette-wrap" hidden>
+      <div class="palette" role="dialog" aria-label="Command palette">
+        <div class="palette-top">
+          <i class="ph-duotone ph-magnifying-glass"></i>
+          <input id="palette-input" placeholder="Search notes, #tags, or run a command…" autocomplete="off" spellcheck="false" />
+        </div>
+        <div id="palette-list" class="palette-list" role="listbox"></div>
+        <div class="palette-foot">
+          <span>↑↓ move</span><span>↵ open</span><span id="palette-split-hint"></span><span>⇧↵ create</span><span class="r">esc close</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="settings" class="backdrop settings-wrap" hidden>
+      <div class="settings" role="dialog" aria-label="Settings">
+        <div class="settings-nav" id="settings-nav"><div class="h">Settings</div></div>
+        <div class="settings-body" id="settings-body" tabindex="-1" style="outline:none"></div>
+      </div>
+    </div>
+
+    <div id="context-menu" class="context-menu" role="menu" hidden></div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
