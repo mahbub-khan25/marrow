@@ -163,12 +163,19 @@ export async function publish(o: Run, progress: (msg: string) => void): Promise<
   progress("Reading notes…");
   const pages: Page[] = [];
   let skipped = 0;
+  // Locked notes stay out even while they're unlocked for reading in Marrow.
+  const locked = await api.lockedPaths();
+  const isLocked = (p: string) => locked.notes.includes(p) || locked.folders.some((f) => p.startsWith(f + "/"));
   for (const path of o.files.filter((p) => isNotePath(p) && inFolder(p)).sort()) {
+    if (isLocked(path)) {
+      skipped++;
+      continue;
+    }
     let text: string;
     try {
       text = await api.readNote(path);
     } catch {
-      skipped++; // locked, or unreadable
+      skipped++; // unreadable
       continue;
     }
     const p = props(text);
