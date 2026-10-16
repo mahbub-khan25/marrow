@@ -19,6 +19,7 @@ import { hideCard, hoverCard, leaveCard, type CardContent } from "./hover";
 import type { Mode } from "./prefs";
 import { props, setProp } from "./frontmatter";
 import { setLivePreview } from "./livepreview";
+import { applyWriting } from "./writing";
 import { showMenu } from "./menu";
 import { prefs } from "./prefs";
 import { BlockHandles } from "./blocks";
@@ -509,6 +510,7 @@ export class NotePane {
     const state = opts.state ?? makeState(doc.text, this.hooks);
     this.view.setState(state);
     setLivePreview(this.view, prefs.livePreview); // a kept state may predate the setting
+    applyWriting(this.view);
     if (state.doc.toString() !== doc.text) this.applyQuietly(doc.text);
     if (!opts.state) this.restoreFolds();
     this.mode = opts.mode;
@@ -1133,6 +1135,14 @@ export class NotePane {
   }
 
   /** Fills in images and embedded notes, which need the vault. */
+  /** Draws images, embeds, code and diagrams in `el` as Preview does (for slides). */
+  async hydrateFor(el: HTMLElement): Promise<void> {
+    if (!this.doc) return;
+    await this.hydrate(el, this.doc.path);
+    await highlightCodeBlocks(el);
+    await renderMermaid(el);
+  }
+
   private async hydrate(container: HTMLElement, source: string) {
     void highlightCodeBlocks(container);
     void renderMermaid(container);

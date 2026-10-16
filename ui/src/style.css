@@ -2010,3 +2010,36 @@ body.block-dragging, body.block-dragging * { cursor: grabbing !important; user-s
 .switch > span { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--color-bg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.25); transition: transform 0.15s; }
 .switch[aria-checked="true"] { background: var(--color-accent); }
 .switch[aria-checked="true"] > span { transform: translateX(16px); }
+
+/* ------------------------------------------------------------ presenting */
+
+.present {
+  position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column;
+  background: var(--color-bg); color: var(--color-text); outline: none;
+}
+.present-title {
+  position: absolute; left: 32px; top: 22px; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-65); opacity: 0; transition: opacity 0.3s;
+}
+.present-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 7vh 8vw; overflow: hidden; cursor: default; }
+.present-slide { --note-size: clamp(20px, 2.3vw, 40px); width: min(1200px, 100%); max-width: none; transform-origin: center center; }
+.present-slide > :first-child { margin-top: 0; }
+.present-slide > :last-child { margin-bottom: 0; }
+.present-slide h1 { font-size: 2.1em; }
+.present-slide h2 { font-size: 1.6em; }
+.present-slide img, .present-slide svg { max-height: 62vh; }
+.present.is-title .present-slide { text-align: center; }
+.present.is-title .present-slide h1, .present.is-title .present-slide h2 { font-size: 2.6em; }
+.present-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: color-mix(in srgb, var(--color-text) 8%, transparent); }
+.present-bar > span { display: block; height: 100%; background: var(--color-accent); transition: width 0.25s; }
+.present-controls {
+  position: absolute; right: 24px; bottom: 18px; display: flex; align-items: center; gap: 4px; padding: 4px;
+  border-radius: var(--radius-md); background: var(--color-bg); box-shadow: var(--shadow-sm); opacity: 0; transition: opacity 0.3s;
+}
+.present.is-awake .present-controls, .present.is-awake .present-title { opacity: 1; }
+.present-btn { width: 34px; height: 34px; border: 0; background: none; border-radius: 6px; font-size: 18px; display: grid; place-items: center; color: inherit; }
+.present-btn:hover { background: var(--color-surface); }
+.present-count { min-width: 64px; text-align: center; font-size: 14px; color: var(--ink-70); font-variant-numeric: tabular-nums; }
+.present-slide .mermaid-block svg { width: 100%; max-width: 100% !important; height: auto; max-height: 58vh; }
+.cm-vim-panel { font-size: 13px; padding: 2px 10px; }
+.cm-vim-panel input { font-size: 13px; }

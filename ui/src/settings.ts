@@ -184,6 +184,22 @@ function render() {
           ]),
         ),
         row(
+          "Spell check",
+          "Underlines misspelt words while you write in Source. Right-click a word for suggestions. Uses your computer's dictionaries and languages.",
+          prefSeg("spellcheck", [
+            [true, "On"],
+            [false, "Off"],
+          ]),
+        ),
+        row(
+          "Vim keys",
+          "Edit in Source with Vim's normal, insert and visual modes (Esc, hjkl, dd, :w …). Off by default.",
+          prefSeg("vim", [
+            [false, "Off"],
+            [true, "On"],
+          ]),
+        ),
+        row(
           "Locked notes",
           "After you enter a locked note's password, lock it again when Marrow has been left alone this long.",
           prefSeg("lockAfter", [

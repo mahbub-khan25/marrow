@@ -32,6 +32,7 @@ import { openCapture } from "./capture";
 import { TasksView } from "./tasks";
 import { openImport } from "./import";
 import { openPublish } from "./publish";
+import { present } from "./present";
 import { applySnippets, initPlugins, pluginCommands, startPlugins } from "./extras";
 import {
   initLocks,
@@ -71,6 +72,7 @@ import { makeState } from "./editor";
 import { GraphPanel } from "./graphpanel";
 import { Inspector } from "./inspector";
 import { setLivePreview } from "./livepreview";
+import { applyWriting, onVimWrite } from "./writing";
 import { hideMenu } from "./menu";
 import { NotePane, type At } from "./notepane";
 import type { ButtonSpec } from "./preview";
@@ -556,6 +558,14 @@ async function lockAllNow(quiet = false) {
   }
   for (const d of allDocs()) if (locked(d.path)) forget(d.path);
   if (!quiet || closed) toast(closed ? "Locked. Notes that need a password were closed." : "Locked. Passwords are needed again.");
+}
+
+/** Shows the open note as slides, full screen. */
+function presentNote() {
+  const pane = focusedPane();
+  const d = pane.doc;
+  if (!d) return toast("Open a note first.");
+  void present(displayName(d.path), d.text, (el) => pane.hydrateFor(el));
 }
 
 /** Publish a folder ("" = the whole vault) as a website. */
@@ -1320,6 +1330,7 @@ function commands(): Command[] {
       void unlockRemove(d.path, false);
     }),
     cmd("Lock all notes now", "lock-key", () => void lockAllNow()),
+    cmd("Present this note as slides", "presentation-chart", () => presentNote()),
     cmd("Publish notes as a website…", "globe", () => publishSite("")),
     cmd("Star / unstar this note", "star", () => {
       const t = activeTab();
@@ -1795,6 +1806,10 @@ function pluginHooks() {
 async function boot() {
   applyPrefs();
   pluginHooks();
+  onVimWrite(() => {
+    const d = focusedPane().doc;
+    if (d) void forceSave(d).then(() => toast(`Saved “${displayName(d.path)}”.`));
+  });
   initLocks();
   setLockAll(() => lockAllNow(true));
   onLockList(() => {
@@ -1956,7 +1971,10 @@ async function boot() {
   void listen<boolean>("quick-capture", (e) => quickCapture(e.payload));
   onPrefs(() => {
     applyCaptureKey();
-    for (const p of [primary, splitPane]) setLivePreview(p.view, prefs.livePreview);
+    for (const p of [primary, splitPane]) {
+      setLivePreview(p.view, prefs.livePreview);
+      applyWriting(p.view);
+    }
     showStage();
     graphPanel?.restyle();
   });

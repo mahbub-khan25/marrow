@@ -183,6 +183,19 @@ space in the file tree) brings notes in from:
 Everything goes into a new folder (“Notion”, “Evernote”…); the files you
 pick are only read.
 
+## Writing comfort
+
+* **Spell check**: misspelt words are underlined in Source; right-click one
+  for suggestions. It uses your computer's own dictionaries and languages
+  (on Windows: Settings → Time & language → Language). Turn it off in
+  Settings → Editor.
+* **Presentation mode**: Ctrl+K → *Present this note as slides*. Put a line
+  with just `---` between slides (as in Obsidian), or let Marrow start a
+  new slide at each heading. → / Space for the next slide, ← to go back,
+  Esc to stop. It goes full screen; long slides shrink to fit.
+* **Vim keys**: Settings → Editor → *Vim keys*. Normal, insert and visual
+  modes, `:w` saves.
+
 ## Customize: CSS snippets and plugins
 
 Settings → **Customize**.

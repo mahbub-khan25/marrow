@@ -407,7 +407,7 @@ colours come from the prototype's own source, not from eyeballing.
 | K | Drawing and shapes on canvases | ✅ done |
 | L | Publish a folder as a static website | ✅ done |
 | M | CSS snippets and plugins | ✅ done |
-| N | Spell check, presentation mode, Vim keys | next |
+| N | Spell check, presentation mode, Vim keys | ✅ done |
 
 ## Phase E — what shipped
 
@@ -617,3 +617,22 @@ colours come from the prototype's own source, not from eyeballing.
   the cursor, undo), and a probe plugin that tried to reach the parent
   page, the network, Tauri and storage (all blocked) and to read a note
   without permission (refused).
+
+## Phase N — what shipped
+
+* `ui/src/writing.ts`: a compartment holding `Prec.highest(vim())`
+  (`@replit/codemirror-vim`, when the `vim` pref is on) and the editor's
+  `spellcheck` content attribute (pref `spellcheck`, default on — the
+  webview's own checker: WebView2 on Windows, WKWebView on macOS). Applied
+  to every new state, to kept tab states when shown, and live when Settings
+  change. `:w` saves through `forceSave`.
+* `ui/src/present.ts`: `splitSlides` (frontmatter dropped; `---` lines
+  outside code fences separate slides; with none, a slide per H1 — or per H2
+  when there's at most one H1). Full-screen overlay (Tauri `setFullscreen`,
+  restored afterwards; capabilities `allow-set-fullscreen`,
+  `allow-is-fullscreen`), slides rendered with `renderMarkdown` and drawn
+  with `NotePane.hydrateFor` (images, embeds, code, Mermaid). A slide that
+  overflows is scaled down to fit; a slide that's only a heading is
+  centred as a title. Keys: → Space PageDown Enter n / ← PageUp Backspace p
+  / Home End / Esc; click the left third to go back, elsewhere to go on.
+  Controls and progress bar appear when the mouse moves.
