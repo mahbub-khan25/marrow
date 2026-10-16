@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   AbsoluteFill,
+  Audio,
   Easing,
   Img,
   Sequence,
@@ -210,8 +211,8 @@ const Plan: React.FC<{ dur: number }> = ({ dur }) => (
 
 const Canvas: React.FC<{ dur: number }> = ({ dur }) => (
   <Scene bg={C.paper}>
-    <Shot src="09-canvas.jpg" width={1300} left={520} top={180} dur={dur} zoom={{ from: 1.3, to: 1.6, ox: 62, oy: 52 }} />
-    <Caption left={110} top={330} width={440} size={88} eyebrow="Canvas" title={<>Think on an endless <Em>board</Em>.</>} sub="Cards, shapes, arrows and ink, side by side with your notes." />
+    <Shot src="09-canvas.jpg" width={1100} left={720} top={240} dur={dur} zoom={{ from: 1.3, to: 1.6, ox: 62, oy: 52 }} />
+    <Caption left={110} top={300} width={560} eyebrow="Canvas" title={<>Think on an<br />endless <Em>board</Em>.</>} sub="Cards, shapes, arrows and ink, side by side with your notes." />
   </Scene>
 );
 
@@ -350,6 +351,8 @@ export const Promo: React.FC = () => {
   let at = 0;
   return (
     <AbsoluteFill style={{ background: C.paper }}>
+      {/* Music and voiceover, mixed by audio/make_soundtrack.py. */}
+      <Audio src={staticFile("soundtrack.wav")} />
       {SCENES.map(([S, d], i) => {
         const from = at;
         at += d - OVERLAP;
