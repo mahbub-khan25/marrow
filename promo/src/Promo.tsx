@@ -261,12 +261,18 @@ const Private: React.FC<{ dur: number }> = ({ dur }) => {
 
 const Publish: React.FC<{ dur: number }> = ({ dur }) => (
   <Scene bg={C.paper}>
-    <Caption left={110} top={300} width={600} eyebrow="Publish" title={<>Your vault,<br />as a <Em>website</Em>.</>} sub="One page per note, with links, search and diagrams. Nothing is uploaded until you say so." />
+    <Caption left={110} top={300} width={600} eyebrow="Publish" title={<>Your vault,<br />as a <Em>website</Em>.</>} sub="One page per note, with links, search and diagrams. Works on phones. Locked notes stay out." />
     <Sequence from={0} durationInFrames={84} layout="none">
       <Shot src="25-publish-dialog.jpg" width={1080} left={740} top={250} dur={84} zoom={{ from: 2.3, to: 2.5, ox: 50, oy: 50 }} fadeAt={[72, 84]} />
     </Sequence>
-    <Sequence from={72} durationInFrames={dur - 72} layout="none">
-      <Shot src="26-published.jpg" width={1080} left={740} top={250} dur={dur - 72} zoom={{ from: 2.5, to: 2.65, ox: 50, oy: 52 }} />
+    <Sequence from={72} durationInFrames={84} layout="none">
+      <Shot src="26-published.jpg" width={1080} left={740} top={250} dur={84} zoom={{ from: 2.5, to: 2.65, ox: 50, oy: 52 }} fadeAt={[72, 84]} />
+    </Sequence>
+    <Sequence from={144} durationInFrames={96} layout="none">
+      <Shot src="31-site-note.jpg" width={1080} left={740} top={250} dur={96} zoom={{ from: 1.12, to: 1.3, ox: 45, oy: 25 }} fadeAt={[84, 96]} />
+    </Sequence>
+    <Sequence from={228} durationInFrames={dur - 228} layout="none">
+      <Shot src="33-site-phone.jpg" width={1080} left={740} top={250} dur={dur - 228} zoom={{ from: 1.02, to: 1.1, ox: 50, oy: 45 }} />
     </Sequence>
   </Scene>
 );
@@ -324,7 +330,7 @@ const SCENES: [React.FC<{ dur: number }>, number][] = [
   [Canvas, 160],
   [Present, 160],
   [Private, 240],
-  [Publish, 170],
+  [Publish, 300],
   [Yours, 190],
   [Outro, 200],
 ];
