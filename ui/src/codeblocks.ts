@@ -74,6 +74,8 @@ export async function renderMermaid(root: HTMLElement) {
     // Encoded, because the sanitiser drops attributes containing "-->".
     const src = decodeURIComponent(el.dataset.mermaid ?? "");
     el.removeAttribute("data-mermaid");
+    // Kept so the diagram can be redrawn when the theme changes.
+    drawn.set(el, src);
     try {
       const { svg } = await mermaid.render(`marrow-mermaid-${++count}`, src);
       el.innerHTML = svg;
@@ -82,6 +84,31 @@ export async function renderMermaid(root: HTMLElement) {
     }
   }
 }
+
+/** Diagrams on screen and their source, for redrawing in a new theme. */
+const drawn = new WeakMap<HTMLElement, string>();
+let lastDark: boolean | null = null;
+
+function isDark() {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+/** Redraws the diagrams on screen after a switch between light and dark. */
+function onThemeChange() {
+  const dark = isDark();
+  if (lastDark === null) lastDark = dark;
+  if (dark === lastDark) return;
+  lastDark = dark;
+  for (const el of document.querySelectorAll<HTMLElement>(".mermaid-block")) {
+    const src = drawn.get(el);
+    if (src !== undefined) el.dataset.mermaid = encodeURIComponent(src);
+  }
+  void renderMermaid(document.body);
+}
+lastDark = isDark();
+new MutationObserver(onThemeChange).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", onThemeChange);
 
 function showError(el: HTMLElement, src: string, e: unknown) {
   el.removeAttribute("data-mermaid");
