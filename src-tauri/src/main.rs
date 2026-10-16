@@ -15,11 +15,20 @@ mod sync;
 use std::sync::Mutex;
 
 use commands::AppState;
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 fn main() {
     portable::prepare();
     tauri::Builder::default()
+        // Opening Marrow again brings the open window forward instead of
+        // starting a second copy that can't use the vault.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
         .setup(|app| {
             let mut win = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
                 .title("Marrow")
