@@ -1,0 +1,21 @@
+{
+  "name": "marrow-promo",
+  "version": "1.0.0",
+  "description": "Marrow promo video (Remotion)",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts MarrowPromo out/marrow-promo.mp4 --codec=h264 --crf=18"
+  },
+  "dependencies": {
+    "@fontsource/eb-garamond": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/source-sans-3": "^5.3.1",
+    "@remotion/cli": "4.0.242",
+    "@types/react": "^19.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.242",
+    "typescript": "5.6.3"
+  },
+  "private": true
+}

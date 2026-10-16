@@ -1,0 +1,626 @@
+<title>Marrow User Guide</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a field guide. Sticky contents rail on the left, a reading column on the right,
+   screenshots framed like the app window and allowed to run wider than the text. */
+:root {
+  --paper: #f4f3ef;
+  --sheet: #fbfaf7;
+  --ink: #23221f;
+  --ink-soft: #5d5a53;
+  --rule: #dedbd2;
+  --teal: #0b7896;
+  --teal-wash: #e1eff2;
+  --tag: #b3195f;
+  --kbd: #ecebe5;
+  --shadow: 0 1px 2px rgb(40 36 28 / .06), 0 8px 28px rgb(40 36 28 / .09);
+  --display: "EB Garamond", "Iowan Old Style", Georgia, serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #151515; --sheet: #1c1c1b; --ink: #e9e6df; --ink-soft: #a8a49b; --rule: #33322f;
+    --teal: #4fb8d3; --teal-wash: #16323a; --tag: #f0679e; --kbd: #2a2927;
+    --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 10px 30px rgb(0 0 0 / .45);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #151515; --sheet: #1c1c1b; --ink: #e9e6df; --ink-soft: #a8a49b; --rule: #33322f;
+  --teal: #4fb8d3; --teal-wash: #16323a; --tag: #f0679e; --kbd: #2a2927;
+  --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 10px 30px rgb(0 0 0 / .45);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  background: var(--paper); color: var(--ink);
+  font: 17px/1.62 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+a { color: var(--teal); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; text-wrap: balance; line-height: 1.12; margin: 0; }
+p { margin: 0; }
+code { font: 500 .84em var(--mono); background: var(--kbd); padding: .08em .35em; border-radius: 4px; }
+kbd {
+  font: 500 .78em var(--mono); background: var(--sheet); border: 1px solid var(--rule);
+  border-bottom-width: 2px; padding: .05em .42em; border-radius: 5px; white-space: nowrap;
+}
+
+/* Masthead */
+.mast {
+  max-width: 1180px; margin: 0 auto; padding-block: 56px 40px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end;
+  border-bottom: 1px solid var(--rule);
+}
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+.brand svg { width: 34px; height: 34px; color: var(--ink); }
+.brand span { font: 600 13px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+.mast h1 { font-size: clamp(40px, 6vw, 68px); letter-spacing: -.01em; max-width: 18ch; }
+.mast h1 em { font-style: italic; color: var(--teal); font-weight: 500; }
+.lede { margin-top: 16px; max-width: 58ch; color: var(--ink-soft); font-size: 18.5px; }
+.facts { display: grid; gap: 6px; font-size: 14px; color: var(--ink-soft); text-align: right; }
+.facts b { color: var(--ink); font-weight: 600; }
+
+/* Two columns */
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 56px; }
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; padding-block: 36px; max-height: 100vh; overflow-y: auto; }
+.toc h2 { font: 600 12px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 14px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: s; }
+.toc li { counter-increment: s; }
+.toc a {
+  display: grid; grid-template-columns: 26px 1fr; padding: 5px 8px; border-radius: 6px;
+  color: var(--ink-soft); text-decoration: none; font-size: 15px; line-height: 1.3;
+}
+.toc a::before { content: counter(s, decimal-leading-zero); font: 500 11px/1.9 var(--mono); color: var(--ink-soft); opacity: .55; }
+.toc a:hover { color: var(--ink); background: var(--sheet); }
+.toc a.on { color: var(--teal); background: var(--teal-wash); }
+.toc a.on::before { color: var(--teal); }
+
+main { min-width: 0; padding-block: 36px; }
+section { padding-block: 40px; border-bottom: 1px solid var(--rule); display: grid; gap: 18px; }
+section:last-of-type { border-bottom: 0; }
+section > p, section > ul, section > ol, .cols > div > p { max-width: 66ch; }
+.eyebrow { font: 600 12px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--teal); }
+h2.sec { font-size: clamp(30px, 3.6vw, 40px); }
+h3 { font-size: 23px; margin-top: 10px; }
+section ul, section ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+section li::marker { color: var(--ink-soft); }
+
+/* Screenshot frames */
+figure { margin: 6px 0; display: grid; gap: 10px; }
+.shot {
+  display: block; width: 100%; padding: 0; border: 1px solid var(--rule); border-radius: 10px; overflow: hidden;
+  background: var(--sheet); box-shadow: var(--shadow); cursor: zoom-in; position: relative;
+}
+.shot img { display: block; width: 100%; height: auto; }
+figcaption { font-size: 14.5px; color: var(--ink-soft); max-width: 70ch; }
+figcaption b { color: var(--ink); font-weight: 600; }
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+
+/* Annotated tour */
+.pin {
+  position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
+  background: var(--teal); color: var(--sheet); font: 700 13px/26px var(--body); text-align: center;
+  box-shadow: 0 0 0 3px rgb(255 255 255 / .85), 0 2px 8px rgb(0 0 0 / .25);
+}
+.legend { list-style: none; padding: 0 !important; display: grid !important; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px 24px !important; max-width: none !important; }
+.legend li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; font-size: 15.5px; }
+.legend li span:first-child { width: 22px; height: 22px; border-radius: 50%; background: var(--teal); color: var(--sheet); font: 700 12px/22px var(--body); text-align: center; margin-top: 2px; }
+
+/* Steps that really are a sequence */
+.steps { counter-reset: st; list-style: none; padding: 0 !important; gap: 12px !important; }
+.steps li { counter-increment: st; display: grid; grid-template-columns: 34px 1fr; gap: 12px; }
+.steps li::before {
+  content: counter(st); width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--teal);
+  color: var(--teal); font: 600 14px/25px var(--body); text-align: center;
+}
+
+.note {
+  border-left: 3px solid var(--teal); background: var(--teal-wash); padding: 14px 18px; border-radius: 0 8px 8px 0;
+  max-width: 66ch; font-size: 16px;
+}
+.note.warn { border-color: var(--tag); background: color-mix(in srgb, var(--tag) 9%, var(--paper)); }
+.note b { font-weight: 700; }
+
+pre.code {
+  margin: 0; font: 13.5px/1.6 var(--mono); background: var(--sheet); border: 1px solid var(--rule);
+  border-radius: 8px; padding: 14px 16px; overflow-x: auto; max-width: 66ch;
+}
+.cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; align-items: start; }
+.cols > div { display: grid; gap: 12px; min-width: 0; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--sheet); }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 600 12px/1.4 var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); background: var(--paper); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { white-space: nowrap; }
+.kgroup td[colspan] { font: 600 13px/1 var(--display); font-size: 17px; color: var(--teal); background: var(--paper); padding-top: 14px; }
+
+.tag { color: var(--tag); font-style: italic; font-family: var(--display); font-size: 1.05em; }
+
+footer { max-width: 1180px; margin: 0 auto; padding-top: 28px; border-top: 1px solid var(--rule); color: var(--ink-soft); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+
+/* Lightbox */
+dialog.lb { border: 0; padding: 0; background: transparent; max-width: 96vw; max-height: 94vh; }
+dialog.lb::backdrop { background: rgb(10 10 10 / .82); }
+dialog.lb img { display: block; max-width: 96vw; max-height: 88vh; border-radius: 8px; }
+dialog.lb p { color: #e8e6e0; font-size: 14px; margin-top: 10px; text-align: center; }
+dialog.lb button { position: fixed; top: max(14px, env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); background: #fff; color: #222; border: 0; border-radius: 99px; font: 600 14px var(--body); padding: 8px 14px; cursor: pointer; }
+
+@media (max-width: 900px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  nav.toc { position: static; max-height: none; padding-block: 24px 0; }
+  .toc ol { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  .mast { grid-template-columns: minmax(0, 1fr); padding-block: 36px 28px; }
+  .facts { text-align: left; }
+  .pair, .cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .trio { grid-template-columns: minmax(0, 1fr); }
+  .pin { width: 20px; height: 20px; margin: -10px 0 0 -10px; font-size: 11px; line-height: 20px; }
+}
+</style>
+
+<header class="mast">
+  <div>
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path fill="currentColor" d="M5 7.5 11 5l5 3 5-3 6 2.5V26l-6-2.5-5 3-5-3L5 26z" opacity=".14"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M5 7.5 11 5l5 3 5-3 6 2.5V26l-6-2.5-5 3-5-3L5 26zM11 5v18.5M16 8v18.5M21 5v18.5"/></svg>
+      <span>Marrow · User guide</span>
+    </div>
+    <h1>Notes that stay <em>yours</em>, and link themselves.</h1>
+    <p class="lede">Marrow keeps every note as a plain Markdown file in a folder on your computer. This guide walks through everything it can do, with screenshots taken from Marrow running on Windows.</p>
+  </div>
+  <div class="facts">
+    <div><b>Works offline</b>, no account</div>
+    <div><b>Plain .md files</b>, open in Obsidian too</div>
+    <div>Windows · macOS · Linux</div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#start">Getting started</a></li>
+      <li><a href="#tour">The window</a></li>
+      <li><a href="#writing">Writing notes</a></li>
+      <li><a href="#linking">Links, tags and the graph</a></li>
+      <li><a href="#finding">Search and the palette</a></li>
+      <li><a href="#daily">Daily notes and tasks</a></li>
+      <li><a href="#databases">Databases</a></li>
+      <li><a href="#canvas">Canvas</a></li>
+      <li><a href="#present">Slides and focus</a></li>
+      <li><a href="#locked">Locked notes</a></li>
+      <li><a href="#publish">Publish a website</a></li>
+      <li><a href="#ai">AI, your own</a></li>
+      <li><a href="#customize">Snippets and plugins</a></li>
+      <li><a href="#settings">Settings and themes</a></li>
+      <li><a href="#safety">Keeping text safe</a></li>
+      <li><a href="#keys">Keyboard shortcuts</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <!-- 1 -->
+    <section id="start">
+      <div class="eyebrow">Chapter 1</div>
+      <h2 class="sec">Getting started</h2>
+      <p>A <b>vault</b> is just a folder. Every note in it is a <code>.md</code> file you can open in any text editor, back up, sync with OneDrive or Dropbox, or move to another app. Marrow adds a hidden <code>.marrow</code> folder for its own things (history, trash, plugins) and never locks your notes into a format.</p>
+      <ol class="steps">
+        <li><span>Start Marrow. The first time, it asks for a folder. Pick an empty one to start fresh, or a copy of an existing Obsidian vault.</span></li>
+        <li><span>The empty vault shows three buttons: <b>New note</b> (<kbd>Ctrl</kbd>+<kbd>N</kbd>), <b>Today's note</b> (<kbd>Ctrl</kbd>+<kbd>D</kbd>) and <b>Search</b> (<kbd>Ctrl</kbd>+<kbd>K</kbd>).</span></li>
+        <li><span>Click the title to name the note, then start typing. Marrow saves two seconds after you stop.</span></li>
+      </ol>
+      <figure>
+        <button class="shot" type="button"><img src="shots/01-empty-vault.webp" alt="Marrow's start screen in a new, empty vault" loading="lazy"></button>
+        <figcaption><b>A new vault.</b> Write, link, wander: the start screen shows the three things you'll do most.</figcaption>
+      </figure>
+      <div class="note"><b>Coming from Notion, Evernote, OneNote or Word?</b> Press <kbd>Ctrl</kbd>+<kbd>K</kbd> and choose <i>Import notes…</i>. Pages, links, tags, properties and pictures come across into a new folder; the files you pick are only read.</div>
+    </section>
+
+    <!-- 2 -->
+    <section id="tour">
+      <div class="eyebrow">Chapter 2</div>
+      <h2 class="sec">The window at a glance</h2>
+      <p>Everything has one home, and most of it can be hidden. Here is a note called <i>Welcome to Marrow</i> in the demo vault.</p>
+      <figure>
+        <button class="shot" type="button" aria-label="Enlarge the annotated window">
+          <img src="shots/03-preview.webp" alt="The Marrow window with a note open in Preview" loading="lazy">
+          <span class="pin" style="left:1.8%;top:42%">1</span>
+          <span class="pin" style="left:9%;top:11%">2</span>
+          <span class="pin" style="left:22%;top:3.6%">3</span>
+          <span class="pin" style="left:61.5%;top:9.8%">4</span>
+          <span class="pin" style="left:44%;top:30%">5</span>
+          <span class="pin" style="left:79%;top:3.6%">6</span>
+          <span class="pin" style="left:93%;top:16%">7</span>
+        </button>
+        <ol class="legend">
+          <li><span>1</span><span><b>Rail.</b> Files, search, tags and tasks at the top; daily note, graph, canvas, command palette and settings at the bottom.</span></li>
+          <li><span>2</span><span><b>File tree.</b> Drag to move, right-click for more. A padlock marks a locked note.</span></li>
+          <li><span>3</span><span><b>Tabs.</b> They reopen where you left off. <kbd>Ctrl</kbd>+<kbd>\</kbd> splits the pane.</span></li>
+          <li><span>4</span><span><b>Preview / Source.</b> Read the rendered note, or edit the Markdown. <kbd>Ctrl</kbd>+<kbd>E</kbd> switches.</span></li>
+          <li><span>5</span><span><b>The note.</b> To-dos tick, diagrams draw, maths renders, tables edit in place.</span></li>
+          <li><span>6</span><span><b>Search or jump to</b> any note, heading or command.</span></li>
+          <li><span>7</span><span><b>Inspector.</b> Local graph, outline, backlinks and unlinked mentions for this note.</span></li>
+        </ol>
+      </figure>
+    </section>
+
+    <!-- 3 -->
+    <section id="writing">
+      <div class="eyebrow">Chapter 3</div>
+      <h2 class="sec">Writing notes</h2>
+      <p>Notes open in <b>Preview</b>, which reads like a finished page. Double-click a paragraph, or press <kbd>Ctrl</kbd>+<kbd>E</kbd>, to edit it in <b>Source</b>. Source hides Markdown marks except on the line you're typing, so it stays tidy, and the toolbar above it formats text if you'd rather not type <code>**</code> and <code>#</code>.</p>
+      <div class="pair">
+        <figure>
+          <button class="shot" type="button"><img src="shots/04-source-mode.webp" alt="A note in Source mode with the formatting toolbar" loading="lazy"></button>
+          <figcaption><b>Source mode</b> with the formatting toolbar. Select text for a smaller bar with bold, italic, links and AI.</figcaption>
+        </figure>
+        <figure>
+          <button class="shot" type="button"><img src="shots/06-slash-menu.webp" alt="The slash menu listing headings, lists and to-dos" loading="lazy"></button>
+          <figcaption><b>Type <code>/</code></b> on a new line for headings, lists, to-dos, toggles, callouts, tables, code, maths, diagrams, columns, databases and your templates.</figcaption>
+        </figure>
+      </div>
+      <h3>What a note can hold</h3>
+      <ul>
+        <li><b>Callouts</b> like <code>&gt; [!tip] Try this</code>, coloured by type. Click the icon in Preview to change the type.</li>
+        <li><b>Maths</b> with <code>$g = r \times t$</code> inline or <code>$$ … $$</code> on its own lines.</li>
+        <li><b>Tables</b> you edit by clicking a cell. <kbd>Tab</kbd> moves on and adds a row at the end; right-click for sorting and columns.</li>
+        <li><b>Diagrams</b> in Mermaid: flowcharts, sequences, mind maps, timelines, Gantt, pie and more.</li>
+        <li><b>Images and files</b>: paste a screenshot or drag files in. They're saved in the vault's <code>attachments</code> folder.</li>
+        <li><b>Footnotes, toggles, columns, buttons, code</b> coloured by language, and <b>synced blocks</b> that edit the original wherever they're embedded.</li>
+      </ul>
+      <figure>
+        <button class="shot" type="button"><img src="shots/07-diagram-editor.webp" alt="The diagram editor with visual controls on the left and a live flowchart" loading="lazy"></button>
+        <figcaption><b>The diagram editor.</b> Double-click any diagram, or type <code>/diagram</code>. Flowcharts have a Visual mode: click a box to rename it or change its shape, add connected boxes, and label arrows. It's saved as ordinary Mermaid text.</figcaption>
+      </figure>
+      <div class="note"><b>History is automatic.</b> Right-click a note → <i>Version history…</i> to see earlier copies and restore one. Copies are kept every few minutes while you edit, thinning out to daily over a year.</div>
+    </section>
+
+    <!-- 4 -->
+    <section id="linking">
+      <div class="eyebrow">Chapter 4</div>
+      <h2 class="sec">Links, tags and the graph</h2>
+      <p>Type <code>[[</code> and pick a note to link it. Linking to a note that doesn't exist yet is fine: click the link and Marrow creates it. Rename a note and every link to it updates. Add <span class="tag">#tags</span> anywhere in the text or in the note's properties.</p>
+      <figure>
+        <button class="shot" type="button"><img src="shots/05-properties-links.webp" alt="A note's properties panel with status, date, owner and tags, and backlinks in the inspector" loading="lazy"></button>
+        <figcaption><b>Properties</b> sit under the title as editable fields: text, numbers, dates, checkboxes, lists, tags and links. The inspector on the right lists who links here and which notes mention this one without a link yet.</figcaption>
+      </figure>
+      <div class="pair">
+        <figure>
+          <button class="shot" type="button"><img src="shots/08-graph.webp" alt="The graph view with notes as dots, tags in pink and a card for the selected note" loading="lazy"></button>
+          <figcaption><b>Graph</b> (<kbd>Ctrl</kbd>+<kbd>G</kbd>). Click a dot to see its links and tags in a card; double-click to open it. <kbd>/</kbd> filters, and <i>Forces</i> changes the layout.</figcaption>
+        </figure>
+        <figure>
+          <button class="shot" type="button"><img src="shots/27-tags.webp" alt="The tags panel listing #garden, #ideas, #plan and #reading" loading="lazy"></button>
+          <figcaption><b>Tags</b> (the <b>#</b> in the rail). Pick one to list its notes. Sub-tags like <code>#idea/later</code> roll up into their parent.</figcaption>
+        </figure>
+      </div>
+      <p>Rest the pointer on a link in Preview to read that note in a small card without leaving the page. Star the notes you use most (right-click → <i>Star</i>) to keep them at the top of the tree.</p>
+    </section>
+
+    <!-- 5 -->
+    <section id="finding">
+      <div class="eyebrow">Chapter 5</div>
+      <h2 class="sec">Search and the command palette</h2>
+      <div class="pair">
+        <figure>
+          <button class="shot" type="button"><img src="shots/19-search.webp" alt="Search results for 'garden' across three notes" loading="lazy"></button>
+          <figcaption><b>Search</b> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd>) shows each match in context. <i>Replace…</i> under the box changes a word in every note, after asking.</figcaption>
+        </figure>
+        <figure>
+          <button class="shot" type="button"><img src="shots/10-command-palette.webp" alt="The command palette filtered to lock commands" loading="lazy"></button>
+          <figcaption><b>The palette</b> (<kbd>Ctrl</kbd>+<kbd>K</kbd>) finds notes, headings, tags and every command. If you remember nothing else, remember this key.</figcaption>
+        </figure>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Type in search</th><th>Finds notes that…</th></tr></thead>
+          <tbody>
+            <tr><td><code>seed compost</code></td><td>contain both words, anywhere, any case</td></tr>
+            <tr><td><code>"raised beds"</code></td><td>contain the exact phrase</td></tr>
+            <tr><td><code>-draft</code></td><td>don't contain the word</td></tr>
+            <tr><td><code>tag:#garden</code> or <code>#garden</code></td><td>have the tag, or a sub-tag of it</td></tr>
+            <tr><td><code>path:Projects</code></td><td>are in a folder whose path contains the text</td></tr>
+            <tr><td><code>file:2026</code></td><td>have the text in their file name</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section id="daily">
+      <div class="eyebrow">Chapter 6</div>
+      <h2 class="sec">Daily notes and tasks</h2>
+      <p>Press <kbd>Ctrl</kbd>+<kbd>D</kbd> (or the calendar in the rail) for today's note. It lives in the <code>Daily</code> folder, named by date, with <i>Log</i> and <i>Tasks</i> sections. The arrows beside the date step to the day before or after.</p>
+      <div class="pair">
+        <figure>
+          <button class="shot" type="button"><img src="shots/20-tasks.webp" alt="The tasks panel listing open to-dos from several notes" loading="lazy"></button>
+          <figcaption><b>Tasks</b> (✓ in the rail) gathers every <code>- [ ]</code> in the vault: overdue, today, upcoming and undated. Tick one here and it's ticked in its note.</figcaption>
+        </figure>
+        <figure>
+          <button class="shot" type="button"><img src="shots/21-daily-note.webp" alt="Today's daily note with a task added from the tasks panel" loading="lazy"></button>
+          <figcaption><b>Add a task</b> in the box at the top of the panel and it lands in today's note under <i>Tasks</i>.</figcaption>
+        </figure>
+      </div>
+      <ul>
+        <li>Give a task a date with <code>📅 2026-10-20</code>, <code>due: 2026-10-20</code> or a <code>[[2026-10-20]]</code> link.</li>
+        <li><b>Quick capture:</b> press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd> in any app while Marrow is open, even minimised, to jot a line or a to-do into today's note.</li>
+      </ul>
+    </section>
+
+    <!-- 7 -->
+    <section id="databases">
+      <div class="eyebrow">Chapter 7</div>
+      <h2 class="sec">Databases</h2>
+      <p>A database shows the notes in a folder as a <b>table</b>, <b>board</b>, <b>calendar</b> or <b>gallery</b>, using their properties as columns. Type <code>/database</code> in a note, or right-click a folder → <i>View as database</i>. Every row is a real note, and every cell is a property in it.</p>
+      <figure>
+        <button class="shot" type="button"><img src="shots/22-database-table.webp" alt="A Garden database as a table with status and due columns" loading="lazy"></button>
+        <figcaption><b>Table.</b> Click a cell to edit it, a header to sort. <i>New</i> adds a note to the folder; <i>AI column</i> asks your AI to fill a column for every row.</figcaption>
+      </figure>
+      <div class="pair">
+        <figure>
+          <button class="shot" type="button"><img src="shots/23-database-board.webp" alt="The same database as a board with To do, Doing and Done columns" loading="lazy"></button>
+          <figcaption><b>Board.</b> Columns come from a property (here <code>status</code>). Drag a card to change it.</figcaption>
+        </figure>
+        <figure>
+          <button class="shot" type="button"><img src="shots/24-database-calendar.webp" alt="The same database as a calendar for October 2026" loading="lazy"></button>
+          <figcaption><b>Calendar.</b> Notes sit on their <code>due</code> date. Drag one to another day to move it.</figcaption>
+        </figure>
+      </div>
+      <div class="cols">
+        <div>
+          <p>The block behind it is plain text, so you can fine-tune it in Source:</p>
+          <pre class="code">```database
+from: Garden
+view: board
+columns: [status, due]
+group: status
+sort: due desc
+filter: status != Done
+```</pre>
+        </div>
+        <div>
+          <p><b>Relations and rollups.</b> A property holding <code>[[links]]</code> is a relation, and <code>project.owner</code> reads <code>owner</code> from the linked note. <code>count()</code>, <code>sum()</code>, <code>avg()</code> and <code>percent()</code> roll values up, for example <code>Done = percent(backlinks.done)</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8 -->
+    <section id="canvas">
+      <div class="eyebrow">Chapter 8</div>
+      <h2 class="sec">Canvas</h2>
+      <p>A canvas is an endless board for laying out notes and drawing between them. Open one from the squares icon in the rail, or right-click a folder → <i>New canvas here</i>. Drag notes in from the file tree; they show live and open with a double-click.</p>
+      <figure>
+        <button class="shot" type="button"><img src="shots/09-canvas.webp" alt="A canvas with a note card, a box, an ellipse, a diamond, connecting arrows and a pen line" loading="lazy"></button>
+        <figcaption><b>Shapes, arrows and ink.</b> The toolbar at the bottom draws boxes, ellipses, diamonds, arrows and pen lines in six colours. Drag from a card's edge to connect it; double-click a shape or an arrow to label it.</figcaption>
+      </figure>
+      <p>Tool keys: <kbd>V</kbd> select, <kbd>T</kbd> text, <kbd>R</kbd> box, <kbd>O</kbd> ellipse, <kbd>D</kbd> diamond, <kbd>A</kbd> arrow, <kbd>P</kbd> pen. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes. Canvases are saved as JSON Canvas files, the same format Obsidian uses.</p>
+    </section>
+
+    <!-- 9 -->
+    <section id="present">
+      <div class="eyebrow">Chapter 9</div>
+      <h2 class="sec">Slides and focus mode</h2>
+      <div class="pair">
+        <figure>
+          <button class="shot" type="button"><img src="shots/14-slides.webp" alt="A note shown full screen as a slide with a diagram, formula and table" loading="lazy"></button>
+          <figcaption><b>Present a note</b>: <kbd>Ctrl</kbd>+<kbd>K</kbd> → <i>Present this note as slides</i>. Put a line with just <code>---</code> between slides, or let Marrow start a slide at each heading. <kbd>→</kbd> next, <kbd>←</kbd> back, <kbd>Esc</kbd> stops.</figcaption>
+        </figure>
+        <figure>
+          <button class="shot" type="button"><img src="shots/29-focus-mode.webp" alt="Focus mode in the dark theme, showing only the note" loading="lazy"></button>
+          <figcaption><b>Focus mode</b> (<kbd>F11</kbd>) hides everything but the note. Set a word goal in Settings → Editor for a bar that fills as you write.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- 10 -->
+    <section id="locked">
+      <div class="eyebrow">Chapter 10</div>
+      <h2 class="sec">Locked notes</h2>
+      <p>Lock a private note with a password: right-click it → <i>Lock with password…</i>, or a folder → <i>Lock folder with password…</i>. On disk the note becomes unreadable, so it stays private even if the folder is synced or copied. Its file name stays visible.</p>
+      <div class="trio">
+        <figure>
+          <button class="shot" type="button"><img src="shots/11-lock-dialog.webp" alt="The Lock note dialog asking for a password, confirmation and hint" loading="lazy"></button>
+          <figcaption><b>1. Lock.</b> Choose a password and an optional hint.</figcaption>
+        </figure>
+        <figure>
+          <button class="shot" type="button"><img src="shots/12-unlock-dialog.webp" alt="The Unlock note dialog showing the hint" loading="lazy"></button>
+          <figcaption><b>2. Unlock.</b> Opening it asks once, and shows your hint.</figcaption>
+        </figure>
+        <figure>
+          <button class="shot" type="button"><img src="shots/13-unlocked.webp" alt="The unlocked note with a Locked badge under its title" loading="lazy"></button>
+          <figcaption><b>3. Read and edit.</b> The <i>Locked</i> badge shows it's saved locked.</figcaption>
+        </figure>
+      </div>
+      <ul>
+        <li>A note stays open until you choose <i>Lock all notes now</i> in the palette, leave Marrow alone for 15 minutes (change it in Settings → Editor), or close Marrow.</li>
+        <li>Locked text is kept out of search, tasks, the graph, backlinks, AI, plugins and published websites.</li>
+        <li><i>Remove lock…</i> turns it back into plain Markdown.</li>
+      </ul>
+      <div class="note warn"><b>There is no way to recover a forgotten password.</b> Not by Marrow, not by anyone. Use the hint, and keep the password somewhere safe.</div>
+    </section>
+
+    <!-- 11 -->
+    <section id="publish">
+      <div class="eyebrow">Chapter 11</div>
+      <h2 class="sec">Publish a website</h2>
+      <p>Turn the vault, or one folder, into a small website: <kbd>Ctrl</kbd>+<kbd>K</kbd> → <i>Publish as a website…</i>, or right-click a folder. Pick a title and an empty folder, then <b>Publish</b>. You get one page per note with working links, images, diagrams, maths, a sidebar, "Linked from" lists, search and a phone-friendly menu.</p>
+      <div class="pair">
+        <figure>
+          <button class="shot" type="button"><img src="shots/25-publish-dialog.webp" alt="The Publish as a website dialog" loading="lazy"></button>
+          <figcaption><b>Choose where.</b> Tick <i>Only notes marked publish: true</i> to share just the notes you choose.</figcaption>
+        </figure>
+        <figure>
+          <button class="shot" type="button"><img src="shots/26-published.webp" alt="The dialog after publishing 8 pages, with links to open the website or the folder" loading="lazy"></button>
+          <figcaption><b>Done.</b> <i>Open the website</i> to check it; <i>Publish again</i> updates it after you edit.</figcaption>
+        </figure>
+      </div>
+      <p>Nothing is uploaded. To put the site online, drag the folder onto Cloudflare Pages or Netlify, or push it to GitHub Pages. Locked notes and notes with <code>publish: false</code> are always left out.</p>
+    </section>
+
+    <!-- 12 -->
+    <section id="ai">
+      <div class="eyebrow">Chapter 12</div>
+      <h2 class="sec">AI, with your own account</h2>
+      <div class="cols">
+        <div>
+          <p>Marrow has no AI of its own and sends nothing anywhere until you connect one in <b>Settings → AI</b>. Use your own key for OpenAI, Claude, Gemini, Mistral, DeepSeek, Qwen and many others, or a free model on your own computer with Ollama or LM Studio.</p>
+          <ul>
+            <li><b>Select text</b> in Source and click <b>AI</b>, or press <kbd>Ctrl</kbd>+<kbd>J</kbd>: improve, shorten, translate, change tone, turn into a table.</li>
+            <li><b><code>/ai</code></b> on an empty line writes at the cursor.</li>
+            <li><b>Ask my notes</b> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>J</kbd>) answers from your whole vault and cites the notes it used.</li>
+            <li><b>Search by meaning</b> finds notes by what they mean, not only their words.</li>
+          </ul>
+          <p>Keys are kept in Windows Credential Manager, never in your notes. Only the text you ask about is sent, and only when you ask.</p>
+        </div>
+        <figure>
+          <button class="shot" type="button"><img src="shots/16-settings-ai.webp" alt="Settings, AI tab, with no AI connected yet and an Add AI button" loading="lazy"></button>
+          <figcaption><b>Add AI</b>: pick a provider, paste the key, load models, test, save.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- 13 -->
+    <section id="customize">
+      <div class="eyebrow">Chapter 13</div>
+      <h2 class="sec">CSS snippets and plugins</h2>
+      <p>Settings → <b>Customize</b>. <b>Snippets</b> are <code>.css</code> files that restyle Marrow; they live in the vault's <code>.marrow/snippets</code> folder and travel with it. <b>Plugins</b> add commands to the palette.</p>
+      <div class="pair">
+        <figure>
+          <button class="shot" type="button"><img src="shots/17-plugin-permission.webp" alt="A dialog asking to turn on the Writing tools plugin, listing what it may do" loading="lazy"></button>
+          <figcaption><b>You decide what a plugin may do.</b> Turning one on shows exactly what it asks for: reading notes, changing them, or neither.</figcaption>
+        </figure>
+        <figure>
+          <button class="shot" type="button"><img src="shots/18-settings-customize.webp" alt="The Customize tab with the Writing tools plugin switched on" loading="lazy"></button>
+          <figcaption><b>Example plugin</b> adds "Writing tools": insert the date, sort lines, Title Case and count words. Copy it to write your own.</figcaption>
+        </figure>
+      </div>
+      <p>Each plugin runs in a sealed sandbox. It can't reach the internet, Marrow's window or your files; it can only ask Marrow through a small API, and only for what you allowed. Locked notes are never shown to plugins.</p>
+    </section>
+
+    <!-- 14 -->
+    <section id="settings">
+      <div class="eyebrow">Chapter 14</div>
+      <h2 class="sec">Settings and themes</h2>
+      <p>Open Settings with <kbd>Ctrl</kbd>+<kbd>,</kbd> or the gear in the rail.</p>
+      <div class="pair">
+        <figure>
+          <button class="shot" type="button"><img src="shots/15-settings-editor.webp" alt="Settings, Editor tab" loading="lazy"></button>
+          <figcaption><b>Editor</b>: open notes in Preview or Source, live preview, toolbar, word goal, quick-capture shortcut, spell check, Vim keys and the locked-notes timer.</figcaption>
+        </figure>
+        <figure>
+          <button class="shot" type="button"><img src="shots/28-dark-theme.webp" alt="Marrow in the dark theme" loading="lazy"></button>
+          <figcaption><b>Appearance</b>: System, Light or Dark theme, inspector on or off, and how links look. Diagrams redraw to match.</figcaption>
+        </figure>
+      </div>
+      <ul>
+        <li><b>Spell check</b> underlines misspelt words in Source; right-click one for suggestions. It uses Windows' own dictionaries.</li>
+        <li><b>Vim keys</b>: normal, insert and visual modes; <code>:w</code> saves.</li>
+        <li><b>Vault</b>: daily-note folder, templates folder, link format, cloud sync and import.</li>
+        <li><b>Hotkeys</b>: see and change every shortcut.</li>
+      </ul>
+    </section>
+
+    <!-- 15 -->
+    <section id="safety">
+      <div class="eyebrow">Chapter 15</div>
+      <h2 class="sec">How Marrow keeps your text safe</h2>
+      <ul>
+        <li><b>Another app edits the note you're typing in</b> (OneDrive, Dropbox, your phone): Marrow merges both versions. If you both changed the same lines, both are kept.</li>
+        <li><b>A save fails</b> (file locked, disk full): your text is kept in a backup and offered back next time you open the note.</li>
+        <li><b>Deleted notes</b> go to <code>.marrow/trash</code>, not straight off the disk.</li>
+        <li><b>Cloud drives</b>: create a vault inside your OneDrive, Dropbox, Google Drive or iCloud folder, or sync a local vault with one in Settings → Vault → Sync.</li>
+      </ul>
+    </section>
+
+    <!-- 16 -->
+    <section id="keys">
+      <div class="eyebrow">Chapter 16</div>
+      <h2 class="sec">Keyboard shortcuts</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Keys</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr class="kgroup"><td colspan="2">Everywhere</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>Command palette: notes, headings, tags and commands (also <kbd>Ctrl</kbd>+<kbd>P</kbd>)</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd></td><td>New note</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>Today's daily note</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></td><td>Search all notes</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>G</kbd></td><td>Graph</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>Settings</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd></td><td>Quick capture into today's note, from any app</td></tr>
+            <tr class="kgroup"><td colspan="2">Notes and tabs</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>Switch between Preview and Source</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save now (it also saves 2 s after you stop typing)</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>\</kbd></td><td>Split pane</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>Tab</kbd> · <kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Next tab · close tab</td></tr>
+            <tr><td><kbd>F2</kbd></td><td>Rename the selected note in the tree (links update)</td></tr>
+            <tr><td><kbd>F11</kbd></td><td>Focus mode</td></tr>
+            <tr class="kgroup"><td colspan="2">Writing</td></tr>
+            <tr><td><kbd>/</kbd></td><td>Insert menu (start of a line or after a space)</td></tr>
+            <tr><td><kbd>[[</kbd></td><td>Link a note</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>B</kbd> · <kbd>Ctrl</kbd>+<kbd>I</kbd></td><td>Bold · italic</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> · <kbd>H</kbd></td><td>Strikethrough · highlight</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Find in this note (Source)</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+click</td><td>Follow a link in Source; open in the other pane from Preview</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>J</kbd></td><td>AI on the selection, or on the whole note in Preview</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>J</kbd></td><td>Ask my notes</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <span>Marrow user guide · screenshots from Marrow 0.1 on Windows 11, October 2026</span>
+  <span>Your notes are plain Markdown. They're yours whatever app you use next.</span>
+</footer>
+
+<dialog class="lb" id="lb" aria-label="Enlarged screenshot">
+  <button type="button" id="lb-close">Close</button>
+  <img id="lb-img" alt="">
+  <p id="lb-cap"></p>
+</dialog>
+
+<script>
+(() => {
+  const lb = document.getElementById('lb'), img = document.getElementById('lb-img'), cap = document.getElementById('lb-cap');
+  document.querySelectorAll('.shot').forEach((b) => b.addEventListener('click', () => {
+    const i = b.querySelector('img');
+    img.src = i.src; img.alt = i.alt;
+    const fc = b.closest('figure')?.querySelector('figcaption');
+    cap.textContent = fc ? fc.textContent : i.alt;
+    if (lb.showModal) lb.showModal();
+  }));
+  document.getElementById('lb-close').addEventListener('click', () => lb.close());
+  lb.addEventListener('click', (e) => { if (e.target === lb) lb.close(); });
+
+  // Highlight the chapter being read in the contents.
+  const links = [...document.querySelectorAll('.toc a')];
+  const byId = new Map(links.map((a) => [a.getAttribute('href').slice(1), a]));
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((es) => {
+      for (const e of es) if (e.isIntersecting) {
+        links.forEach((a) => a.classList.remove('on'));
+        byId.get(e.target.id)?.classList.add('on');
+      }
+    }, { rootMargin: '-30% 0px -60% 0px' });
+    document.querySelectorAll('main section').forEach((s) => io.observe(s));
+  }
+})();
+</script>
