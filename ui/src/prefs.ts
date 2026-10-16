@@ -22,6 +22,10 @@ export interface Prefs {
   captureKey: "" | "CommandOrControl+Alt+N" | "CommandOrControl+Alt+Space" | "CommandOrControl+Shift+Space";
   /** Lock unlocked notes again after this many idle minutes (0: when Marrow closes). */
   lockAfter: 0 | 5 | 15 | 60;
+  /** Underline misspelt words in Source (the system's dictionaries). */
+  spellcheck: boolean;
+  /** Vim keys in Source. */
+  vim: boolean;
 }
 
 const DEFAULTS: Prefs = {
@@ -36,6 +40,8 @@ const DEFAULTS: Prefs = {
   wordGoal: 0,
   captureKey: "CommandOrControl+Alt+N",
   lockAfter: 15,
+  spellcheck: true,
+  vim: false,
 };
 
 export const prefs: Prefs = { ...DEFAULTS, ...storage<Partial<Prefs>>("marrow.prefs", {}) };

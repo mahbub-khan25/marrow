@@ -44,6 +44,7 @@ import { tags as t } from "@lezer/highlight";
 
 import { api } from "./api";
 import { formatting } from "./format";
+import { writingOptions } from "./writing";
 import { livePreview } from "./livepreview";
 import { prefs } from "./prefs";
 import { slashCompletions, slashIcon, type SlashHooks } from "./slash";
@@ -243,6 +244,7 @@ function foldMarker(open: boolean): HTMLElement {
 
 export function editorExtensions(hooks: EditorHooks): Extension[] {
   return [
+    writingOptions(),
     history(),
     drawSelection(),
     indentOnInput(),
