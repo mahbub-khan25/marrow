@@ -390,7 +390,7 @@ impl Vault {
         if let Some(dir) = full.parent() {
             fs::create_dir_all(dir).at(dir)?;
         }
-        fs::write(&full, contents).at(&full)?;
+        crate::atomic::write_str(&full, contents).at(&full)?;
         self.reconcile(path)
     }
 
@@ -399,7 +399,18 @@ impl Vault {
         if self.get(path).is_some() || path.to_os(&self.root).exists() {
             return Err(Error::AlreadyExists(path.to_string()));
         }
-        self.write(path, contents)
+        if path.is_root() || path.is_hidden() {
+            return Err(Error::InvalidPath(path.to_string()));
+        }
+        let full = path.to_os(&self.root);
+        if let Some(dir) = full.parent() {
+            fs::create_dir_all(dir).at(dir)?;
+        }
+        match crate::atomic::create(&full, contents.as_bytes()) {
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(Error::AlreadyExists(path.to_string())),
+            r => r.at(&full),
+        }?;
+        self.reconcile(path)
     }
 
     pub fn create_folder(&mut self, path: &VaultPath) -> Result<Vec<VaultEvent>> {

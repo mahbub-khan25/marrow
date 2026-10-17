@@ -87,7 +87,7 @@ impl History {
         while dir.join(format!("{t}.md")).exists() {
             t += 1;
         }
-        fs::write(dir.join(format!("{t}.md")), text)?;
+        crate::atomic::write_str(&dir.join(format!("{t}.md")), text)?;
         self.prune(path, now);
         Ok(Some(t))
     }

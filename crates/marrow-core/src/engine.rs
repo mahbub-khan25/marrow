@@ -127,6 +127,8 @@ pub struct Engine {
     stats: IndexStats,
     /// Note text for search, loaded on first search, dropped on change.
     texts: search::TextCache,
+    /// What opening the vault had to repair, in words, for the window to show.
+    recovered: Vec<String>,
 }
 
 struct Indexed {
@@ -151,6 +153,7 @@ impl Engine {
             link_format: LinkFormat::default(),
             stats: IndexStats::default(),
             texts: Default::default(),
+            recovered: Vec::new(),
         };
         for p in e.vault.files().cloned().collect::<Vec<_>>() {
             e.names.add(&p);
@@ -176,7 +179,20 @@ impl Engine {
         for p in notes {
             e.resolve_note(&p);
         }
+
+        // Tidy up after a crash: half-made temporary files, unfinished renames.
+        let tidy = root.to_path_buf();
+        let _ = std::thread::Builder::new()
+            .name("marrow-tidy".into())
+            .spawn(move || crate::atomic::clean_up(&tidy));
+        e.recovered = e.recover();
         Ok(e)
+    }
+
+    /// What opening the vault repaired (an interrupted rename, say). Empty
+    /// almost always. Each call hands the list over once.
+    pub fn take_recovered(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.recovered)
     }
 
     pub fn vault(&self) -> &Vault {

@@ -1623,6 +1623,7 @@ async function openVault(path: string) {
   await api.lockNow().catch(() => {});
   void applySnippets(vaultSettings.snippets ?? []);
   void startPlugins(vaultSettings.plugins ?? []);
+  for (const msg of info.recovered ?? []) toast(msg);
   await refreshLocked();
   await refreshTree();
   void refreshStats();

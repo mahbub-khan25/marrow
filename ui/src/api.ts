@@ -23,6 +23,8 @@ export interface VaultInfo {
   name: string;
   notes: number;
   stats: IndexStats;
+  /** What opening it repaired after a crash. */
+  recovered?: string[];
 }
 
 export interface BacklinkGroup {

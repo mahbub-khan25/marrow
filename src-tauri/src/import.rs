@@ -116,7 +116,7 @@ pub async fn import_files(app: AppHandle, state: State<'_, AppState>, kind: Stri
             if let Some(dir) = dest.parent() {
                 std::fs::create_dir_all(dir).map_err(err)?;
             }
-            std::fs::write(&dest, &f.bytes).map_err(err)?;
+            marrow_core::atomic::create(&dest, &f.bytes).map_err(err)?;
             written.push(vp);
         }
         e.on_paths_changed(&written).map_err(err)

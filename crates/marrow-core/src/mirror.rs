@@ -436,7 +436,7 @@ impl Mirror {
         if let Some(d) = p.parent() {
             let _ = fs::create_dir_all(d);
         }
-        let _ = fs::write(p, bytes);
+        let _ = crate::atomic::write(&p, bytes);
     }
 
     fn read_base(&self, hash: &str) -> Option<String> {
@@ -584,23 +584,10 @@ fn hash_file(p: &Path) -> Option<String> {
 fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let dir = path.parent().ok_or_else(|| io::Error::other("no parent folder"))?;
     fs::create_dir_all(dir)?;
-    let tmp = dir.join(format!(
-        ".~marrow-{}-{}.tmp",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0)
-    ));
-    fs::write(&tmp, bytes)?;
-    match fs::rename(&tmp, path) {
+    match crate::atomic::write(path, bytes) {
         Ok(()) => Ok(()),
-        Err(_) => {
-            // Some sync folders refuse to replace a file in one step.
-            let r = fs::write(path, bytes);
-            let _ = fs::remove_file(&tmp);
-            r
-        }
+        // Some sync folders refuse to replace a file in one step.
+        Err(_) => fs::write(path, bytes),
     }
 }
 

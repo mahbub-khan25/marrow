@@ -9,6 +9,12 @@
 //!    still reaches the same file and the file's name didn't change, leave it
 //!    alone; otherwise write new link text (keeping `#heading`, `^block`,
 //!    alias and embed `!`). Edits are spliced bottom-up per file.
+//!
+//! A rename touches many files, so it keeps a journal in
+//! `.marrow/journal/rename.json`: written before the move, then filled in
+//! with every note's new text before any note is rewritten. If Marrow stops
+//! partway, [`Engine::recover`] finishes the job the next time the vault
+//! opens. A note someone changed in the meantime is left alone.
 
 use std::collections::BTreeSet;
 use std::ops::Range;
@@ -18,7 +24,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{Engine, EngineEvent};
 use crate::cache::hash_bytes;
-use crate::error::Result;
+use crate::error::{IoContext, Result};
 use crate::links::link_text;
 use crate::parse::{parse, split_subpath, LinkKind, LinkRef, NoteMeta};
 use crate::path::VaultPath;
@@ -118,14 +124,23 @@ impl Engine {
             }
         }
 
-        // 3. Rename and re-index.
-        let mut events = self.rename(from, to)?;
+        // 3. Rename and re-index, with the journal in place first.
+        let journal = Journal { from: from.to_string(), to: to.to_string(), files: None };
+        self.write_journal(&journal)?;
+        let mut events = match self.rename(from, to) {
+            Ok(ev) => ev,
+            Err(e) => {
+                self.clear_journal();
+                return Err(e);
+            }
+        };
 
         // 4. Rewrite.
         let mut report = RenameReport {
             new_path: to.clone(),
             ..Default::default()
         };
+        let mut rewrites: Vec<(VaultPath, String, String, usize)> = Vec::new();
         for snap in snaps {
             let source = moved(&snap.source);
             let text = self.vault.read_text(&source)?;
@@ -182,13 +197,135 @@ impl Engine {
                 applied += 1;
             }
             if out != text {
-                events.extend(self.write_note(&source, &out)?);
-                report.links_updated += applied;
-                report.files_updated.push(source);
+                rewrites.push((source, text, out, applied));
             }
         }
+
+        // 5. Record every new text, then write them.
+        if !rewrites.is_empty() {
+            let files = rewrites
+                .iter()
+                .map(|(p, before, after, _)| JournalFile {
+                    path: p.to_string(),
+                    before: hash_bytes(before.as_bytes()),
+                    after: after.clone(),
+                })
+                .collect();
+            self.write_journal(&Journal { files: Some(files), ..journal })?;
+        }
+        for (source, _, out, applied) in rewrites {
+            events.extend(self.write_note(&source, &out)?);
+            report.links_updated += applied;
+            report.files_updated.push(source);
+        }
+        self.clear_journal();
         Ok((events, report))
     }
+
+    /// Finishes a rename that was interrupted (Marrow closed or crashed
+    /// partway). Run when the vault opens. Returns what it did, in words.
+    pub fn recover(&mut self) -> Vec<String> {
+        let path = self.journal_path();
+        let Ok(bytes) = std::fs::read(&path) else {
+            return Vec::new();
+        };
+        let mut notes = Vec::new();
+        let Ok(j) = serde_json::from_slice::<Journal>(&bytes) else {
+            // Unreadable: keep it aside for diagnosis, don't act on it.
+            let _ = std::fs::rename(&path, path.with_extension("unreadable.json"));
+            return vec!["An unfinished rename couldn't be read, so it was set aside.".into()];
+        };
+        let (Ok(from), Ok(to)) = (VaultPath::new(&j.from), VaultPath::new(&j.to)) else {
+            self.clear_journal();
+            return notes;
+        };
+        match j.files {
+            None => {
+                let at_from = from.to_os(self.vault.root()).exists();
+                let at_to = to.to_os(self.vault.root()).exists();
+                if at_to && !at_from {
+                    // Moved, but no links were rewritten yet: move it back and
+                    // do the whole rename again, links and all.
+                    let redo = self
+                        .rename(&to, &from)
+                        .and_then(|_| self.rename_with_links(&from, &to));
+                    match redo {
+                        Ok((_, r)) => notes.push(format!(
+                            "Finished renaming “{}” to “{}” ({} links updated).",
+                            from.name(),
+                            to.name(),
+                            r.links_updated
+                        )),
+                        Err(e) => notes.push(format!("Couldn't finish renaming “{}”: {e}", from.name())),
+                    }
+                }
+            }
+            Some(files) => {
+                let (mut done, mut skipped) = (0, Vec::new());
+                for f in files {
+                    let Ok(p) = VaultPath::new(&f.path) else { continue };
+                    let Ok(now) = self.vault.read_text(&p) else {
+                        skipped.push(f.path);
+                        continue;
+                    };
+                    if now == f.after {
+                        continue;
+                    }
+                    if hash_bytes(now.as_bytes()) == f.before && self.write_note(&p, &f.after).is_ok() {
+                        done += 1;
+                    } else {
+                        // Changed since: leave the person's text alone.
+                        skipped.push(f.path);
+                    }
+                }
+                if done > 0 {
+                    notes.push(format!("Finished updating links after renaming “{}” ({done} notes).", to.name()));
+                }
+                if !skipped.is_empty() {
+                    notes.push(format!(
+                        "After renaming “{}”, links in these notes may need a look: {}",
+                        to.name(),
+                        skipped.join(", ")
+                    ));
+                }
+            }
+        }
+        self.clear_journal();
+        notes
+    }
+
+    fn journal_path(&self) -> std::path::PathBuf {
+        self.vault.root().join(".marrow").join("journal").join("rename.json")
+    }
+
+    fn write_journal(&self, j: &Journal) -> Result<()> {
+        let p = self.journal_path();
+        if let Some(d) = p.parent() {
+            std::fs::create_dir_all(d).at(d)?;
+        }
+        let bytes = serde_json::to_vec(j).expect("journal serialises");
+        crate::atomic::write(&p, &bytes).at(&p)
+    }
+
+    fn clear_journal(&self) {
+        let _ = std::fs::remove_file(self.journal_path());
+    }
+}
+
+/// A rename in progress. `files` is filled in once every new text is known.
+#[derive(Serialize, Deserialize)]
+struct Journal {
+    from: String,
+    to: String,
+    files: Option<Vec<JournalFile>>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct JournalFile {
+    path: String,
+    /// Hash of the text the rewrite was made from.
+    before: String,
+    after: String,
 }
 
 /// Rebuilds one body link with new target text.
@@ -276,6 +413,102 @@ mod tests {
 
     fn read(d: &tempfile::TempDir, path: &str) -> String {
         fs::read_to_string(d.path().join(path)).unwrap()
+    }
+
+    fn journal(d: &tempfile::TempDir) -> std::path::PathBuf {
+        d.path().join(".marrow/journal/rename.json")
+    }
+
+    fn put_journal(d: &tempfile::TempDir, j: serde_json::Value) {
+        fs::create_dir_all(journal(d).parent().unwrap()).unwrap();
+        fs::write(journal(d), j.to_string()).unwrap();
+    }
+
+    fn reopen(d: &tempfile::TempDir) -> Engine {
+        Engine::open(d.path(), Cache::in_memory().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn a_finished_rename_leaves_no_journal() {
+        let (d, mut e) = setup(&[("Old.md", "x"), ("A.md", "[[Old]]")]);
+        e.rename_with_links(&p("Old.md"), &p("New.md")).unwrap();
+        assert!(!journal(&d).exists());
+        assert_eq!(read(&d, "A.md"), "[[New]]");
+    }
+
+    #[test]
+    fn a_failed_rename_leaves_no_journal() {
+        let (d, mut e) = setup(&[("Old.md", "x"), ("Taken.md", "y"), ("A.md", "[[Old]]")]);
+        assert!(e.rename_with_links(&p("Old.md"), &p("Taken.md")).is_err());
+        assert!(!journal(&d).exists());
+        assert_eq!(read(&d, "A.md"), "[[Old]]");
+    }
+
+    /// Marrow stopped right after moving the file, before any link was fixed.
+    #[test]
+    fn recovers_a_rename_that_stopped_after_the_move() {
+        let (d, e) = setup(&[("Old.md", "x"), ("A.md", "See [[Old]] and [[Old#Top|that]].")]);
+        drop(e);
+        fs::rename(d.path().join("Old.md"), d.path().join("New.md")).unwrap();
+        put_journal(&d, serde_json::json!({"from": "Old.md", "to": "New.md", "files": null}));
+        let mut e = reopen(&d);
+        assert_eq!(read(&d, "A.md"), "See [[New]] and [[New#Top|that]].");
+        assert!(d.path().join("New.md").exists() && !d.path().join("Old.md").exists());
+        assert!(!journal(&d).exists());
+        let said = e.take_recovered();
+        assert_eq!(said.len(), 1, "{said:?}");
+        assert!(e.take_recovered().is_empty());
+    }
+
+    /// Stopped before the move happened at all: nothing to do.
+    #[test]
+    fn a_rename_that_never_moved_is_dropped() {
+        let (d, e) = setup(&[("Old.md", "x"), ("A.md", "[[Old]]")]);
+        drop(e);
+        put_journal(&d, serde_json::json!({"from": "Old.md", "to": "New.md", "files": null}));
+        let mut e = reopen(&d);
+        assert_eq!(read(&d, "A.md"), "[[Old]]");
+        assert!(d.path().join("Old.md").exists());
+        assert!(!journal(&d).exists());
+        assert!(e.take_recovered().is_empty());
+    }
+
+    /// Stopped halfway through rewriting links: A was done, B wasn't, and
+    /// C was edited by the person after the crash.
+    #[test]
+    fn finishes_rewrites_and_leaves_edited_notes_alone() {
+        let (d, e) = setup(&[("New.md", "x"), ("A.md", "[[New]]"), ("B.md", "[[Old]] b"), ("C.md", "my new words [[Old]]")]);
+        drop(e);
+        let h = |t: &str| crate::cache::hash_bytes(t.as_bytes());
+        put_journal(
+            &d,
+            serde_json::json!({"from": "Old.md", "to": "New.md", "files": [
+                {"path": "A.md", "before": h("[[Old]]"), "after": "[[New]]"},
+                {"path": "B.md", "before": h("[[Old]] b"), "after": "[[New]] b"},
+                {"path": "C.md", "before": h("[[Old]] c"), "after": "[[New]] c"},
+            ]}),
+        );
+        let mut e = reopen(&d);
+        assert_eq!(read(&d, "A.md"), "[[New]]");
+        assert_eq!(read(&d, "B.md"), "[[New]] b");
+        assert_eq!(read(&d, "C.md"), "my new words [[Old]]");
+        assert!(!journal(&d).exists());
+        let said = e.take_recovered().join("\n");
+        assert!(said.contains("1 notes") && said.contains("C.md"), "{said}");
+        // The index follows the files.
+        assert_eq!(e.backlinks(&p("New.md")).len(), 2);
+    }
+
+    #[test]
+    fn an_unreadable_journal_is_set_aside() {
+        let (d, e) = setup(&[("A.md", "x")]);
+        drop(e);
+        fs::create_dir_all(journal(&d).parent().unwrap()).unwrap();
+        fs::write(journal(&d), "{ not json").unwrap();
+        let mut e = reopen(&d);
+        assert!(!journal(&d).exists());
+        assert!(d.path().join(".marrow/journal/rename.unreadable.json").exists());
+        assert_eq!(e.take_recovered().len(), 1);
     }
 
     #[test]
