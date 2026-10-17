@@ -57,7 +57,7 @@ pub fn site_write(out: String, rel: String, contents: String) -> CmdResult<()> {
     if let Some(d) = dest.parent() {
         std::fs::create_dir_all(d).map_err(err)?;
     }
-    std::fs::write(dest, contents).map_err(err)
+    marrow_core::atomic::write(dest, contents).map_err(err)
 }
 
 /// Copies an image or other attachment from the vault into the site.
@@ -108,7 +108,7 @@ pub fn site_finish(out: String, files: Vec<String>) -> CmdResult<usize> {
             }
         }
     }
-    std::fs::write(out.join(MANIFEST), serde_json::to_string_pretty(&now).map_err(err)?).map_err(err)?;
+    marrow_core::atomic::write(out.join(MANIFEST), serde_json::to_string_pretty(&now).map_err(err)?).map_err(err)?;
     Ok(removed)
 }
 

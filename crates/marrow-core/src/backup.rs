@@ -51,10 +51,8 @@ impl BackupStore {
         };
         let file = self.file_for(vault, path);
         let json = serde_json::to_vec_pretty(&b).expect("backup serialises");
-        // Write next to it first so a crash mid-write can't destroy an older backup.
-        let tmp = file.with_extension("tmp");
-        fs::write(&tmp, json).at(&tmp)?;
-        fs::rename(&tmp, &file).at(&file)
+        // Crash-safe, so a crash mid-write can't destroy an older backup.
+        crate::atomic::write(&file, &json).at(&file)
     }
 
     pub fn get(&self, vault: &Path, path: &str) -> Option<Backup> {

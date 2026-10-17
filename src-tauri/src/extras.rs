@@ -100,7 +100,7 @@ pub fn extras_write(state: State<AppState>, kind: String, rel: String, contents:
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent).map_err(err)?;
     }
-    std::fs::write(dest, contents).map_err(err)?;
+    marrow_core::atomic::create(dest, contents).map_err(err)?;
     Ok(true)
 }
 

@@ -90,7 +90,7 @@ pub(crate) fn save(app: &AppHandle, cfg: &AiConfig) -> CmdResult<()> {
     for p in &mut clean.providers {
         p.has_key = false;
     }
-    std::fs::write(dir.join("ai.json"), serde_json::to_vec_pretty(&clean).map_err(err)?).map_err(err)
+    marrow_core::atomic::write(dir.join("ai.json"), serde_json::to_vec_pretty(&clean).map_err(err)?).map_err(err)
 }
 
 // ----------------------------------------------------------------- keys
@@ -121,7 +121,7 @@ mod keys {
             let _ = std::fs::remove_file(&p);
             return Ok(());
         }
-        std::fs::write(p, serde_json::to_vec_pretty(map).map_err(err)?).map_err(err)
+        marrow_core::atomic::write(p, serde_json::to_vec_pretty(map).map_err(err)?).map_err(err)
     }
 
     /// Whether keys go in the system's credential store.

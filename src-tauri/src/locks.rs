@@ -78,7 +78,7 @@ fn store(root: &Path, r: &Registry) -> CmdResult<()> {
     if let Some(d) = f.parent() {
         std::fs::create_dir_all(d).map_err(err)?;
     }
-    std::fs::write(f, serde_json::to_string_pretty(r).map_err(err)?).map_err(err)
+    marrow_core::atomic::write(f, serde_json::to_string_pretty(r).map_err(err)?).map_err(err)
 }
 
 /// The locked folder holding `path` (or `path` itself), innermost first.

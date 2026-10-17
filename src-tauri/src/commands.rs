@@ -88,7 +88,7 @@ pub(crate) fn save_settings(app: &AppHandle, s: &Settings) -> CmdResult<()> {
     if let Some(dir) = p.parent() {
         std::fs::create_dir_all(dir).map_err(err)?;
     }
-    std::fs::write(p, serde_json::to_vec_pretty(s).map_err(err)?).map_err(err)
+    marrow_core::atomic::write(p, serde_json::to_vec_pretty(s).map_err(err)?).map_err(err)
 }
 
 // --------------------------------------------------------------- vault
@@ -100,6 +100,8 @@ pub struct VaultInfo {
     name: String,
     notes: usize,
     stats: IndexStats,
+    /// What opening it repaired after a crash (an unfinished rename).
+    recovered: Vec<String>,
 }
 
 /// The vault opened last time, if it still exists.
@@ -148,8 +150,9 @@ pub fn open_vault(app: AppHandle, state: State<AppState>, path: String) -> CmdRe
     .map_err(err)?;
 
     let info = {
-        let e = svc.engine();
+        let mut e = svc.engine();
         let root = e.vault().root().to_path_buf();
+        let recovered = e.take_recovered();
         VaultInfo {
             name: root
                 .file_name()
@@ -158,6 +161,7 @@ pub fn open_vault(app: AppHandle, state: State<AppState>, path: String) -> CmdRe
             root: root.to_string_lossy().into_owned(),
             notes: e.vault().markdown_files().count(),
             stats: e.stats(),
+            recovered,
         }
     };
     // Let the window load images and other files from this vault (and only this vault).
@@ -763,7 +767,7 @@ fn store_attachment(app: &AppHandle, state: &State<AppState>, name: &str, folder
         if let Some(dir) = dest.parent() {
             std::fs::create_dir_all(dir).map_err(err)?;
         }
-        std::fs::write(&dest, bytes).map_err(err)?;
+        marrow_core::atomic::create(&dest, bytes).map_err(err)?;
         let ev = e.on_paths_changed(std::slice::from_ref(&p)).map_err(err)?;
         Ok((p, ev))
     })?;
@@ -809,7 +813,7 @@ fn percent_decode(s: &str) -> String {
 /// Writes an exported file (HTML) wherever the person chose to save it.
 #[tauri::command]
 pub fn write_export(path: String, contents: String) -> CmdResult<()> {
-    std::fs::write(&path, contents).map_err(err)
+    marrow_core::atomic::write(&path, contents).map_err(err)
 }
 
 /// Every to-do in the vault (open ones, or all).
@@ -909,7 +913,7 @@ pub fn set_vault_settings(state: State<AppState>, settings: VaultSettings) -> Cm
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir).map_err(err)?;
         }
-        std::fs::write(&path, serde_json::to_vec_pretty(&settings).map_err(err)?).map_err(err)?;
+        marrow_core::atomic::write(&path, serde_json::to_vec_pretty(&settings).map_err(err)?).map_err(err)?;
         e.link_format = settings.link_format;
         Ok(())
     })

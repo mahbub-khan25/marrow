@@ -6,6 +6,7 @@
 //!
 //! | module    | job                                                        |
 //! |-----------|------------------------------------------------------------|
+//! | `atomic`  | crash-safe file writes (temporary file, then replace)      |
 //! | `path`    | canonical vault-relative paths                             |
 //! | `vault`   | in-memory file tree, reconcile against disk, file ops      |
 //! | `parse`   | Markdown → links, embeds, tags, headings, blocks, YAML      |
@@ -23,6 +24,7 @@
 //! | `vectors` | embeddings of note chunks, for search by meaning             |
 //! | `lock`    | password-locked notes (Argon2id + XChaCha20-Poly1305)        |
 
+pub mod atomic;
 pub mod backup;
 pub mod cache;
 pub mod cloud;
