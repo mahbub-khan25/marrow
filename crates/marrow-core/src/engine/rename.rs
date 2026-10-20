@@ -438,6 +438,29 @@ mod tests {
     }
 
     #[test]
+    fn backlink_index_stays_in_step() {
+        let (d, mut e) = setup(&[
+            ("Hub.md", "x"),
+            ("A.md", "[[Hub]] [[B]]"),
+            ("B.md", "[[Hub]] [[A]] [[Hub]]"),
+            ("dir/C.md", "[[Hub]] [[dir/D]]"),
+            ("dir/D.md", "[[C]]"),
+        ]);
+        assert!(e.graph().incoming_is_consistent());
+        assert_eq!(e.backlinks(&p("Hub.md")).len(), 3);
+        e.rename_with_links(&p("Hub.md"), &p("Home.md")).unwrap();
+        assert!(e.graph().incoming_is_consistent());
+        e.rename_with_links(&p("dir"), &p("moved")).unwrap();
+        assert!(e.graph().incoming_is_consistent());
+        e.write_note(&p("A.md"), "no links now").unwrap();
+        assert!(e.graph().incoming_is_consistent());
+        e.trash(&p("B.md")).unwrap();
+        assert!(e.graph().incoming_is_consistent());
+        assert_eq!(e.backlinks(&p("Home.md")).len(), 1);
+        drop(d);
+    }
+
+    #[test]
     fn a_finished_rename_leaves_no_journal() {
         let (d, mut e) = setup(&[("Old.md", "x"), ("A.md", "[[Old]]")]);
         e.rename_with_links(&p("Old.md"), &p("New.md")).unwrap();

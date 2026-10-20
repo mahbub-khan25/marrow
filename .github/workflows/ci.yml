@@ -1,0 +1,43 @@
+# Every push and pull request: tests on Windows, macOS and Linux.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Linux system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libgtk-3-dev
+      - run: npm ci
+      - name: Type check and window tests
+        run: |
+          npx tsc --noEmit
+          npm test
+      - name: Engine and app tests
+        run: cargo test --workspace
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Crash test (200 forced crashes while saving)
+        run: cargo run --release --example crashtest -p marrow-core -- run 200
+      - name: Build the window
+        run: npm run build
