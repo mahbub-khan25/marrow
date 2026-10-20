@@ -7,13 +7,13 @@ Every blocker from the readiness reviews is fixed and covered by tests:
 | Area | Status | How it's checked |
 |---|---|---|
 | Crash-safe saves | Done | `crashtest` kills Marrow 200× mid-save (Windows: 0 damaged; plain overwrite: 35) |
-| Unsaved text on crash | Kept as a draft, offered back | `npm test` (docs lifecycle) |
+| Unsaved text on crash | Draft at least every 5 s while typing, offered back | `npm test` (docs lifecycle) |
 | Failed saves | Block close / switch / lock / trash; ask first | `npm test` |
 | Interrupted renames | Finished on next open | `cargo test` (rename journal) |
 | Locked folders | Sealed on create, import, move; fail closed | `cargo test -p marrow-app` |
-| Canvas conflicts | Both versions kept | code review; manual check below |
+| Canvas conflicts | Both versions kept, edits during the conflict too | `npm test` (canvas) |
 | Portable rebuild | Never deletes Notes/Data | script review |
-| Freezing | All commands run in the background | manual check below |
+| Freezing | Commands run in the background; very large renames still make other actions wait | manual check below |
 
 Speed on a generated vault (Linux, release build; Windows is usually a bit slower):
 
@@ -41,8 +41,9 @@ Run it yourself: `cargo run --release --example bench -p marrow-core -- 10000`.
 - **Release** (`.github/workflows/release.yml`): push a tag such as `v0.9.0`
   and GitHub builds the Windows installers (.exe, .msi) and a macOS app (.dmg,
   Apple Silicon and Intel) and attaches them to a draft release.
-- **On your PC**: double-click `scripts\windows-check.cmd`. It runs all tests
-  and the crash test, writes `windows-check.log` and starts Marrow.
+- **On your PC**: double-click `scripts\windows-check.cmd`. It runs every
+  check, ends with a clear PASS or FAIL (details in `windows-check.log`),
+  and starts Marrow only if everything passed.
 
 ## Steps only you can do
 

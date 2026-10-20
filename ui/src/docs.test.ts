@@ -105,6 +105,35 @@ describe("crash drafts", () => {
     forget("d.md");
   });
 
+  it("keeps a draft every few seconds even when typing never pauses", async () => {
+    disk.set("g.md", "");
+    const d = await openDoc("g.md");
+    let text = "";
+    // A keystroke every 200 ms for 12 seconds: never a half-second pause.
+    for (let t = 0; t < 12000; t += 200) {
+      text += "x";
+      edit(d, text, {});
+      await vi.advanceTimersByTimeAsync(200);
+      // Whatever was typed more than 5 seconds ago is safe in a draft.
+      if (t >= 5200) expect((drafts.get("g.md") ?? "").length).toBeGreaterThanOrEqual(text.length - 26);
+    }
+    expect(drafts.get("g.md")?.length).toBeGreaterThan(0);
+    forget("g.md");
+  });
+
+  it("saves at least every 15 seconds while typing goes on", async () => {
+    disk.set("h.md", "");
+    const d = await openDoc("h.md");
+    let text = "";
+    for (let t = 0; t < 16000; t += 300) {
+      text += "y";
+      edit(d, text, {});
+      await vi.advanceTimersByTimeAsync(300);
+    }
+    expect((disk.get("h.md") ?? "").length).toBeGreaterThan(40);
+    forget("h.md");
+  });
+
   it("keeps drafts on request before giving up on a save", async () => {
     disk.set("e.md", "a");
     const d = await openDoc("e.md");

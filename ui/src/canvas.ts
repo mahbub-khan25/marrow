@@ -193,8 +193,10 @@ export class CanvasView {
   async load(path: string) {
     if (this.path) {
       // Save what's here first, even when reopening the same canvas, so
-      // recent changes are never replaced by the older file.
-      await this.flush();
+      // recent changes are never replaced by the older file. If they could
+      // be neither saved nor kept, stay on this canvas rather than lose them.
+      if (!(await this.flush()) && this.unsafe)
+        throw new Error(`your changes to “${displayName(this.path)}” couldn't be saved or kept, so it stays open. Copy them somewhere safe, then try again`);
       if (this.path !== path) this.views.set(this.path, { k: this.k, tx: this.tx, ty: this.ty });
     }
     const disk = await api.readNote(path);
@@ -249,7 +251,17 @@ export class CanvasView {
     this.scheduleSave();
   }
 
+  /** Counts edits, so a conflict can tell whether more were made meanwhile. */
+  private rev = 0;
+  /** The latest changes are neither saved nor kept as a draft. */
+  private unsafe = false;
+
+  private serialize(): string {
+    return JSON.stringify(this.data, null, "\t");
+  }
+
   private scheduleSave() {
+    this.rev++;
     window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => void this.flush(), 600);
   }
@@ -305,24 +317,29 @@ export class CanvasView {
     this.saveTimer = undefined;
     if (this.saving) await this.saving;
     if (!this.path) return true;
-    const text = JSON.stringify(this.data, null, "\t");
+    const text = this.serialize();
     if (text === this.lastSaved) return true;
     const path = this.path;
+    const rev = this.rev;
     let ok = false;
     this.saving = api
       // Only replace the version we loaded; another app may have changed it.
       .writeNote(path, text, this.lastSaved)
       .then(() => {
         this.lastSaved = text;
+        this.unsafe = false;
         ok = true;
       })
       .catch(async (e) => {
         if (String(e) === "CHANGED_ON_DISK") {
-          ok = await this.keepBoth(path, text);
+          ok = await this.keepBoth(path, text, rev);
           return;
         }
         // Kept outside the vault and offered back when the canvas opens.
-        await api.keepDraft(path, text).catch(() => {});
+        this.unsafe = !(await api.keepDraft(path, text).then(
+          () => true,
+          () => false,
+        ));
         this.app.toast(`Couldn't save the canvas: ${e}`, "error");
       })
       .finally(() => {
@@ -335,28 +352,49 @@ export class CanvasView {
   /**
    * Another app changed the canvas while it had changes here. Neither side
    * is thrown away: these changes go to a copy beside it, and the canvas
-   * shows the other app's version.
+   * shows the other app's version. Edits made while that happens go into
+   * the copy too, before the canvas switches over.
    */
-  private async keepBoth(path: string, mine: string): Promise<boolean> {
+  private async keepBoth(path: string, mine: string, rev: number): Promise<boolean> {
     const folder = parentOf(path);
-    const name = `${displayName(path)} (my changes)`;
+    let copy: string;
     try {
-      const copy = await api.createFile(folder, name, "canvas", mine);
-      this.app.toast(`“${displayName(path)}” was changed in another app. Your changes were saved as “${displayName(copy)}”.`);
+      copy = await api.createFile(folder, `${displayName(path)} (my changes)`, "canvas", mine);
     } catch (e) {
-      await api.keepDraft(path, mine).catch(() => {});
+      this.unsafe = !(await api.keepDraft(path, mine).then(
+        () => true,
+        () => false,
+      ));
       this.app.toast(`“${displayName(path)}” was changed in another app, and your changes couldn't be saved beside it: ${e}`, "error");
       return false;
     }
-    if (this.path === path) {
+    for (let round = 0; round < 20 && this.path === path; round++) {
+      if (this.rev !== rev) {
+        // Edited while the copy was being made: bring the copy up to date.
+        rev = this.rev;
+        try {
+          await api.writeNote(copy, this.serialize());
+        } catch (e) {
+          this.unsafe = true;
+          this.app.toast(`Couldn't update “${displayName(copy)}” with your latest changes: ${e}`, "error");
+          return false;
+        }
+        continue;
+      }
       const disk = await api.readNote(path).catch(() => null);
+      if (this.rev !== rev) continue; // edited while reading: copy first
       if (disk !== null) {
+        window.clearTimeout(this.saveTimer);
+        this.saveTimer = undefined;
         this.lastSaved = disk;
         this.data = parse(disk);
         this.resetUndo();
         this.renderAll();
       }
+      break;
     }
+    this.unsafe = false;
+    this.app.toast(`“${displayName(path)}” was changed in another app. Your changes were saved as “${displayName(copy)}”.`);
     return true;
   }
 

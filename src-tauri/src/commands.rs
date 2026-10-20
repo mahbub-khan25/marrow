@@ -232,7 +232,9 @@ pub fn write_note(
         }
         match e.write_note(&p, &text) {
             Ok(events) => {
-                backups.remove(&root, p.as_str());
+                // Saved: the kept copy is no longer needed (if it lingers, it's
+                // offered once and discarded, as it matches the note).
+                let _ = backups.remove(&root, p.as_str());
                 crate::sync::poke(&state);
                 Ok(events)
             }
@@ -333,8 +335,7 @@ pub fn backup_for(
 pub fn discard_backup(app: AppHandle, state: State<AppState>, path: String) -> CmdResult<()> {
     let store = backup_store(&app)?;
     with_engine(&state, |e| {
-        store.remove(e.vault().root(), &path);
-        Ok(())
+        store.remove(e.vault().root(), &path).map_err(err)
     })
 }
 
@@ -448,11 +449,12 @@ pub fn rename(
             return Err(format!("“{file_name}” already exists in this folder."));
         }
         crate::locks::check_move(&locks, e.vault().root(), from.as_str(), to.as_str())?;
-        let (mut events, report) = e.rename_with_links(&from, &to).map_err(err)?;
+        let mut events = crate::locks::seal_before_move(&app, &locks, e, &from, &to)?;
+        let (moved, report) = e.rename_with_links(&from, &to).map_err(err)?;
+        events.extend(moved);
         backup_store(&app)?.rename(e.vault().root(), from.as_str(), to.as_str());
         let _ = marrow_core::history::History::for_vault(e.vault().root()).moved(from.as_str(), to.as_str());
         crate::locks::moved(e.vault().root(), from.as_str(), to.as_str())?;
-        events.extend(crate::locks::seal_moved_in(&locks, e, &to)?);
         Ok((events, report))
     })?;
     emit_events(&app, events, None);
@@ -485,11 +487,12 @@ pub fn move_path(
             return Err(format!("“{}” already exists there.", from.name()));
         }
         crate::locks::check_move(&locks, e.vault().root(), from.as_str(), to.as_str())?;
-        let (mut events, report) = e.rename_with_links(&from, &to).map_err(err)?;
+        let mut events = crate::locks::seal_before_move(&app, &locks, e, &from, &to)?;
+        let (moved, report) = e.rename_with_links(&from, &to).map_err(err)?;
+        events.extend(moved);
         backup_store(&app)?.rename(e.vault().root(), from.as_str(), to.as_str());
         let _ = marrow_core::history::History::for_vault(e.vault().root()).moved(from.as_str(), to.as_str());
         crate::locks::moved(e.vault().root(), from.as_str(), to.as_str())?;
-        events.extend(crate::locks::seal_moved_in(&locks, e, &to)?);
         Ok((events, report))
     })?;
     emit_events(&app, events, None);
