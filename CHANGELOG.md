@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.0-beta.2
+
+Fixes from the third readiness review:
+- A canvas save now also covers edits made while it was writing, before
+  Marrow closes the canvas or switches to another one.
+- The "Not saved" warning on closing now says so when a canvas's changes
+  couldn't be kept either, instead of promising they were.
+- Moving a note into a locked folder protects its kept unsaved text before
+  the note itself, and a retried move finishes anything an earlier try
+  left readable.
+- Renaming or moving a locked folder keeps it locked even if Marrow stops
+  halfway: it's listed under both names until the move is done, and the
+  next open tidies up.
+
 ## 0.9.0 — release candidate (beta)
 
 The first version meant for other people. No new features: this release is

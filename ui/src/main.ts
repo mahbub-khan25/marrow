@@ -415,11 +415,12 @@ async function settleEdits(action: string, only?: Doc[]): Promise<boolean> {
   const failed = (await saveAll()).filter((d) => !only || only.includes(d));
   const canvasOk = only ? true : await canvasView.flush();
   if (!failed.length && canvasOk) return true;
-  const notKept = await keepDrafts(failed);
+  const notKept: string[] = (await keepDrafts(failed)).map((d) => `“${d.name}”`);
+  if (!canvasOk && canvasView.changesAtRisk) notKept.push("the open canvas");
   const names = [...failed.map((d) => `“${d.name}”`), ...(canvasOk ? [] : ["the open canvas"])];
   const list = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", ");
   const safe = notKept.length
-    ? `Copy your text somewhere safe first: Marrow couldn't keep a copy of ${notKept.map((d) => `“${d.name}”`).join(", ")} either.`
+    ? `Copy your text somewhere safe first: Marrow couldn't keep a copy of ${notKept.join(", ")} either.`
     : "Your text is kept, and Marrow offers it back when you open it again.";
   return ask(`${list} couldn't be saved.\n\n${safe}`, {
     title: "Not saved",

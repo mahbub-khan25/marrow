@@ -311,8 +311,24 @@ export class CanvasView {
     this.scheduleSave();
   }
 
-  /** Saves now. True once the canvas on screen is on disk (or kept safe). */
+  /**
+   * Saves now. True once the canvas on screen is on disk (or kept safe),
+   * including edits made while an earlier save was still writing.
+   */
   async flush(): Promise<boolean> {
+    for (let round = 0; round < 20; round++) {
+      if (!(await this.flushOnce())) return false;
+      if (!this.path || this.serialize() === this.lastSaved) return true;
+    }
+    return false;
+  }
+
+  /** True when the canvas has changes that are neither saved nor kept. */
+  get changesAtRisk(): boolean {
+    return this.unsafe;
+  }
+
+  private async flushOnce(): Promise<boolean> {
     window.clearTimeout(this.saveTimer);
     this.saveTimer = undefined;
     if (this.saving) await this.saving;
