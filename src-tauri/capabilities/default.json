@@ -12,6 +12,7 @@
     "core:window:allow-set-fullscreen",
     "core:window:allow-is-fullscreen",
     "dialog:default",
-    "opener:default"
+    "opener:default",
+    "log:default"
   ]
 }

@@ -351,7 +351,7 @@ fn pick(app: &AppHandle, provider_id: Option<&str>) -> CmdResult<Provider> {
 
 // --------------------------------------------------------------- commands
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ai_config(app: AppHandle) -> AiConfig {
     let mut cfg = load(&app);
     for p in &mut cfg.providers {
@@ -361,7 +361,7 @@ pub fn ai_config(app: AppHandle) -> AiConfig {
 }
 
 /// Adds or updates a provider. `key`: a new key, "" to remove it, or absent to keep it.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ai_save_provider(app: AppHandle, mut provider: Provider, key: Option<String>) -> CmdResult<AiConfig> {
     let mut cfg = load(&app);
     if provider.id.is_empty() {
@@ -389,7 +389,7 @@ pub fn ai_save_provider(app: AppHandle, mut provider: Provider, key: Option<Stri
     Ok(ai_config(app))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ai_remove_provider(app: AppHandle, id: String) -> CmdResult<AiConfig> {
     let mut cfg = load(&app);
     cfg.providers.retain(|p| p.id != id);
@@ -404,7 +404,7 @@ pub fn ai_remove_provider(app: AppHandle, id: String) -> CmdResult<AiConfig> {
     Ok(ai_config(app))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ai_set_default(app: AppHandle, id: String) -> CmdResult<AiConfig> {
     let mut cfg = load(&app);
     if cfg.providers.iter().any(|p| p.id == id) {
@@ -490,7 +490,7 @@ pub async fn ai_test(app: AppHandle, provider: Provider, key: Option<String>) ->
 }
 
 /// Starts a request; the answer arrives as `ai-event`s with this `id`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ai_run(app: AppHandle, id: String, provider_id: Option<String>, system: String, messages: Vec<Msg>) -> CmdResult<String> {
     let p = pick(&app, provider_id.as_deref())?;
     if p.model.is_empty() {
@@ -517,7 +517,7 @@ pub fn ai_run(app: AppHandle, id: String, provider_id: Option<String>, system: S
     Ok(name)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ai_cancel(id: String) {
     if let Ok(mut r) = running().lock() {
         if let Some(t) = r.remove(&id) {

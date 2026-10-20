@@ -309,6 +309,12 @@ function render() {
           "A local-first notes app. Your notes are plain Markdown files in a folder you choose; Marrow reads and writes them in place and keeps its own data in a hidden .marrow folder.",
         ),
         h("div.line", null, "Built in Rust with Tauri and CodeMirror. Canvases use the open JSON Canvas format."),
+        h(
+          "div.line",
+          null,
+          "Something went wrong? Marrow keeps a small diagnostic log on this computer. It never contains your notes or passwords, and nothing is sent anywhere. Attach it to a bug report. ",
+          h("button.btn", { type: "button", onclick: () => void api.openLogFolder() }, "Show the log"),
+        ),
       ),
     );
   } else if (tab === "ai") {

@@ -29,7 +29,15 @@ fn main() {
                 let _ = w.set_focus();
             }
         }))
+        .plugin(log_plugin())
         .setup(|app| {
+            // A crash leaves its reason in the log, for a bug report.
+            let default_hook = std::panic::take_hook();
+            std::panic::set_hook(Box::new(move |info| {
+                log::error!("crash: {info}");
+                default_hook(info);
+            }));
+            log::info!("Marrow {} started on {} {}", env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH);
             let mut win = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
                 .title("Marrow")
                 .inner_size(1280.0, 820.0)
@@ -75,6 +83,7 @@ fn main() {
             commands::backup_for,
             commands::discard_backup,
             commands::keep_draft,
+            extras::open_log_folder,
             commands::merge_text,
             commands::create_note,
             commands::create_folder,
@@ -131,4 +140,21 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Marrow");
+}
+
+/// Diagnostic log: what Marrow did and what went wrong, for bug reports.
+/// It never contains note text or passwords. Kept to a few small files in
+/// the app's log folder (or `Data\logs` in the portable version).
+fn log_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
+    let file = match portable::data("logs") {
+        Some(dir) => TargetKind::Folder { path: dir, file_name: Some("marrow".into()) },
+        None => TargetKind::LogDir { file_name: Some("marrow".into()) },
+    };
+    tauri_plugin_log::Builder::new()
+        .targets([Target::new(file), Target::new(TargetKind::Stdout)])
+        .level(log::LevelFilter::Info)
+        .max_file_size(1_000_000)
+        .rotation_strategy(RotationStrategy::KeepSome(3))
+        .build()
 }

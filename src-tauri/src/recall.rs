@@ -166,7 +166,7 @@ pub struct IndexInfo {
     pub building: bool,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ai_index_info(app: AppHandle, state: State<AppState>) -> CmdResult<IndexInfo> {
     let chunks = with_engine(&state, |e| Ok(e.chunks()))?;
     let set = ai::load(&app).embed;
@@ -187,7 +187,7 @@ pub fn ai_index_info(app: AppHandle, state: State<AppState>) -> CmdResult<IndexI
 }
 
 /// Sets (or clears) the model for search by meaning.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ai_set_embedding(app: AppHandle, provider_id: Option<String>, model: Option<String>) -> CmdResult<()> {
     let mut cfg = ai::load(&app);
     cfg.embed = match (provider_id, model) {

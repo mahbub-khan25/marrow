@@ -30,7 +30,7 @@ fn previous(out: &Path) -> Option<BTreeSet<String>> {
 }
 
 /// Checks the output folder before publishing (creating it if needed).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn site_begin(state: State<AppState>, out: String) -> CmdResult<()> {
     let out = PathBuf::from(&out);
     let vault = with_engine(&state, |e| Ok(e.vault().root().to_path_buf()))?;
@@ -51,7 +51,7 @@ pub fn site_begin(state: State<AppState>, out: String) -> CmdResult<()> {
 }
 
 /// Writes one page (or the stylesheet, script, search index).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn site_write(out: String, rel: String, contents: String) -> CmdResult<()> {
     let dest = inside(Path::new(&out), &rel)?;
     if let Some(d) = dest.parent() {
@@ -61,7 +61,7 @@ pub fn site_write(out: String, rel: String, contents: String) -> CmdResult<()> {
 }
 
 /// Copies an image or other attachment from the vault into the site.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn site_copy(state: State<AppState>, out: String, rel: String, path: String) -> CmdResult<()> {
     let src = vp(&path)?;
     let dest = inside(Path::new(&out), &rel)?;
@@ -73,7 +73,7 @@ pub fn site_copy(state: State<AppState>, out: String, rel: String, path: String)
 }
 
 /// Opens the published site's home page in the default browser.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn site_open(app: tauri::AppHandle, out: String) -> CmdResult<()> {
     use tauri_plugin_opener::OpenerExt;
     let index = Path::new(&out).join("index.html");
@@ -85,7 +85,7 @@ pub fn site_open(app: tauri::AppHandle, out: String) -> CmdResult<()> {
 
 /// Removes pages from an earlier publish that weren't written this time, and
 /// remembers what was. Returns how many old files were removed.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn site_finish(out: String, files: Vec<String>) -> CmdResult<usize> {
     let out = PathBuf::from(out);
     let now: BTreeSet<String> = files.into_iter().collect();

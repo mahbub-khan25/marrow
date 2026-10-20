@@ -105,7 +105,7 @@ pub struct VaultInfo {
 }
 
 /// The vault opened last time, if it still exists.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn last_vault(app: AppHandle) -> Option<String> {
     load_settings(&app)
         .last_vault
@@ -129,7 +129,7 @@ pub(crate) fn vault_cache_file(app: &AppHandle, root: &Path, ext: &str) -> CmdRe
     Ok(cache_dir.join("vaults").join(format!("{}.{ext}", &key[..16])))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn open_vault(app: AppHandle, state: State<AppState>, path: String) -> CmdResult<VaultInfo> {
     let root = PathBuf::from(&path);
     if !root.is_dir() {
@@ -153,6 +153,10 @@ pub fn open_vault(app: AppHandle, state: State<AppState>, path: String) -> CmdRe
         let mut e = svc.engine();
         let root = e.vault().root().to_path_buf();
         let recovered = e.take_recovered();
+        log::info!("vault opened: {} notes, {} repairs", e.vault().markdown_files().count(), recovered.len());
+        for r in &recovered {
+            log::warn!("repaired on open: {r}");
+        }
         VaultInfo {
             name: root
                 .file_name()
@@ -181,14 +185,14 @@ pub fn open_vault(app: AppHandle, state: State<AppState>, path: String) -> CmdRe
     Ok(info)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn tree(state: State<AppState>) -> CmdResult<TreeNode> {
     with_engine(&state, |e| Ok(e.tree()))
 }
 
 // --------------------------------------------------------------- notes
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_note(state: State<AppState>, locks: State<crate::locks::Locks>, path: String) -> CmdResult<String> {
     let p = vp(&path)?;
     let text = with_engine(&state, |e| e.read_note(&p).map_err(err))?;
@@ -198,7 +202,7 @@ pub fn read_note(state: State<AppState>, locks: State<crate::locks::Locks>, path
 /// A new version is kept at most this often while a note is being edited.
 const HISTORY_GAP_MS: i64 = 5 * 60 * 1000;
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_note(
     app: AppHandle,
     state: State<AppState>,
@@ -236,6 +240,7 @@ pub fn write_note(
                 // Keep the text somewhere safe before reporting the failure.
                 let kept = backups.put(&root, p.as_str(), &text).is_ok();
                 let why = plain_io_error(&write_err);
+                log::warn!("save failed ({}); backup kept: {kept}", io_kind(&write_err));
                 Err(if kept {
                     format!("{why} Your text was kept in a backup and will be offered when you reopen this note.")
                 } else {
@@ -246,6 +251,14 @@ pub fn write_note(
     })?;
     emit_events(&app, result, Some(&p));
     Ok(())
+}
+
+/// The kind of failure, for the log (never the note's text).
+fn io_kind(e: &marrow_core::Error) -> String {
+    match e {
+        marrow_core::Error::Io { source, .. } => format!("{:?}", source.kind()),
+        other => other.to_string(),
+    }
 }
 
 /// Says what went wrong with a file operation in words a person can act on.
@@ -278,7 +291,7 @@ pub(crate) fn backup_store(app: &AppHandle) -> CmdResult<BackupStore> {
 /// Keeps unsaved text as a draft, outside the vault, so a crash loses
 /// nothing; the next open offers it back (see `backup_for`). A locked note's
 /// draft is sealed like the note; one that can't be sealed isn't kept.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn keep_draft(
     app: AppHandle,
     state: State<AppState>,
@@ -300,7 +313,7 @@ pub fn keep_draft(
 }
 
 /// Text kept from a failed save of this note, if any.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn backup_for(
     app: AppHandle,
     state: State<AppState>,
@@ -316,7 +329,7 @@ pub fn backup_for(
     }))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn discard_backup(app: AppHandle, state: State<AppState>, path: String) -> CmdResult<()> {
     let store = backup_store(&app)?;
     with_engine(&state, |e| {
@@ -326,7 +339,7 @@ pub fn discard_backup(app: AppHandle, state: State<AppState>, path: String) -> C
 }
 
 /// Three-way merge: `base` = last saved text, `mine` = editor, `theirs` = disk.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn merge_text(base: String, mine: String, theirs: String) -> MergeOutcome {
     merge3(&base, &mine, &theirs)
 }
@@ -349,7 +362,7 @@ fn unique_child(e: &Engine, folder: &VaultPath, base: &str, ext: &str) -> CmdRes
 }
 
 /// Creates an empty note in `folder` (root if empty) and returns its path.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_note(
     app: AppHandle,
     state: State<AppState>,
@@ -367,7 +380,7 @@ pub fn create_note(
     Ok(p.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_folder(app: AppHandle, state: State<AppState>, parent: String) -> CmdResult<String> {
     let parent = vp(&parent)?;
     let (p, events) = with_engine(&state, |e| {
@@ -380,7 +393,7 @@ pub fn create_folder(app: AppHandle, state: State<AppState>, parent: String) -> 
 }
 
 /// Moves a file or folder to the vault's `.marrow/trash`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn trash(app: AppHandle, state: State<AppState>, path: String) -> CmdResult<()> {
     let p = vp(&path)?;
     let events = with_engine(&state, |e| e.trash(&p).map_err(err))?;
@@ -393,7 +406,7 @@ const BAD_NAME_CHARS: &[char] = &['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
 
 /// Renames a file or folder in place (`new_name` is just the last segment,
 /// without `.md` for notes) and rewrites links to it across the vault.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn rename(
     app: AppHandle,
     state: State<AppState>,
@@ -447,7 +460,7 @@ pub fn rename(
 }
 
 /// Moves a file or folder into another folder ("" = vault root), rewriting links.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn move_path(
     app: AppHandle,
     state: State<AppState>,
@@ -483,7 +496,7 @@ pub fn move_path(
     Ok(report)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn search(
     state: State<AppState>,
     query: String,
@@ -493,7 +506,7 @@ pub fn search(
 }
 
 /// Places where other notes name this one (or one of `names`) without linking.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn unlinked_mentions(state: State<AppState>, path: String, names: Vec<String>) -> CmdResult<Vec<marrow_core::engine::Mention>> {
     let p = vp(&path)?;
     with_engine(&state, |e| Ok(e.unlinked_mentions(&p, &names)))
@@ -506,7 +519,7 @@ pub struct TagCount {
 }
 
 /// Every tag in the vault with how many notes use it, most used first.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn tags(state: State<AppState>) -> CmdResult<Vec<TagCount>> {
     with_engine(&state, |e| {
         let mut v: Vec<TagCount> = e
@@ -519,7 +532,7 @@ pub fn tags(state: State<AppState>) -> CmdResult<Vec<TagCount>> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn graph(state: State<AppState>, options: Option<GraphOptions>) -> CmdResult<GraphData> {
     with_engine(&state, |e| Ok(e.graph_data(options.unwrap_or_default())))
 }
@@ -543,7 +556,7 @@ pub struct BacklinkGroup {
     items: Vec<BacklinkItem>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn backlinks(state: State<AppState>, path: String) -> CmdResult<Vec<BacklinkGroup>> {
     let p = vp(&path)?;
     with_engine(&state, |e| {
@@ -588,7 +601,7 @@ pub struct NoteLinks {
     unresolved: Vec<String>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn note_links(state: State<AppState>, path: String) -> CmdResult<NoteLinks> {
     let p = vp(&path)?;
     with_engine(&state, |e| {
@@ -599,7 +612,7 @@ pub fn note_links(state: State<AppState>, path: String) -> CmdResult<NoteLinks> 
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn resolve_link(
     state: State<AppState>,
     link: String,
@@ -613,7 +626,7 @@ pub fn resolve_link(
 
 /// Resolves a link, creating the target note at the vault root (or at the
 /// path the link names) if it doesn't exist yet. Returns the target path.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn follow_link(
     app: AppHandle,
     state: State<AppState>,
@@ -656,7 +669,7 @@ pub struct FileHit {
     link_text: String,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn find_files(
     state: State<AppState>,
     query: String,
@@ -687,31 +700,31 @@ pub fn find_files(
 
 // ------------------------------------------------------------ vault info
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn note_info(state: State<AppState>, path: String) -> CmdResult<Option<NoteInfo>> {
     let p = vp(&path)?;
     with_engine(&state, |e| Ok(e.note_info(&p)))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn recent_files(state: State<AppState>, limit: Option<usize>) -> CmdResult<Vec<RecentFile>> {
     with_engine(&state, |e| Ok(e.recent_files(limit.unwrap_or(20))))
 }
 
 /// The notes in a folder as database rows (for database views).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn query_notes(state: State<AppState>, folder: String, recursive: Option<bool>) -> CmdResult<marrow_core::QueryResult> {
     let f = vp(folder.trim_matches('/'))?;
     with_engine(&state, |e| Ok(e.query(&f, recursive.unwrap_or(false))))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn vault_stats(state: State<AppState>) -> CmdResult<VaultStats> {
     with_engine(&state, |e| Ok(e.vault_stats()))
 }
 
 /// Creates a file of any type (e.g. a `.canvas`) with a unique name in `folder`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_file(
     app: AppHandle,
     state: State<AppState>,
@@ -740,7 +753,7 @@ pub fn create_file(
 /// Copies a file from anywhere on the computer into `folder` in the vault
 /// (made unique), e.g. a cover image picked with the file dialog. Files
 /// already inside the vault are not copied; their vault path is returned.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn import_file(app: AppHandle, state: State<AppState>, source: String, folder: String) -> CmdResult<String> {
     let src = PathBuf::from(&source);
     let folder = vp(&folder)?;
@@ -770,7 +783,7 @@ pub fn import_file(app: AppHandle, state: State<AppState>, source: String, folde
 /// Saves pasted or dropped file bytes (the request body) into `folder` and
 /// returns the new file's vault path. Headers: `name` (URL-encoded file name)
 /// and `folder`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_attachment(app: AppHandle, state: State<AppState>, request: tauri::ipc::Request<'_>) -> CmdResult<String> {
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
         return Err("Expected the file's bytes".into());
@@ -814,7 +827,7 @@ fn store_attachment(app: &AppHandle, state: &State<AppState>, name: &str, folder
 
 /// Saves the image on the system clipboard as a PNG, for when the webview
 /// doesn't hand pasted images to the page (WebKitGTK). None if there's no image.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_clipboard_image(app: AppHandle, state: State<AppState>, name: String, folder: String) -> CmdResult<Option<String>> {
     let Ok(mut cb) = arboard::Clipboard::new() else { return Ok(None) };
     let Ok(img) = cb.get_image() else { return Ok(None) };
@@ -848,13 +861,13 @@ fn percent_decode(s: &str) -> String {
 }
 
 /// Writes an exported file (HTML) wherever the person chose to save it.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_export(path: String, contents: String) -> CmdResult<()> {
     marrow_core::atomic::write(&path, contents).map_err(err)
 }
 
 /// Every to-do in the vault (open ones, or all).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn tasks(state: State<AppState>, include_done: bool) -> CmdResult<Vec<marrow_core::engine::TaskItem>> {
     with_engine(&state, |e| Ok(e.tasks(include_done)))
 }
@@ -862,13 +875,13 @@ pub fn tasks(state: State<AppState>, include_done: bool) -> CmdResult<Vec<marrow
 // --------------------------------------------------------- version history
 
 /// Earlier versions of a note, newest first.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn history_list(state: State<AppState>, path: String) -> CmdResult<Vec<marrow_core::history::Version>> {
     let p = vp(&path)?;
     with_engine(&state, |e| Ok(marrow_core::history::History::for_vault(e.vault().root()).list(p.as_str())))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn history_read(state: State<AppState>, locks: State<crate::locks::Locks>, path: String, time_ms: i64) -> CmdResult<String> {
     let p = vp(&path)?;
     let text = with_engine(&state, |e| marrow_core::history::History::for_vault(e.vault().root()).read(p.as_str(), time_ms).map_err(err))?;
@@ -876,7 +889,7 @@ pub fn history_read(state: State<AppState>, locks: State<crate::locks::Locks>, p
 }
 
 /// Keeps the note's current text as a version now (before a restore, say).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn history_snapshot(state: State<AppState>, locks: State<crate::locks::Locks>, path: String, text: String) -> CmdResult<()> {
     let p = vp(&path)?;
     with_engine(&state, |e| {
@@ -910,6 +923,9 @@ pub struct VaultSettings {
     pub snippets: Vec<String>,
     /// Plugins that are on (folders in `.marrow/plugins`).
     pub plugins: Vec<String>,
+    /// Property name → the type picked for it ("date", "number", …), so an
+    /// empty "due" stays a date after a restart, as in Obsidian.
+    pub property_types: std::collections::BTreeMap<String, String>,
 }
 
 impl Default for VaultSettings {
@@ -923,6 +939,7 @@ impl Default for VaultSettings {
             starred: Vec::new(),
             snippets: Vec::new(),
             plugins: Vec::new(),
+            property_types: Default::default(),
         }
     }
 }
@@ -938,12 +955,12 @@ fn read_vault_settings(root: &Path) -> VaultSettings {
         .unwrap_or_default()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_vault_settings(state: State<AppState>) -> CmdResult<VaultSettings> {
     with_engine(&state, |e| Ok(read_vault_settings(e.vault().root())))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_vault_settings(state: State<AppState>, settings: VaultSettings) -> CmdResult<()> {
     with_engine(&state, |e| {
         let path = vault_settings_path(e.vault().root());

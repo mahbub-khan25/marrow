@@ -122,6 +122,8 @@ export interface VaultSettings {
   snippets: string[];
   /** Plugins that are on. */
   plugins: string[];
+  /** Property name → the type picked for it. */
+  propertyTypes?: Record<string, string>;
 }
 
 export interface PluginInfo {
@@ -242,6 +244,7 @@ export const api = {
   discardBackup: (path: string) => invoke<void>("discard_backup", { path }),
   /** Keeps unsaved text as a crash draft (offered back like a backup). */
   keepDraft: (path: string, text: string) => invoke<void>("keep_draft", { path, text }),
+  openLogFolder: () => invoke<void>("open_log_folder"),
   createNote: (folder: string, name?: string) => invoke<string>("create_note", { folder, name }),
   createFolder: (parent: string) => invoke<string>("create_folder", { parent }),
   trash: (path: string) => invoke<void>("trash", { path }),
