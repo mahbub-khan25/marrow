@@ -41,8 +41,11 @@ fn main() {
 fn save_forever(path: &Path, plain: bool) {
     let a = "a".repeat(SIZE);
     let b = "b".repeat(SIZE);
-    for i in 0u64.. {
-        let text = if i % 2 == 0 { &a } else { &b };
+    // Runs until the test kills it.
+    let mut even = true;
+    loop {
+        let text = if even { &a } else { &b };
+        even = !even;
         if plain {
             std::fs::write(path, text).unwrap();
         } else {
