@@ -30,7 +30,7 @@
       "icons/icon.ico"
     ],
     "publisher": "Khan",
-    "copyright": "© 2026 Khan",
+    "copyright": "\u00a9 2026 Khan",
     "category": "Productivity",
     "shortDescription": "Local-first Markdown notes",
     "longDescription": "Marrow keeps your notes as plain Markdown files in a folder you choose, links them with [[wikilinks]], and shows backlinks, a graph and canvases.",
@@ -42,6 +42,18 @@
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
       }
-    }
+    },
+    "linux": {
+      "deb": {
+        "section": "text"
+      },
+      "rpm": {
+        "release": "1"
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
+    "license": "MIT"
   }
 }
