@@ -6,6 +6,7 @@ const disk = new Map<string, string>();
 let failWrites = false;
 let failDrafts = false;
 let onCopy: (() => void) | null = null;
+let onWrite: (() => void) | null = null;
 
 vi.mock("@tauri-apps/api/core", () => ({ convertFileSrc: (p: string) => p, invoke: vi.fn() }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ ask: vi.fn(async () => false) }));
@@ -20,6 +21,10 @@ vi.mock("./api", () => ({
       if (failWrites) throw new Error("The disk is full.");
       if (expected !== undefined && disk.get(p) !== expected) throw "CHANGED_ON_DISK";
       disk.set(p, text);
+      // The person keeps drawing while the save is writing.
+      const f = onWrite;
+      onWrite = null;
+      f?.();
     }),
     createFile: vi.fn(async (folder: string, name: string, ext: string, text: string) => {
       const p = `${folder ? folder + "/" : ""}${name}.${ext}`;
@@ -53,6 +58,7 @@ beforeEach(() => {
   disk.clear();
   failWrites = failDrafts = false;
   onCopy = null;
+  onWrite = null;
   toasts.length = 0;
   window.requestAnimationFrame = (f: FrameRequestCallback) => (f(0), 0);
   view = new CanvasView(document.createElement("div"), { vaultRoot: () => "/v", openPath: () => {}, toast: (t) => void toasts.push(t) });
@@ -90,5 +96,29 @@ describe("canvas saving", () => {
     failDrafts = false;
     await view.load("B.canvas");
     expect(view.path).toBe("B.canvas");
+  });
+
+  it("saves edits made while a save is writing before reporting success", async () => {
+    disk.set("A.canvas", empty);
+    disk.set("B.canvas", empty);
+    await view.load("A.canvas");
+    addCard("first");
+    onWrite = () => addCard("during-save");
+    expect(await view.flush()).toBe(true);
+    expect(disk.get("A.canvas")).toContain("during-save");
+    await view.load("B.canvas");
+    expect(disk.get("A.canvas")).toContain("during-save");
+  });
+
+  it("reports changes that could be neither saved nor kept", async () => {
+    disk.set("A.canvas", empty);
+    await view.load("A.canvas");
+    addCard("unsaved");
+    failWrites = true;
+    expect(await view.flush()).toBe(false);
+    expect(view.changesAtRisk).toBe(false); // kept as a draft
+    failDrafts = true;
+    expect(await view.flush()).toBe(false);
+    expect(view.changesAtRisk).toBe(true);
   });
 });
