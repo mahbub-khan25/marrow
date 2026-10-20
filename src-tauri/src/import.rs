@@ -83,7 +83,7 @@ fn merge(into: &mut Output, from: Output) {
 
 /// Imports `paths` into a new folder named like `folder` ("Notion", "Notion 2"…).
 #[tauri::command]
-pub async fn import_files(app: AppHandle, state: State<'_, AppState>, kind: String, paths: Vec<String>, folder: String) -> CmdResult<ImportReport> {
+pub async fn import_files(app: AppHandle, state: State<'_, AppState>, locks: State<'_, crate::locks::Locks>, kind: String, paths: Vec<String>, folder: String) -> CmdResult<ImportReport> {
     if paths.is_empty() {
         return Err("Pick something to import.".into());
     }
@@ -116,7 +116,14 @@ pub async fn import_files(app: AppHandle, state: State<'_, AppState>, kind: Stri
             if let Some(dir) = dest.parent() {
                 std::fs::create_dir_all(dir).map_err(err)?;
             }
-            marrow_core::atomic::create(&dest, &f.bytes).map_err(err)?;
+            // Notes landing in a locked folder (or a locked vault) are sealed.
+            let bytes = match std::str::from_utf8(&f.bytes) {
+                Ok(text) if vp.is_markdown() => {
+                    crate::locks::conceal(&locks, &root, vp.as_str(), None, text)?.into_bytes()
+                }
+                _ => f.bytes.clone(),
+            };
+            marrow_core::atomic::create(&dest, &bytes).map_err(err)?;
             written.push(vp);
         }
         e.on_paths_changed(&written).map_err(err)

@@ -15,6 +15,7 @@ import {
   onMirrorChanged,
   onVaultChanged,
   parentOf,
+  setUnlockHandler,
   type ConflictCopy,
   type EngineEvent,
   type GraphNode,
@@ -66,6 +67,7 @@ import {
   replaceText,
   save,
   saveAll,
+  keepDrafts,
 } from "./docs";
 import { editNote } from "./database";
 import { makeState } from "./editor";
@@ -390,12 +392,36 @@ function renderTabs() {
   bar.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
+/**
+ * Saves everything before leaving it behind (closing the window, switching
+ * vaults, closing tabs). True when it's safe to go on: all saved, or the
+ * person chose to go on with the unsaved text kept as a draft.
+ */
+async function settleEdits(action: string, only?: Doc[]): Promise<boolean> {
+  stashActive();
+  const failed = (await saveAll()).filter((d) => !only || only.includes(d));
+  const canvasOk = only ? true : await canvasView.flush();
+  if (!failed.length && canvasOk) return true;
+  const notKept = await keepDrafts(failed);
+  const names = [...failed.map((d) => `“${d.name}”`), ...(canvasOk ? [] : ["the open canvas"])];
+  const list = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", ");
+  const safe = notKept.length
+    ? `Copy your text somewhere safe first: Marrow couldn't keep a copy of ${notKept.map((d) => `“${d.name}”`).join(", ")} either.`
+    : "Your text is kept, and Marrow offers it back when you open it again.";
+  return ask(`${list} couldn't be saved.\n\n${safe}`, {
+    title: "Not saved",
+    kind: "warning",
+    okLabel: `${action} anyway`,
+    cancelLabel: "Stay here",
+  });
+}
+
 async function closeTab(i: number) {
   const t = tabs[i];
   if (!t) return;
   if (i === active) stashActive();
-  if (t.kind === "note") await save(t.doc);
-  if (t.kind === "canvas" && canvasView.path === t.path) await canvasView.flush();
+  if (t.kind === "note" && !(await save(t.doc)) && !(await settleEdits("Close", [t.doc]))) return;
+  if (t.kind === "canvas" && canvasView.path === t.path && !(await canvasView.flush()) && !(await settleEdits("Close"))) return;
   tabs.splice(i, 1);
   if (i < active) active--;
   else if (i === active) {
@@ -413,9 +439,7 @@ async function closeTab(i: number) {
 }
 
 async function closeAllTabs() {
-  stashActive();
-  await saveAll();
-  await canvasView.flush();
+  if (!(await settleEdits("Close the tabs"))) return;
   tabs = [];
   active = -1;
   split = null;
@@ -538,7 +562,9 @@ async function unlockRemove(path: string, isFolder: boolean) {
  */
 async function lockAllNow(quiet = false) {
   stashActive();
-  await saveAll();
+  // A note whose save failed stays open (its unsaved text would be lost by
+  // closing it); its banner asks for the password to save it later.
+  const unsaved = new Set(await saveAll());
   await api.lockNow();
   stopIdleLock();
   await refreshLocked();
@@ -550,13 +576,15 @@ async function lockAllNow(quiet = false) {
   }
   for (let i = tabs.length - 1; i >= 0; i--) {
     const t = tabs[i];
-    if (t.kind === "note" && locked(t.doc.path)) {
-      t.doc.dirty = false;
+    if (t.kind === "note" && locked(t.doc.path) && !unsaved.has(t.doc)) {
       await closeTab(i);
       closed++;
     }
   }
-  for (const d of allDocs()) if (locked(d.path)) forget(d.path);
+  for (const d of allDocs()) if (locked(d.path) && !unsaved.has(d)) forget(d.path);
+  const kept = [...unsaved].filter((d) => locked(d.path));
+  if (kept.length)
+    toast(`${kept.map((d) => `“${d.name}”`).join(", ")} couldn't be saved, so ${kept.length === 1 ? "it stays" : "they stay"} open. Save, then lock again.`, "error");
   if (!quiet || closed) toast(closed ? "Locked. Notes that need a password were closed." : "Locked. Passwords are needed again.");
 }
 
@@ -1008,6 +1036,9 @@ function afterMove(oldPath: string, r: RenameReport, verb: string) {
   const n = r.linksUpdated;
   const m = r.filesUpdated.length;
   toast(n === 0 ? `${verb}.` : `${verb}. Updated ${n} ${n === 1 ? "link" : "links"} in ${m} ${m === 1 ? "note" : "notes"}.`);
+  const k = r.linksSkipped ?? 0;
+  if (k > 0)
+    toast(`${k} ${k === 1 ? "link wasn't" : "links weren't"} updated because another app was changing ${k === 1 ? "that note" : "those notes"} at the same moment. Search for the old name to fix ${k === 1 ? "it" : "them"}.`, "error");
 }
 
 /** Points everything open at a renamed path. Safe to call twice. */
@@ -1035,6 +1066,9 @@ function pathMoved(from: string, to: string) {
   persistSession();
 }
 
+/** Paths being moved to the trash by Marrow itself (not deleted outside). */
+let trashing: string[] = [];
+
 async function trashPath(path: string, isFolder: boolean) {
   const what = isFolder ? `the folder “${displayName(path)}” and everything in it` : `“${displayName(path)}”`;
   const ok = await ask(`Move ${what} to the vault trash?\n\nYou can get it back from the .marrow/trash folder.`, {
@@ -1045,11 +1079,24 @@ async function trashPath(path: string, isFolder: boolean) {
   });
   if (!ok) return;
   const gone = (p: string) => p === path || p.startsWith(path + "/");
+  // Save first, so the trash holds the latest text.
+  stashActive();
+  const failed = (await saveAll()).filter((d) => gone(d.path));
+  if (failed.length && !(await settleEdits("Move to trash", failed))) return;
+  if (canvasView.path && gone(canvasView.path) && !(await canvasView.flush())) return;
+  trashing = [...trashing, path];
+  try {
+    await api.trash(path);
+  } catch (e) {
+    // Nothing was moved: everything stays open as it was.
+    trashing = trashing.filter((t) => t !== path);
+    toast(`Couldn't move it to the trash: ${e}`, "error");
+    return;
+  }
   for (let i = tabs.length - 1; i >= 0; i--) {
     const t = tabs[i];
     const p = t.kind === "note" ? t.doc.path : t.kind === "canvas" ? t.path : null;
     if (p && gone(p)) {
-      if (t.kind === "note") t.doc.dirty = false;
       tabs.splice(i, 1);
       if (i < active) active--;
       else if (i === active) active = -1;
@@ -1062,11 +1109,8 @@ async function trashPath(path: string, isFolder: boolean) {
   if (canvasView.path && gone(canvasView.path)) canvasView.path = null;
   if ((vaultSettings.starred ?? []).some(gone)) setStarred(vaultSettings.starred.filter((p) => !gone(p)));
   forget(path);
-  try {
-    await api.trash(path);
-  } catch (e) {
-    toast(String(e), "error");
-  }
+  // The watcher reports the move a moment later; ignore it until then.
+  window.setTimeout(() => (trashing = trashing.filter((t) => t !== path)), 3000);
   if (active < 0 && tabs.length) await activateTab(Math.min(tabs.length - 1, 0));
   else if (active < 0) {
     primary.clear();
@@ -1247,7 +1291,7 @@ async function onEngineEvents(events: EngineEvent[]) {
       pathMoved(v.from, v.to);
     } else if (v.type === "deleted") {
       const d = findDoc(v.path);
-      if (d) {
+      if (d && !trashing.some((t) => d.path === t || d.path.startsWith(t + "/"))) {
         // A background tab whose note vanished just closes; a visible one stays.
         const visible = primary.doc === d || splitPane.doc === d;
         if (visible) onDiskDeleted(d);
@@ -1585,8 +1629,7 @@ async function chooseVault() {
 }
 
 async function openVault(path: string) {
-  await saveAll();
-  await canvasView?.flush();
+  if (canvasView && !(await settleEdits("Switch vaults"))) return;
   window.clearTimeout(sessionTimer);
   writeSession();
   $("welcome-error").hidden = true;
@@ -1990,11 +2033,18 @@ async function boot() {
     void canvasView.flush();
     writeSession();
   });
-  await getCurrentWindow().onCloseRequested(async () => {
-    await saveAll();
-    await canvasView.flush();
+  await getCurrentWindow().onCloseRequested(async (event) => {
+    // Never close over text that isn't saved, unless the person says so.
+    if (!(await settleEdits("Close Marrow"))) {
+      event.preventDefault();
+      return;
+    }
     writeSession();
   });
+  // Putting a note into a locked folder asks for its password first.
+  setUnlockHandler((folder) => unlockPath(folder, folder));
+  // Problems the backend wants the person to know about.
+  void listen<string>("notice", (e) => toast(e.payload, "error"));
 
   await onVaultChanged((ev) => void onEngineEvents(ev));
   await onMirrorChanged(onMirror);

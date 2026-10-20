@@ -13,6 +13,7 @@
 // saying it was drawn in Marrow.
 
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
 import { api, displayName, parentOf } from "./api";
@@ -190,14 +191,31 @@ export class CanvasView {
   // --------------------------------------------------------------- loading
 
   async load(path: string) {
-    if (this.path && this.path !== path) {
+    if (this.path) {
+      // Save what's here first, even when reopening the same canvas, so
+      // recent changes are never replaced by the older file.
       await this.flush();
-      this.views.set(this.path, { k: this.k, tx: this.tx, ty: this.ty });
+      if (this.path !== path) this.views.set(this.path, { k: this.k, tx: this.tx, ty: this.ty });
     }
-    const text = await api.readNote(path);
+    const disk = await api.readNote(path);
+    let shown = disk;
+    // Changes kept from a save that failed (or a crash) are offered back.
+    const kept = await api.backupFor(path).catch(() => null);
+    if (kept && kept.text !== disk) {
+      const when = new Date(kept.savedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+      const restore = await ask(`Changes you made to “${displayName(path)}” on ${when} weren't saved, so they were kept. Restore them?`, {
+        title: "Unsaved canvas changes",
+        kind: "warning",
+        okLabel: "Restore",
+        cancelLabel: "Discard",
+      });
+      if (restore) shown = kept.text;
+      else void api.discardBackup(path);
+    } else if (kept) void api.discardBackup(path);
     this.path = path;
-    this.lastSaved = text;
-    this.data = parse(text);
+    this.lastSaved = disk;
+    this.data = parse(shown);
+    if (shown !== disk) this.scheduleSave();
     this.resetUndo();
     this.selected.clear();
     this.selectedEdge = null;
@@ -281,24 +299,65 @@ export class CanvasView {
     this.scheduleSave();
   }
 
-  async flush() {
+  /** Saves now. True once the canvas on screen is on disk (or kept safe). */
+  async flush(): Promise<boolean> {
     window.clearTimeout(this.saveTimer);
     this.saveTimer = undefined;
     if (this.saving) await this.saving;
-    if (!this.path) return;
+    if (!this.path) return true;
     const text = JSON.stringify(this.data, null, "\t");
-    if (text === this.lastSaved) return;
+    if (text === this.lastSaved) return true;
     const path = this.path;
+    let ok = false;
     this.saving = api
-      .writeNote(path, text)
+      // Only replace the version we loaded; another app may have changed it.
+      .writeNote(path, text, this.lastSaved)
       .then(() => {
         this.lastSaved = text;
+        ok = true;
       })
-      .catch((e) => this.app.toast(`Couldn't save the canvas: ${e}`, "error"))
+      .catch(async (e) => {
+        if (String(e) === "CHANGED_ON_DISK") {
+          ok = await this.keepBoth(path, text);
+          return;
+        }
+        // Kept outside the vault and offered back when the canvas opens.
+        await api.keepDraft(path, text).catch(() => {});
+        this.app.toast(`Couldn't save the canvas: ${e}`, "error");
+      })
       .finally(() => {
         this.saving = null;
       });
     await this.saving;
+    return ok;
+  }
+
+  /**
+   * Another app changed the canvas while it had changes here. Neither side
+   * is thrown away: these changes go to a copy beside it, and the canvas
+   * shows the other app's version.
+   */
+  private async keepBoth(path: string, mine: string): Promise<boolean> {
+    const folder = parentOf(path);
+    const name = `${displayName(path)} (my changes)`;
+    try {
+      const copy = await api.createFile(folder, name, "canvas", mine);
+      this.app.toast(`“${displayName(path)}” was changed in another app. Your changes were saved as “${displayName(copy)}”.`);
+    } catch (e) {
+      await api.keepDraft(path, mine).catch(() => {});
+      this.app.toast(`“${displayName(path)}” was changed in another app, and your changes couldn't be saved beside it: ${e}`, "error");
+      return false;
+    }
+    if (this.path === path) {
+      const disk = await api.readNote(path).catch(() => null);
+      if (disk !== null) {
+        this.lastSaved = disk;
+        this.data = parse(disk);
+        this.resetUndo();
+        this.renderAll();
+      }
+    }
+    return true;
   }
 
   // ---------------------------------------------------------------- render
