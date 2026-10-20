@@ -60,15 +60,21 @@ impl BackupStore {
         serde_json::from_slice(&bytes).ok()
     }
 
-    pub fn remove(&self, vault: &Path, path: &str) {
-        let _ = fs::remove_file(self.file_for(vault, path));
+    /// Deletes the kept text. Having nothing to delete is fine; failing to
+    /// delete is an error, since the copy may be readable text of a note
+    /// that has since been locked.
+    pub fn remove(&self, vault: &Path, path: &str) -> std::io::Result<()> {
+        match fs::remove_file(self.file_for(vault, path)) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+            _ => Ok(()),
+        }
     }
 
     /// Moves a backup along when its note is renamed.
     pub fn rename(&self, vault: &Path, from: &str, to: &str) {
         if let Some(b) = self.get(vault, from) {
             if self.put(vault, to, &b.text).is_ok() {
-                self.remove(vault, from);
+                let _ = self.remove(vault, from);
             }
         }
     }
@@ -95,7 +101,20 @@ mod tests {
         assert!(store.get(vault, "a.md").is_none());
         assert_eq!(store.get(vault, "b.md").unwrap().text, "unsaved words");
 
-        store.remove(vault, "b.md");
+        store.remove(vault, "b.md").unwrap();
+        // Nothing left to remove is not an error.
+        store.remove(vault, "b.md").unwrap();
         assert!(store.get(vault, "b.md").is_none());
+    }
+
+    #[test]
+    fn a_copy_that_cannot_be_removed_is_reported() {
+        let d = tempfile::tempdir().unwrap();
+        let store = BackupStore::new(d.path().join("backups"));
+        let vault = Path::new("/notes");
+        // Something undeletable where the copy lives (a folder with a file in it).
+        let f = store.file_for(vault, "c.md");
+        fs::create_dir_all(f.join("stuck")).unwrap();
+        assert!(store.remove(vault, "c.md").is_err());
     }
 }

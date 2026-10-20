@@ -222,10 +222,17 @@ impl Engine {
                 .collect();
             self.write_journal(&Journal { files: Some(files), ..journal })?;
         }
-        for (source, _, out, applied) in rewrites {
-            events.extend(self.write_note(&source, &out)?);
-            report.links_updated += applied;
-            report.files_updated.push(source);
+        for (source, before, out, applied) in rewrites {
+            // Like an ordinary save: only replace the version the new text was
+            // made from. If another app changed it this instant, leave it.
+            match self.write_note_if_unchanged(&source, &hash_bytes(before.as_bytes()), &out)? {
+                Some(ev) => {
+                    events.extend(ev);
+                    report.links_updated += applied;
+                    report.files_updated.push(source);
+                }
+                None => report.links_skipped += applied,
+            }
         }
         self.clear_journal();
         Ok((events, report))
@@ -280,7 +287,7 @@ impl Engine {
                     if now == f.after {
                         continue;
                     }
-                    if hash_bytes(now.as_bytes()) == f.before && self.write_note(&p, &f.after).is_ok() {
+                    if matches!(self.write_note_if_unchanged(&p, &f.before, &f.after), Ok(Some(_))) {
                         done += 1;
                     } else {
                         // Changed since: leave the person's text alone.
@@ -458,6 +465,20 @@ mod tests {
         assert!(e.graph().incoming_is_consistent());
         assert_eq!(e.backlinks(&p("Home.md")).len(), 1);
         drop(d);
+    }
+
+    #[test]
+    fn a_rewrite_never_replaces_a_newer_version() {
+        let (d, mut e) = setup(&[("A.md", "[[Old]] mine")]);
+        let made_from = crate::cache::hash_bytes(b"[[Old]] mine");
+        // Another app saves a newer version before the rewrite lands.
+        fs::write(d.path().join("A.md"), "[[Old]] mine, and theirs").unwrap();
+        assert!(e.write_note_if_unchanged(&p("A.md"), &made_from, "[[New]] mine").unwrap().is_none());
+        assert_eq!(read(&d, "A.md"), "[[Old]] mine, and theirs");
+        // Unchanged: written.
+        let now = crate::cache::hash_bytes(read(&d, "A.md").as_bytes());
+        assert!(e.write_note_if_unchanged(&p("A.md"), &now, "[[New]] mine, and theirs").unwrap().is_some());
+        assert_eq!(read(&d, "A.md"), "[[New]] mine, and theirs");
     }
 
     #[test]

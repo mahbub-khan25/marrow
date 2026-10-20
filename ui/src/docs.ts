@@ -16,6 +16,10 @@ import { api, displayName } from "./api";
 const SAVE_DELAY_MS = 2000;
 /** Keep a crash draft this long after the last keystroke. */
 const DRAFT_DELAY_MS = 500;
+/** While typing goes on without a pause, keep a draft at least this often, */
+export const DRAFT_MAX_WAIT_MS = 5000;
+/** and save at least this often. So a crash never costs more than 5 seconds. */
+export const SAVE_MAX_WAIT_MS = 15000;
 
 export type SaveState = "saved" | "unsaved" | "saving" | "error";
 
@@ -31,6 +35,9 @@ export class Doc {
   state: SaveState = "saved";
   timer: number | undefined;
   draftTimer: number | undefined;
+  /** When the oldest edit not yet kept as a draft (or saved) was made. */
+  draftWaitSince: number | null = null;
+  saveWaitSince: number | null = null;
   saving: Promise<void> | null = null;
   listeners = new Set<(origin: Origin) => void>();
 
@@ -124,13 +131,23 @@ export function edit(d: Doc, text: string, origin: Origin) {
   setState(d, "unsaved");
   notify(d, origin);
   schedule(d);
+  // Wait for a pause in typing, but not forever: steady typing still gets
+  // a draft every few seconds.
+  const now = Date.now();
+  d.draftWaitSince ??= now;
   window.clearTimeout(d.draftTimer);
-  d.draftTimer = window.setTimeout(() => void keepDraft(d), DRAFT_DELAY_MS);
+  d.draftTimer = window.setTimeout(() => void keepDraft(d), capped(DRAFT_DELAY_MS, d.draftWaitSince, DRAFT_MAX_WAIT_MS, now));
+}
+
+/** `delay`, shortened so the wait since `since` doesn't pass `max`. */
+function capped(delay: number, since: number, max: number, now: number): number {
+  return Math.max(0, Math.min(delay, since + max - now));
 }
 
 /** Keeps the unsaved text where a crash can't take it. */
 async function keepDraft(d: Doc): Promise<boolean> {
   window.clearTimeout(d.draftTimer);
+  d.draftWaitSince = null;
   if (!d.dirty || d.text === d.saved) return true;
   return api.keepDraft(d.path, d.text).then(
     () => true,
@@ -150,8 +167,10 @@ export function replaceText(d: Doc, text: string) {
 }
 
 function schedule(d: Doc, ms = SAVE_DELAY_MS) {
+  const now = Date.now();
+  d.saveWaitSince ??= now;
   window.clearTimeout(d.timer);
-  d.timer = window.setTimeout(() => void save(d), ms);
+  d.timer = window.setTimeout(() => void save(d), capped(ms, d.saveWaitSince, SAVE_MAX_WAIT_MS, now));
 }
 
 /** Saves now. True once everything typed so far is on disk. */
@@ -159,6 +178,7 @@ export async function save(d: Doc): Promise<boolean> {
   window.clearTimeout(d.timer);
   if (d.saving) await d.saving;
   if (!d.dirty) return true;
+  d.saveWaitSince = null;
   d.saving = write(d).finally(() => {
     d.saving = null;
   });

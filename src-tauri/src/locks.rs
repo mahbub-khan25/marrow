@@ -103,16 +103,41 @@ pub fn check_move(locks: &Locks, root: &Path, from: &str, to: &str) -> CmdResult
     Ok(())
 }
 
-/// After a move: seals notes that are now in a locked folder but aren't
-/// sealed yet, and forgets their readable history.
-pub fn seal_moved_in(locks: &Locks, e: &mut marrow_core::Engine, to: &VaultPath) -> CmdResult<Vec<EngineEvent>> {
+/// Before moving `from` to `to`: notes that will land in a locked folder
+/// are sealed where they are now, so they're never readable inside it, not
+/// even for a moment or after a crash halfway through the move. Text kept
+/// for them (failed saves, crash drafts) is sealed too, and their readable
+/// history and cached metadata are wiped.
+pub fn seal_before_move(
+    app: &AppHandle,
+    locks: &Locks,
+    e: &mut marrow_core::Engine,
+    from: &VaultPath,
+    to: &VaultPath,
+) -> CmdResult<Vec<EngineEvent>> {
+    let store = crate::commands::backup_store(app).ok();
+    let (events, sealed) = seal_for_move(locks, e, from, to, store.as_ref())?;
+    wipe_plain_copies(app, e, &sealed, false);
+    Ok(events)
+}
+
+/// The sealing half of [`seal_before_move`]: returns the events and the
+/// notes it sealed.
+fn seal_for_move(
+    locks: &Locks,
+    e: &mut marrow_core::Engine,
+    from: &VaultPath,
+    to: &VaultPath,
+    store: Option<&marrow_core::BackupStore>,
+) -> CmdResult<(Vec<EngineEvent>, Vec<VaultPath>)> {
     let root = e.vault().root().to_path_buf();
     let reg = load(&root)?;
-    let notes: Vec<VaultPath> = e.vault().markdown_files().filter(|n| *n == to || n.starts_with(to)).cloned().collect();
-    let history = marrow_core::history::History::for_vault(&root);
+    let notes: Vec<VaultPath> = e.vault().markdown_files().filter(|n| *n == from || n.starts_with(from)).cloned().collect();
     let mut events = Vec::new();
+    let mut sealed = Vec::new();
     for n in notes {
-        let Some(f) = folder_for(&reg, n.as_str()) else { continue };
+        let dest = format!("{}{}", to.as_str(), &n.as_str()[from.as_str().len()..]);
+        let Some(f) = folder_for(&reg, &dest) else { continue };
         let text = e.read_note(&n).map_err(err)?;
         if lock::is_locked(&text) {
             continue;
@@ -120,9 +145,17 @@ pub fn seal_moved_in(locks: &Locks, e: &mut marrow_core::Engine, to: &VaultPath)
         let h = lock::header(&f.check).map_err(err)?;
         let key = locks.key(&h.salt_id()).ok_or_else(|| format!("{LOCKED_FOLDER}{}", f.path))?;
         events.extend(e.write_note(&n, &lock::seal(&text, &key, h.hint.as_deref())).map_err(err)?);
-        let _ = history.forget(n.as_str());
+        if let Some(b) = store.and_then(|s| s.get(&root, n.as_str())) {
+            if !lock::is_locked(&b.text) {
+                let kept = store.map(|s| s.put(&root, n.as_str(), &lock::seal(&b.text, &key, h.hint.as_deref())));
+                if !matches!(kept, Some(Ok(()))) {
+                    return Err(format!("Couldn't protect the unsaved text kept for “{}”, so it wasn't moved.", n.name()));
+                }
+            }
+        }
+        sealed.push(n);
     }
-    Ok(events)
+    Ok((events, sealed))
 }
 
 fn store(root: &Path, r: &Registry) -> CmdResult<()> {
@@ -201,7 +234,7 @@ pub fn conceal(locks: &Locks, root: &Path, path: &str, disk: Option<&str>, plain
 /// save backups and crash drafts, and the headings and properties the search
 /// cache kept. Whatever can't be removed is reported to the window, since
 /// the person was promised the text is now private.
-fn wipe_plain_copies(app: &AppHandle, e: &mut marrow_core::Engine, notes: &[VaultPath]) {
+fn wipe_plain_copies(app: &AppHandle, e: &mut marrow_core::Engine, notes: &[VaultPath], remove_backups: bool) {
     let root = e.vault().root().to_path_buf();
     let history = marrow_core::history::History::for_vault(&root);
     let mut problems = Vec::new();
@@ -209,8 +242,12 @@ fn wipe_plain_copies(app: &AppHandle, e: &mut marrow_core::Engine, notes: &[Vaul
         if let Err(x) = history.forget(n.as_str()) {
             problems.push(format!("earlier versions of “{}” ({x})", n.name()));
         }
-        if let Ok(store) = crate::commands::backup_store(app) {
-            store.remove(&root, n.as_str());
+        if !remove_backups {
+            continue;
+        }
+        let removed = crate::commands::backup_store(app).and_then(|s| s.remove(&root, n.as_str()).map_err(|x| x.to_string()));
+        if let Err(x) = removed {
+            problems.push(format!("unsaved text kept from “{}” ({x})", n.name()));
         }
     }
     if let Err(x) = e.forget_old_metadata() {
@@ -221,7 +258,7 @@ fn wipe_plain_copies(app: &AppHandle, e: &mut marrow_core::Engine, notes: &[Vaul
         let _ = app.emit(
             "notice",
             format!(
-                "Locked, but Marrow couldn't remove some readable copies made before: {}. Close Marrow and try locking again, or delete the .marrow/history folder for this note.",
+                "Locked, but some readable copies made before couldn't be removed: {}. Close Marrow and lock it again; if this keeps happening, see Settings → About → Show the log.",
                 problems.join("; ")
             ),
         );
@@ -324,7 +361,7 @@ pub fn lock_note(
         }
         let ev = e.write_note(&p, &lock::seal(&text, &key, hint.as_deref())).map_err(err)?;
         // Readable copies made before the lock must go too.
-        wipe_plain_copies(&app, e, std::slice::from_ref(&p));
+        wipe_plain_copies(&app, e, std::slice::from_ref(&p), true);
         Ok(ev)
     })?;
     locks.keep(key);
@@ -366,7 +403,7 @@ pub fn lock_folder(
             sealed.push(n.clone());
             count += 1;
         }
-        wipe_plain_copies(&app, e, &sealed);
+        wipe_plain_copies(&app, e, &sealed, true);
         reg.folders.push(LockedFolder {
             path: folder.to_string(),
             check: lock::seal(CHECK, &key, hint.as_deref()),
@@ -530,11 +567,26 @@ mod tests {
         store(dir.path(), &Registry { folders: vec![LockedFolder { path: "F".into(), check: lock::seal(CHECK, &key, None) }] }).unwrap();
         locks.keep(key);
         let mut e = marrow_core::Engine::open(dir.path(), marrow_core::cache::Cache::in_memory().unwrap()).unwrap();
+        let from = VaultPath::new("a.md").unwrap();
         let to = VaultPath::new("F/a.md").unwrap();
-        e.rename_with_links(&VaultPath::new("a.md").unwrap(), &to).unwrap();
-        seal_moved_in(&locks, &mut e, &to).unwrap();
+        let store = marrow_core::BackupStore::new(dir.path().join("backups"));
+        // Kept text is filed under the vault's own (resolved) path, as the app does.
+        let root = e.vault().root().to_path_buf();
+        store.put(&root, "a.md", "unsaved secret words").unwrap();
+        // Sealed before it moves: even a crash right now leaves no readable copy.
+        let (_, sealed) = seal_for_move(&locks, &mut e, &from, &to, Some(&store)).unwrap();
+        assert_eq!(sealed, vec![from.clone()]);
+        let before_move = std::fs::read_to_string(dir.path().join("a.md")).unwrap();
+        assert!(lock::is_locked(&before_move) && !before_move.contains("secret plan"));
+        let kept = store.get(&root, "a.md").unwrap().text;
+        assert!(lock::is_locked(&kept) && !kept.contains("secret words"));
+        e.rename_with_links(&from, &to).unwrap();
         let on_disk = std::fs::read_to_string(dir.path().join("F/a.md")).unwrap();
-        assert!(lock::is_locked(&on_disk) && !on_disk.contains("secret plan"));
         assert_eq!(reveal(&locks, on_disk).unwrap(), "my secret plan");
+        // A note moving somewhere unlocked is left as it is.
+        std::fs::write(dir.path().join("b.md"), "plain").unwrap();
+        e.on_paths_changed(&[VaultPath::new("b.md").unwrap()]).unwrap();
+        let (_, none) = seal_for_move(&locks, &mut e, &VaultPath::new("b.md").unwrap(), &VaultPath::new("c.md").unwrap(), Some(&store)).unwrap();
+        assert!(none.is_empty());
     }
 }
