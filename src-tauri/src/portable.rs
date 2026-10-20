@@ -85,7 +85,9 @@ mod tests {
         assert_eq!(stored_in(Some(root), "/media/usb/Marrow/Notes"), "./Notes");
         assert_eq!(stored_in(Some(root), "/home/me/Notes"), "/home/me/Notes");
         assert_eq!(stored_in(None, "/media/usb/Marrow/Notes"), "/media/usb/Marrow/Notes");
-        assert_eq!(resolved_in(Some(Path::new("/mnt/e/Marrow")), "./Notes"), "/mnt/e/Marrow/Notes");
+        // Joined with the platform's own separator (`\` on Windows).
+        let expect = Path::new("/mnt/e/Marrow").join("Notes").to_string_lossy().into_owned();
+        assert_eq!(resolved_in(Some(Path::new("/mnt/e/Marrow")), "./Notes"), expect);
         assert_eq!(resolved_in(None, "./Notes"), "./Notes");
     }
 }
