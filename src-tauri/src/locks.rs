@@ -139,19 +139,23 @@ fn seal_for_move(
         let dest = format!("{}{}", to.as_str(), &n.as_str()[from.as_str().len()..]);
         let Some(f) = folder_for(&reg, &dest) else { continue };
         let text = e.read_note(&n).map_err(err)?;
-        if lock::is_locked(&text) {
+        let kept = store.and_then(|s| s.get(&root, n.as_str())).filter(|b| !lock::is_locked(&b.text));
+        // A note sealed by an earlier, interrupted move is still checked:
+        // its kept text and readable history may not have been dealt with.
+        if lock::is_locked(&text) && kept.is_none() {
+            sealed.push(n);
             continue;
         }
         let h = lock::header(&f.check).map_err(err)?;
         let key = locks.key(&h.salt_id()).ok_or_else(|| format!("{LOCKED_FOLDER}{}", f.path))?;
-        events.extend(e.write_note(&n, &lock::seal(&text, &key, h.hint.as_deref())).map_err(err)?);
-        if let Some(b) = store.and_then(|s| s.get(&root, n.as_str())) {
-            if !lock::is_locked(&b.text) {
-                let kept = store.map(|s| s.put(&root, n.as_str(), &lock::seal(&b.text, &key, h.hint.as_deref())));
-                if !matches!(kept, Some(Ok(()))) {
-                    return Err(format!("Couldn't protect the unsaved text kept for “{}”, so it wasn't moved.", n.name()));
-                }
+        // Kept text first, so a failure here leaves everything as it was.
+        if let (Some(s), Some(b)) = (store, kept) {
+            if s.put(&root, n.as_str(), &lock::seal(&b.text, &key, h.hint.as_deref())).is_err() {
+                return Err(format!("Couldn't protect the unsaved text kept for “{}”, so it wasn't moved.", n.name()));
             }
+        }
+        if !lock::is_locked(&text) {
+            events.extend(e.write_note(&n, &lock::seal(&text, &key, h.hint.as_deref())).map_err(err)?);
         }
         sealed.push(n);
     }
@@ -175,20 +179,67 @@ fn folder_for(reg: &Registry, path: &str) -> Option<LockedFolder> {
         .cloned()
 }
 
-/// Keeps the folder list in step with a rename or move.
+/// Where a locked folder at `path` ends up when `from` moves to `to`.
+fn mapped(path: &str, from: &str, to: &str) -> Option<String> {
+    if path == from {
+        Some(to.to_string())
+    } else {
+        path.strip_prefix(&format!("{from}/")).map(|rest| format!("{to}/{rest}"))
+    }
+}
+
+/// Before a rename or move: locked folders inside `from` are listed under
+/// their new place too, so they stay locked whichever side of the move a
+/// crash lands on. [`moved`] drops the old entries afterwards, and [`tidy`]
+/// does it on the next open if Marrow stopped in between.
+pub fn moving(root: &Path, from: &str, to: &str) -> CmdResult<()> {
+    let mut reg = load(root)?;
+    let extra: Vec<LockedFolder> = reg
+        .folders
+        .iter()
+        .filter_map(|f| mapped(&f.path, from, to).map(|path| LockedFolder { path, check: f.check.clone() }))
+        .filter(|n| !reg.folders.iter().any(|f| f.path == n.path))
+        .collect();
+    if extra.is_empty() {
+        return Ok(());
+    }
+    reg.folders.extend(extra);
+    store(root, &reg)
+}
+
+/// Keeps the folder list in step with a finished rename or move.
 pub fn moved(root: &Path, from: &str, to: &str) -> CmdResult<()> {
     let mut reg = load(root)?;
+    let before = reg.folders.len();
     let mut changed = false;
-    for f in &mut reg.folders {
-        if f.path == from {
-            f.path = to.to_string();
+    let paths: Vec<String> = reg.folders.iter().map(|f| f.path.clone()).collect();
+    reg.folders.retain_mut(|f| match mapped(&f.path, from, to) {
+        // Already listed at its new place by `moving`.
+        Some(new) if paths.contains(&new) => false,
+        Some(new) => {
+            f.path = new;
             changed = true;
-        } else if let Some(rest) = f.path.strip_prefix(&format!("{from}/")) {
-            f.path = format!("{to}/{rest}");
-            changed = true;
+            true
         }
+        None => true,
+    });
+    if changed || reg.folders.len() != before {
+        store(root, &reg)?;
     }
-    if changed {
+    Ok(())
+}
+
+/// On opening a vault: finishes a folder-list update a crash interrupted.
+/// A locked folder listed twice (old and new place, same password) keeps
+/// only the place that exists on disk. Nothing else is touched.
+pub fn tidy(root: &Path) -> CmdResult<()> {
+    let mut reg = load(root)?;
+    let exists = |p: &str| root.join(p).is_dir();
+    let all = reg.folders.clone();
+    let before = reg.folders.len();
+    reg.folders
+        .retain(|f| exists(&f.path) || !all.iter().any(|o| o.path != f.path && o.check == f.check && exists(&o.path)));
+    if reg.folders.len() != before {
         store(root, &reg)?;
     }
     Ok(())
@@ -588,5 +639,62 @@ mod tests {
         e.on_paths_changed(&[VaultPath::new("b.md").unwrap()]).unwrap();
         let (_, none) = seal_for_move(&locks, &mut e, &VaultPath::new("b.md").unwrap(), &VaultPath::new("c.md").unwrap(), Some(&store)).unwrap();
         assert!(none.is_empty());
+    }
+
+    #[test]
+    fn a_retried_move_still_seals_what_an_earlier_try_missed() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("F")).unwrap();
+        let locks = Locks::default();
+        let key = lock::derive("secret", [7u8; 16], lock::Cost { m: 64, t: 1, p: 1 }).unwrap();
+        store(dir.path(), &Registry { folders: vec![LockedFolder { path: "F".into(), check: lock::seal(CHECK, &key, None) }] }).unwrap();
+        // An earlier try sealed the note but stopped before its kept text.
+        std::fs::write(dir.path().join("a.md"), lock::seal("my secret plan", &key, None)).unwrap();
+        locks.keep(key);
+        let mut e = marrow_core::Engine::open(dir.path(), marrow_core::cache::Cache::in_memory().unwrap()).unwrap();
+        let root = e.vault().root().to_path_buf();
+        let store = marrow_core::BackupStore::new(dir.path().join("backups"));
+        store.put(&root, "a.md", "unsaved secret words").unwrap();
+        let from = VaultPath::new("a.md").unwrap();
+        let (_, sealed) = seal_for_move(&locks, &mut e, &from, &VaultPath::new("F/a.md").unwrap(), Some(&store)).unwrap();
+        // The kept text is sealed now, and the note's readable copies get wiped.
+        assert_eq!(sealed, vec![from]);
+        let kept = store.get(&root, "a.md").unwrap().text;
+        assert!(lock::is_locked(&kept) && !kept.contains("secret words"));
+        assert_eq!(reveal(&locks, std::fs::read_to_string(dir.path().join("a.md")).unwrap()).unwrap(), "my secret plan");
+    }
+
+    #[test]
+    fn renaming_a_locked_folder_survives_a_crash() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let key = lock::derive("secret", [8u8; 16], lock::Cost { m: 64, t: 1, p: 1 }).unwrap();
+        let folder = |p: &str| LockedFolder { path: p.into(), check: lock::seal(CHECK, &key, None) };
+        store(root, &Registry { folders: vec![folder("F"), folder("F/Inner"), folder("Other")] }).unwrap();
+        std::fs::create_dir_all(root.join("F/Inner")).unwrap();
+        std::fs::create_dir_all(root.join("Other")).unwrap();
+        let paths = || {
+            let mut v: Vec<String> = load(root).unwrap().folders.into_iter().map(|f| f.path).collect();
+            v.sort();
+            v
+        };
+        // Listed under both names before the folder moves.
+        moving(root, "F", "G").unwrap();
+        assert_eq!(paths(), ["F", "F/Inner", "G", "G/Inner", "Other"]);
+        assert!(folder_for(&load(root).unwrap(), "F/new.md").is_some());
+        assert!(folder_for(&load(root).unwrap(), "G/new.md").is_some());
+        // Crash after the folder moved: the next open keeps the new place.
+        std::fs::rename(root.join("F"), root.join("G")).unwrap();
+        tidy(root).unwrap();
+        assert_eq!(paths(), ["G", "G/Inner", "Other"]);
+        // Crash before it moved: the old place is kept.
+        moving(root, "G", "H").unwrap();
+        tidy(root).unwrap();
+        assert_eq!(paths(), ["G", "G/Inner", "Other"]);
+        // A normal rename ends with one entry per folder.
+        moving(root, "G", "H").unwrap();
+        std::fs::rename(root.join("G"), root.join("H")).unwrap();
+        moved(root, "G", "H").unwrap();
+        assert_eq!(paths(), ["H", "H/Inner", "Other"]);
     }
 }

@@ -152,7 +152,11 @@ pub fn open_vault(app: AppHandle, state: State<AppState>, path: String) -> CmdRe
     let info = {
         let mut e = svc.engine();
         let root = e.vault().root().to_path_buf();
-        let recovered = e.take_recovered();
+        let mut recovered = e.take_recovered();
+        // A locked folder renamed just before a crash keeps its lock.
+        if let Err(x) = crate::locks::tidy(&root) {
+            recovered.push(format!("locked folders: {x}"));
+        }
         log::info!("vault opened: {} notes, {} repairs", e.vault().markdown_files().count(), recovered.len());
         for r in &recovered {
             log::warn!("repaired on open: {r}");
@@ -450,7 +454,11 @@ pub fn rename(
         }
         crate::locks::check_move(&locks, e.vault().root(), from.as_str(), to.as_str())?;
         let mut events = crate::locks::seal_before_move(&app, &locks, e, &from, &to)?;
-        let (moved, report) = e.rename_with_links(&from, &to).map_err(err)?;
+        crate::locks::moving(e.vault().root(), from.as_str(), to.as_str())?;
+        let (moved, report) = e.rename_with_links(&from, &to).map_err(|x| {
+            let _ = crate::locks::tidy(e.vault().root());
+            err(x)
+        })?;
         events.extend(moved);
         backup_store(&app)?.rename(e.vault().root(), from.as_str(), to.as_str());
         let _ = marrow_core::history::History::for_vault(e.vault().root()).moved(from.as_str(), to.as_str());
@@ -488,7 +496,11 @@ pub fn move_path(
         }
         crate::locks::check_move(&locks, e.vault().root(), from.as_str(), to.as_str())?;
         let mut events = crate::locks::seal_before_move(&app, &locks, e, &from, &to)?;
-        let (moved, report) = e.rename_with_links(&from, &to).map_err(err)?;
+        crate::locks::moving(e.vault().root(), from.as_str(), to.as_str())?;
+        let (moved, report) = e.rename_with_links(&from, &to).map_err(|x| {
+            let _ = crate::locks::tidy(e.vault().root());
+            err(x)
+        })?;
         events.extend(moved);
         backup_store(&app)?.rename(e.vault().root(), from.as_str(), to.as_str());
         let _ = marrow_core::history::History::for_vault(e.vault().root()).moved(from.as_str(), to.as_str());
