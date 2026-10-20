@@ -142,7 +142,11 @@ impl Cache {
         if ops.is_empty() {
             return Ok(());
         }
-        let txn = self.db.begin_write().map_err(ce)?;
+        let mut txn = self.db.begin_write().map_err(ce)?;
+        // The cache can always be rebuilt from the notes, and every entry is
+        // checked against the file before use, so it needn't wait for the
+        // disk on each save. redb still keeps it consistent after a crash.
+        txn.set_durability(redb::Durability::Eventual);
         {
             let mut files = txn.open_table(FILES).map_err(ce)?;
             let mut meta = txn.open_table(META).map_err(ce)?;

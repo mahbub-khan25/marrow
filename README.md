@@ -380,9 +380,9 @@ npm run tauri build
 
 This builds an optimised app and two installers:
 
-* `target\release\bundle\nsis\Marrow_0.1.0_x64-setup.exe`, the usual choice. It installs for the
+* `target\release\bundle\nsis\Marrow_0.9.0_x64-setup.exe`, the usual choice. It installs for the
   current user, with no admin prompt, and adds Start menu and uninstall entries.
-* `target\release\bundle\msi\Marrow_0.1.0_x64_en-US.msi`, for managed installs.
+* `target\release\bundle\msi\Marrow_0.9.0_x64_en-US.msi`, for managed installs.
 
 The installers download Microsoft's WebView2 runtime only if the PC doesn't already have it
 (Windows 10 and 11 normally do). The version comes from `src-tauri\tauri.conf.json`

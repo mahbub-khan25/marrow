@@ -359,7 +359,9 @@ impl Engine {
         // mention a name that appeared, vanished or moved.
         let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
         let mut relink: BTreeSet<VaultPath> = to_index.into_iter().collect();
-        relink.extend(self.graph.affected_by_names(&name_refs));
+        if !name_refs.is_empty() {
+            relink.extend(self.graph.affected_by_names(&name_refs));
+        }
         relink.retain(|p| self.metas.contains_key(p));
         for p in &relink {
             self.resolve_note(p);

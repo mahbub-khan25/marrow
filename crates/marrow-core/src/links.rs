@@ -220,6 +220,11 @@ pub fn link_text(
 pub struct LinkGraph {
     pub resolved: HashMap<VaultPath, BTreeMap<VaultPath, u32>>,
     pub unresolved: HashMap<VaultPath, BTreeMap<String, u32>>,
+    /// The reverse of `resolved`: target → notes linking to it, with counts.
+    /// Kept in step by the methods below, so backlinks are a lookup rather
+    /// than a scan of every note.
+    #[serde(skip)]
+    incoming: HashMap<VaultPath, BTreeMap<VaultPath, u32>>,
 }
 
 impl LinkGraph {
@@ -242,35 +247,66 @@ impl LinkGraph {
                 }
             }
         }
-        self.resolved.insert(source.clone(), res);
+        self.set_outgoing(source, Some(res));
         self.unresolved.insert(source.clone(), unres);
     }
 
     pub fn remove_note(&mut self, source: &VaultPath) {
-        self.resolved.remove(source);
+        self.set_outgoing(source, None);
         self.unresolved.remove(source);
     }
 
     /// Moves a note's own outgoing entry to its new path. Targets inside
     /// other notes are fixed by re-resolving those notes.
     pub fn rename_note(&mut self, from: &VaultPath, to: &VaultPath) {
-        if let Some(v) = self.resolved.remove(from) {
-            self.resolved.insert(to.clone(), v);
+        let out = self.resolved.get(from).cloned();
+        self.set_outgoing(from, None);
+        if let Some(v) = out {
+            self.set_outgoing(to, Some(v));
         }
         if let Some(v) = self.unresolved.remove(from) {
             self.unresolved.insert(to.clone(), v);
         }
     }
 
-    /// Notes that link to `target` (resolved), with counts.
+    /// Checks `incoming` against a full scan of `resolved` (for tests).
+    #[cfg(test)]
+    pub(crate) fn incoming_is_consistent(&self) -> bool {
+        let mut scan: HashMap<VaultPath, BTreeMap<VaultPath, u32>> = HashMap::new();
+        for (src, m) in &self.resolved {
+            for (t, n) in m {
+                scan.entry(t.clone()).or_default().insert(src.clone(), *n);
+            }
+        }
+        scan == self.incoming
+    }
+
+    /// Replaces `source`'s outgoing links, keeping `incoming` in step.
+    fn set_outgoing(&mut self, source: &VaultPath, links: Option<BTreeMap<VaultPath, u32>>) {
+        if let Some(old) = self.resolved.remove(source) {
+            for t in old.keys() {
+                if let Some(m) = self.incoming.get_mut(t) {
+                    m.remove(source);
+                    if m.is_empty() {
+                        self.incoming.remove(t);
+                    }
+                }
+            }
+        }
+        if let Some(new) = links {
+            for (t, n) in &new {
+                self.incoming.entry(t.clone()).or_default().insert(source.clone(), *n);
+            }
+            self.resolved.insert(source.clone(), new);
+        }
+    }
+
+    /// Notes that link to `target` (resolved), with counts, sorted.
     pub fn linking_notes(&self, target: &VaultPath) -> Vec<(VaultPath, u32)> {
-        let mut out: Vec<_> = self
-            .resolved
-            .iter()
-            .filter_map(|(src, m)| m.get(target).map(|n| (src.clone(), *n)))
-            .collect();
-        out.sort();
-        out
+        self.incoming
+            .get(target)
+            .map(|m| m.iter().map(|(p, n)| (p.clone(), *n)).collect())
+            .unwrap_or_default()
     }
 
     /// Notes whose links could change meaning when files with these names
