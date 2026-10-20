@@ -7,7 +7,13 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Or start it by hand from the Actions tab with a version name such as
+  # v0.9.0-beta.1; GitHub creates that tag on the current commit.
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag, e.g. v0.9.0-beta.1"
+        required: true
 
 jobs:
   build:
@@ -55,10 +61,10 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Marrow ${{ github.ref_name }}"
+          tagName: ${{ inputs.tag || github.ref_name }}
+          releaseName: "Marrow ${{ inputs.tag || github.ref_name }}"
           releaseBody: "See CHANGELOG.md for what's new."
           releaseDraft: true
           # Tags like v0.9.0-beta.1 become pre-releases.
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(inputs.tag || github.ref_name, '-') }}
           args: ${{ matrix.args }}
