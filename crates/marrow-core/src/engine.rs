@@ -404,6 +404,17 @@ impl Engine {
         self.apply(ev)
     }
 
+    /// Writes `text` only if the file still holds the version with hash
+    /// `expected` (the one the new text was made from). `None` means someone
+    /// changed it meanwhile, and it was left alone, as an ordinary save would.
+    pub fn write_note_if_unchanged(&mut self, path: &VaultPath, expected: &str, text: &str) -> Result<Option<Vec<EngineEvent>>> {
+        let now = self.vault.read_text(path)?;
+        if crate::cache::hash_bytes(now.as_bytes()) != expected {
+            return Ok(None);
+        }
+        self.write_note(path, text).map(Some)
+    }
+
     pub fn create_note(&mut self, path: &VaultPath, text: &str) -> Result<Vec<EngineEvent>> {
         let ev = self.vault.create(path, text)?;
         self.apply(ev)

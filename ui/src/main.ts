@@ -342,7 +342,18 @@ async function activateTab(i: number, opts: { at?: At; focusTitle?: boolean } = 
   } else if (t.kind === "canvas") {
     remember(t.path);
     tree.reveal(t.path);
-    await canvasView.load(t.path).catch((e) => toast(`Couldn't open the canvas: ${e}`, "error"));
+    const opened = await canvasView.load(t.path).then(
+      () => true,
+      (e) => {
+        toast(`Couldn't open the canvas: ${e}`, "error");
+        return false;
+      },
+    );
+    // Still showing the canvas that couldn't be saved: keep its tab active.
+    if (!opened && canvasView.path && canvasView.path !== t.path) {
+      const back = tabs.findIndex((x) => x.kind === "canvas" && x.path === canvasView.path);
+      if (back >= 0) active = back;
+    }
     $("canvas-view").focus({ preventScroll: true });
   } else {
     ensureGraph();
