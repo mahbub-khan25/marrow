@@ -44,6 +44,24 @@ Run it yourself: `cargo run --release --example bench -p marrow-core -- 10000`.
 - **On your PC**: double-click `scripts\windows-check.cmd`. It runs all tests
   and the crash test, writes `windows-check.log` and starts Marrow.
 
+## Linux packages
+
+The release builds three Linux files, and the "Linux packages" workflow
+installs them on fresh Fedora and Ubuntu machines to prove they work:
+
+| File | For | Notes |
+|---|---|---|
+| `Marrow-<version>-1.x86_64.rpm` | Fedora 40 and newer, openSUSE Tumbleweed | `sudo dnf install ./Marrow-*.rpm` pulls in what it needs |
+| `Marrow_<version>_amd64.deb` | Ubuntu 22.04+, Debian 12+, Linux Mint 21+ | `sudo apt install ./Marrow_*.deb` |
+| `Marrow_<version>_amd64.AppImage` | Most other desktops | Needs a system as new as Ubuntu 22.04 |
+
+**Red Hat Enterprise Linux (and Rocky/Alma):** Marrow needs the WebKitGTK 4.1
+web engine. RHEL 9 only ships the older 4.0, and RHEL 10's standard
+repositories ship no WebKitGTK at all, so the .rpm can't install there; the
+AppImage doesn't run on RHEL 9 either (it needs a newer C library). The way
+to support Red Hat is a **Flatpak** (Flathub), which brings its own web engine
+and runs on RHEL 9 and 10 as well as every other distribution.
+
 ## Steps only you can do
 
 These need accounts, money or decisions, so they're left to you.
