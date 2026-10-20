@@ -73,6 +73,8 @@ export interface RenameReport {
   newPath: string;
   linksUpdated: number;
   filesUpdated: string[];
+  /** Links left alone because the note changed during the rename. */
+  linksSkipped?: number;
 }
 
 export interface GraphNode {
@@ -187,6 +189,29 @@ export interface LockInfo {
   folder: string | null;
 }
 
+let askUnlock: ((folder: string) => Promise<boolean>) | null = null;
+
+/** How to ask for a locked folder's password when an action needs it. */
+export function setUnlockHandler(f: (folder: string) => Promise<boolean>) {
+  askUnlock = f;
+}
+
+/**
+ * Runs an action that may put a note into a locked folder. If the folder's
+ * password hasn't been entered, asks for it and tries once more.
+ */
+async function intoLockedFolder<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (e) {
+    const s = String(e);
+    if (!s.startsWith("LOCKED_FOLDER:")) throw e;
+    const folder = s.slice("LOCKED_FOLDER:".length);
+    if (askUnlock && (await askUnlock(folder))) return run();
+    throw new Error(`“${folder || "This vault"}” is locked. Enter its password to put notes there.`);
+  }
+}
+
 export const api = {
   lockInfo: (path: string) => invoke<LockInfo>("lock_info", { path }),
   lockedPaths: () => invoke<{ notes: string[]; folders: string[] }>("locked_paths"),
@@ -215,11 +240,13 @@ export const api = {
     invoke<{ text: string; conflicts: number }>("merge_text", { base, mine, theirs }),
   backupFor: (path: string) => invoke<Backup | null>("backup_for", { path }),
   discardBackup: (path: string) => invoke<void>("discard_backup", { path }),
+  /** Keeps unsaved text as a crash draft (offered back like a backup). */
+  keepDraft: (path: string, text: string) => invoke<void>("keep_draft", { path, text }),
   createNote: (folder: string, name?: string) => invoke<string>("create_note", { folder, name }),
   createFolder: (parent: string) => invoke<string>("create_folder", { parent }),
   trash: (path: string) => invoke<void>("trash", { path }),
-  rename: (path: string, newName: string) => invoke<RenameReport>("rename", { path, newName }),
-  movePath: (path: string, folder: string) => invoke<RenameReport>("move_path", { path, folder }),
+  rename: (path: string, newName: string) => intoLockedFolder(() => invoke<RenameReport>("rename", { path, newName })),
+  movePath: (path: string, folder: string) => intoLockedFolder(() => invoke<RenameReport>("move_path", { path, folder })),
   graph: (options: GraphOptions) => invoke<GraphData>("graph", { options }),
   search: (query: string, limit = 100) => invoke<SearchResults>("search", { query, limit }),
   tags: () => invoke<TagCount[]>("tags"),
@@ -242,7 +269,7 @@ export const api = {
   recentFiles: (limit = 20) => invoke<RecentFile[]>("recent_files", { limit }),
   /** Creates `name.ext` (made unique) in `folder` with `contents`. */
   createFile: (folder: string, name: string, ext: string, contents: string) =>
-    invoke<string>("create_file", { folder, name, ext, contents }),
+    intoLockedFolder(() => invoke<string>("create_file", { folder, name, ext, contents })),
   /** Copies a file from the computer into `folder` (or returns its vault path if it's already in the vault). */
   importFile: (source: string, folder: string) => invoke<string>("import_file", { source, folder }),
   /** Saves pasted or dropped bytes as a file in `folder`; returns its vault path. */

@@ -195,6 +195,12 @@ impl Engine {
         std::mem::take(&mut self.recovered)
     }
 
+    /// Drops cached headings, links and properties of file versions that no
+    /// longer exist (after locking a note, so its readable metadata goes).
+    pub fn forget_old_metadata(&mut self) -> Result<usize> {
+        self.cache.collect_garbage()
+    }
+
     pub fn vault(&self) -> &Vault {
         &self.vault
     }

@@ -207,7 +207,9 @@ export async function unlockPath(path: string, folderHint?: string | null): Prom
   const target = info.locked ? path : (folder ?? path);
   const lede = info.locked
     ? `${nameOf(path)} is locked with a password. Enter it to read and edit it. It stays open until you lock everything again or close Marrow.`
-    : `${nameOf(path)} is in the locked folder ${nameOf(folder ?? "")}. Enter the folder's password to save it there.`;
+    : folder === path
+      ? `${nameOf(path)} is a locked folder. Enter its password to put notes in it; they're locked with it.`
+      : `${nameOf(path)} is in the locked folder ${nameOf(folder ?? "")}. Enter the folder's password to save it there.`;
   const ok = await passwordDialog({
     title: info.locked ? "Unlock note" : "Unlock folder",
     lede,

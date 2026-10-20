@@ -266,13 +266,37 @@ fn plain_io_error(e: &marrow_core::Error) -> String {
 /// Error text `write_note` returns when the file changed under the editor.
 const CHANGED_ON_DISK: &str = "CHANGED_ON_DISK";
 
-fn backup_store(app: &AppHandle) -> CmdResult<BackupStore> {
+pub(crate) fn backup_store(app: &AppHandle) -> CmdResult<BackupStore> {
     Ok(BackupStore::new(
         match crate::portable::data("backups") {
             Some(d) => d,
             None => app.path().app_data_dir().map_err(err)?.join("backups"),
         },
     ))
+}
+
+/// Keeps unsaved text as a draft, outside the vault, so a crash loses
+/// nothing; the next open offers it back (see `backup_for`). A locked note's
+/// draft is sealed like the note; one that can't be sealed isn't kept.
+#[tauri::command]
+pub fn keep_draft(
+    app: AppHandle,
+    state: State<AppState>,
+    locks: State<crate::locks::Locks>,
+    path: String,
+    text: String,
+) -> CmdResult<()> {
+    let p = vp(&path)?;
+    let store = backup_store(&app)?;
+    with_engine(&state, |e| {
+        let root = e.vault().root().to_path_buf();
+        let disk = e.read_note(&p).ok();
+        let sealed = crate::locks::conceal(&locks, &root, p.as_str(), disk.as_deref(), &text)?;
+        if crate::locks::needs_lock(&root, p.as_str(), disk.as_deref())? && !marrow_core::lock::is_locked(&sealed) {
+            return Ok(()); // never keep a locked note's text in the clear
+        }
+        store.put(&root, p.as_str(), &sealed).map_err(err)
+    })
 }
 
 /// Text kept from a failed save of this note, if any.
@@ -373,6 +397,7 @@ const BAD_NAME_CHARS: &[char] = &['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
 pub fn rename(
     app: AppHandle,
     state: State<AppState>,
+    locks: State<crate::locks::Locks>,
     path: String,
     new_name: String,
 ) -> CmdResult<RenameReport> {
@@ -409,11 +434,13 @@ pub fn rename(
         if !case_only && e.vault().get(&to).is_some() {
             return Err(format!("“{file_name}” already exists in this folder."));
         }
-        let result = e.rename_with_links(&from, &to).map_err(err)?;
+        crate::locks::check_move(&locks, e.vault().root(), from.as_str(), to.as_str())?;
+        let (mut events, report) = e.rename_with_links(&from, &to).map_err(err)?;
         backup_store(&app)?.rename(e.vault().root(), from.as_str(), to.as_str());
         let _ = marrow_core::history::History::for_vault(e.vault().root()).moved(from.as_str(), to.as_str());
-        crate::locks::moved(e.vault().root(), from.as_str(), to.as_str());
-        Ok(result)
+        crate::locks::moved(e.vault().root(), from.as_str(), to.as_str())?;
+        events.extend(crate::locks::seal_moved_in(&locks, e, &to)?);
+        Ok((events, report))
     })?;
     emit_events(&app, events, None);
     Ok(report)
@@ -424,6 +451,7 @@ pub fn rename(
 pub fn move_path(
     app: AppHandle,
     state: State<AppState>,
+    locks: State<crate::locks::Locks>,
     path: String,
     folder: String,
 ) -> CmdResult<RenameReport> {
@@ -443,11 +471,13 @@ pub fn move_path(
         if e.vault().get(&to).is_some() {
             return Err(format!("“{}” already exists there.", from.name()));
         }
-        let result = e.rename_with_links(&from, &to).map_err(err)?;
+        crate::locks::check_move(&locks, e.vault().root(), from.as_str(), to.as_str())?;
+        let (mut events, report) = e.rename_with_links(&from, &to).map_err(err)?;
         backup_store(&app)?.rename(e.vault().root(), from.as_str(), to.as_str());
         let _ = marrow_core::history::History::for_vault(e.vault().root()).moved(from.as_str(), to.as_str());
-        crate::locks::moved(e.vault().root(), from.as_str(), to.as_str());
-        Ok(result)
+        crate::locks::moved(e.vault().root(), from.as_str(), to.as_str())?;
+        events.extend(crate::locks::seal_moved_in(&locks, e, &to)?);
+        Ok((events, report))
     })?;
     emit_events(&app, events, None);
     Ok(report)
@@ -685,6 +715,7 @@ pub fn vault_stats(state: State<AppState>) -> CmdResult<VaultStats> {
 pub fn create_file(
     app: AppHandle,
     state: State<AppState>,
+    locks: State<crate::locks::Locks>,
     folder: String,
     name: String,
     ext: String,
@@ -693,6 +724,12 @@ pub fn create_file(
     let folder = vp(&folder)?;
     let (p, events) = with_engine(&state, |e| {
         let p = unique_child(e, &folder, name.trim(), ext.trim_start_matches('.'))?;
+        // Into a locked folder, a note is written sealed from the first byte.
+        let contents = if p.is_markdown() {
+            crate::locks::conceal(&locks, e.vault().root(), p.as_str(), None, &contents)?
+        } else {
+            contents.clone()
+        };
         let ev = e.create_note(&p, &contents).map_err(err)?;
         Ok((p, ev))
     })?;

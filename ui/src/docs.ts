@@ -4,11 +4,18 @@
 // Every pane showing it reads and writes `doc.text`; the doc saves itself a
 // moment after the last edit, refuses to overwrite a version it hasn't seen
 // (merging instead), and keeps a backup when a save fails.
+//
+// Unsaved text is also kept as a draft (outside the vault, in the app's data
+// folder) half a second after each edit, so a crash or power cut loses
+// nothing: the next time the note opens, the draft is offered back. A
+// successful save removes it.
 
 import { api, displayName } from "./api";
 
 /** Save this long after the last keystroke. */
 const SAVE_DELAY_MS = 2000;
+/** Keep a crash draft this long after the last keystroke. */
+const DRAFT_DELAY_MS = 500;
 
 export type SaveState = "saved" | "unsaved" | "saving" | "error";
 
@@ -23,6 +30,7 @@ export class Doc {
   dirty = false;
   state: SaveState = "saved";
   timer: number | undefined;
+  draftTimer: number | undefined;
   saving: Promise<void> | null = null;
   listeners = new Set<(origin: Origin) => void>();
 
@@ -116,6 +124,24 @@ export function edit(d: Doc, text: string, origin: Origin) {
   setState(d, "unsaved");
   notify(d, origin);
   schedule(d);
+  window.clearTimeout(d.draftTimer);
+  d.draftTimer = window.setTimeout(() => void keepDraft(d), DRAFT_DELAY_MS);
+}
+
+/** Keeps the unsaved text where a crash can't take it. */
+async function keepDraft(d: Doc): Promise<boolean> {
+  window.clearTimeout(d.draftTimer);
+  if (!d.dirty || d.text === d.saved) return true;
+  return api.keepDraft(d.path, d.text).then(
+    () => true,
+    () => false,
+  );
+}
+
+/** Makes sure each doc's unsaved text is kept as a draft (before giving up on saving it). */
+export async function keepDrafts(ds: Doc[]): Promise<Doc[]> {
+  const ok = await Promise.all(ds.map((d) => keepDraft(d)));
+  return ds.filter((_, i) => !ok[i]);
 }
 
 /** Replaces the text from outside the editor (a checkbox in preview, a restore). */
@@ -128,18 +154,31 @@ function schedule(d: Doc, ms = SAVE_DELAY_MS) {
   d.timer = window.setTimeout(() => void save(d), ms);
 }
 
-export async function save(d: Doc): Promise<void> {
+/** Saves now. True once everything typed so far is on disk. */
+export async function save(d: Doc): Promise<boolean> {
   window.clearTimeout(d.timer);
   if (d.saving) await d.saving;
-  if (!d.dirty) return;
+  if (!d.dirty) return true;
   d.saving = write(d).finally(() => {
     d.saving = null;
   });
   await d.saving;
+  return !d.dirty;
 }
 
-export async function saveAll() {
-  await Promise.all([...docs.values()].map((d) => save(d)));
+/**
+ * Saves every open note. Returns the ones that still aren't saved (the
+ * save failed, or the note is locked meanwhile); empty means all is on disk.
+ */
+export async function saveAll(): Promise<Doc[]> {
+  for (let round = 0; round < 3; round++) {
+    await Promise.all([...docs.values()].map((d) => save(d)));
+    const left = [...docs.values()].filter((d) => d.dirty);
+    // Typing during a save leaves a note dirty: go round again. A failed
+    // save won't fix itself in a moment, so stop there.
+    if (!left.length || left.every((d) => d.state === "error")) return left;
+  }
+  return [...docs.values()].filter((d) => d.dirty);
 }
 
 /** Ctrl+S: write even if nothing seems to have changed. */
@@ -269,6 +308,7 @@ export function forget(path: string) {
   for (const d of [...docs.values()]) {
     if (d.path === path || d.path.startsWith(path + "/")) {
       window.clearTimeout(d.timer);
+      window.clearTimeout(d.draftTimer);
       d.dirty = false;
       docs.delete(d.path);
     }
@@ -293,7 +333,7 @@ export async function offerBackup(d: Doc) {
     return;
   }
   const when = new Date(b.savedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-  host.banner(`Text you wrote in “${d.name}” on ${when} couldn't be saved at the time and was kept.`, "warn", [
+  host.banner(`Text you wrote in “${d.name}” on ${when} wasn't saved (Marrow closed, or the save failed), so it was kept.`, "warn", [
     {
       label: "Restore it",
       run: () => {

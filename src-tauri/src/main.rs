@@ -74,6 +74,7 @@ fn main() {
             commands::write_note,
             commands::backup_for,
             commands::discard_backup,
+            commands::keep_draft,
             commands::merge_text,
             commands::create_note,
             commands::create_folder,

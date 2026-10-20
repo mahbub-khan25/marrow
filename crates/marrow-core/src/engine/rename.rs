@@ -37,6 +37,9 @@ pub struct RenameReport {
     pub new_path: VaultPath,
     pub links_updated: usize,
     pub files_updated: Vec<VaultPath>,
+    /// Links left as they were because the note changed while renaming.
+    #[serde(default)]
+    pub links_skipped: usize,
 }
 
 enum RefSite {
@@ -161,6 +164,12 @@ impl Engine {
                 let new_text = link_text(&self.names, &new_target, &source, self.link_format);
                 match site {
                     RefSite::Body(r) => {
+                        // Another app may have edited the note since it was
+                        // read: only replace the link if it's still exactly there.
+                        if text.get(r.pos.range()) != Some(r.original.as_str()) {
+                            report.links_skipped += 1;
+                            continue;
+                        }
                         let replacement = rewrite_body_link(r, &new_text, sub, &new_target);
                         if replacement != r.original {
                             edits.push((r.pos.range(), replacement));

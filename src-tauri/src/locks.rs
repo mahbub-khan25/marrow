@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use marrow_core::lock::{self, Key};
-use marrow_core::VaultPath;
+use marrow_core::{EngineEvent, VaultPath};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
@@ -69,8 +69,60 @@ fn registry_file(root: &Path) -> PathBuf {
     root.join(".marrow").join("locked.json")
 }
 
-fn load(root: &Path) -> Registry {
-    std::fs::read_to_string(registry_file(root)).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+/// The locked-folder list. A missing file means no locked folders. A file
+/// that can't be read or understood is an error, never "no locked folders":
+/// guessing wrong would save notes in a locked folder unencrypted.
+fn load(root: &Path) -> CmdResult<Registry> {
+    let f = registry_file(root);
+    match std::fs::read_to_string(&f) {
+        Ok(text) => serde_json::from_str(&text).map_err(|_| REGISTRY_BROKEN.to_string()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Registry::default()),
+        Err(e) => Err(format!("{REGISTRY_BROKEN} ({e})")),
+    }
+}
+
+const REGISTRY_BROKEN: &str = "Marrow can't read its list of locked folders (.marrow/locked.json), so it won't save notes until that's fixed. Restore the file from a backup, or remove it if you have no locked folders.";
+
+/// True when `path` must be stored sealed: the note on disk is locked, or it
+/// is in a locked folder.
+pub fn needs_lock(root: &Path, path: &str, disk: Option<&str>) -> CmdResult<bool> {
+    Ok(disk.is_some_and(lock::is_locked) || folder_for(&load(root)?, path).is_some())
+}
+
+/// Before moving `from` to `to`: notes arriving in a locked folder will be
+/// sealed with its password, so it must have been entered.
+pub fn check_move(locks: &Locks, root: &Path, from: &str, to: &str) -> CmdResult<()> {
+    let reg = load(root)?;
+    if let Some(dest) = folder_for(&reg, to) {
+        let same = folder_for(&reg, from).is_some_and(|f| f.path == dest.path);
+        let h = lock::header(&dest.check).map_err(err)?;
+        if !same && locks.key(&h.salt_id()).is_none() {
+            return Err(format!("{LOCKED_FOLDER}{}", dest.path));
+        }
+    }
+    Ok(())
+}
+
+/// After a move: seals notes that are now in a locked folder but aren't
+/// sealed yet, and forgets their readable history.
+pub fn seal_moved_in(locks: &Locks, e: &mut marrow_core::Engine, to: &VaultPath) -> CmdResult<Vec<EngineEvent>> {
+    let root = e.vault().root().to_path_buf();
+    let reg = load(&root)?;
+    let notes: Vec<VaultPath> = e.vault().markdown_files().filter(|n| *n == to || n.starts_with(to)).cloned().collect();
+    let history = marrow_core::history::History::for_vault(&root);
+    let mut events = Vec::new();
+    for n in notes {
+        let Some(f) = folder_for(&reg, n.as_str()) else { continue };
+        let text = e.read_note(&n).map_err(err)?;
+        if lock::is_locked(&text) {
+            continue;
+        }
+        let h = lock::header(&f.check).map_err(err)?;
+        let key = locks.key(&h.salt_id()).ok_or_else(|| format!("{LOCKED_FOLDER}{}", f.path))?;
+        events.extend(e.write_note(&n, &lock::seal(&text, &key, h.hint.as_deref())).map_err(err)?);
+        let _ = history.forget(n.as_str());
+    }
+    Ok(events)
 }
 
 fn store(root: &Path, r: &Registry) -> CmdResult<()> {
@@ -91,8 +143,8 @@ fn folder_for(reg: &Registry, path: &str) -> Option<LockedFolder> {
 }
 
 /// Keeps the folder list in step with a rename or move.
-pub fn moved(root: &Path, from: &str, to: &str) {
-    let mut reg = load(root);
+pub fn moved(root: &Path, from: &str, to: &str) -> CmdResult<()> {
+    let mut reg = load(root)?;
     let mut changed = false;
     for f in &mut reg.folders {
         if f.path == from {
@@ -104,8 +156,9 @@ pub fn moved(root: &Path, from: &str, to: &str) {
         }
     }
     if changed {
-        let _ = store(root, &reg);
+        store(root, &reg)?;
     }
+    Ok(())
 }
 
 // ------------------------------------------------------ reading & writing
@@ -132,7 +185,7 @@ pub fn conceal(locks: &Locks, root: &Path, path: &str, disk: Option<&str>, plain
         let key = locks.key(&h.salt_id()).ok_or_else(|| LOCKED.to_string())?;
         return Ok(lock::seal(plain, &key, h.hint.as_deref()));
     }
-    if let Some(f) = folder_for(&load(root), path) {
+    if let Some(f) = folder_for(&load(root)?, path) {
         let h = lock::header(&f.check).map_err(err)?;
         return match locks.key(&h.salt_id()) {
             Some(key) => Ok(lock::seal(plain, &key, h.hint.as_deref())),
@@ -142,6 +195,36 @@ pub fn conceal(locks: &Locks, root: &Path, path: &str, disk: Option<&str>, plain
         };
     }
     Ok(plain.to_string())
+}
+
+/// After notes are locked: removes their readable earlier versions, failed-
+/// save backups and crash drafts, and the headings and properties the search
+/// cache kept. Whatever can't be removed is reported to the window, since
+/// the person was promised the text is now private.
+fn wipe_plain_copies(app: &AppHandle, e: &mut marrow_core::Engine, notes: &[VaultPath]) {
+    let root = e.vault().root().to_path_buf();
+    let history = marrow_core::history::History::for_vault(&root);
+    let mut problems = Vec::new();
+    for n in notes {
+        if let Err(x) = history.forget(n.as_str()) {
+            problems.push(format!("earlier versions of “{}” ({x})", n.name()));
+        }
+        if let Ok(store) = crate::commands::backup_store(app) {
+            store.remove(&root, n.as_str());
+        }
+    }
+    if let Err(x) = e.forget_old_metadata() {
+        problems.push(format!("the search cache ({x})"));
+    }
+    if !problems.is_empty() {
+        let _ = app.emit(
+            "notice",
+            format!(
+                "Locked, but Marrow couldn't remove some readable copies made before: {}. Close Marrow and try locking again, or delete the .marrow/history folder for this note.",
+                problems.join("; ")
+            ),
+        );
+    }
 }
 
 // --------------------------------------------------------------- commands
@@ -170,7 +253,7 @@ pub fn lock_info(state: State<AppState>, locks: State<Locks>, path: String) -> C
     let p = vp(&path)?;
     with_engine(&state, |e| {
         let root = e.vault().root().to_path_buf();
-        let folder = folder_for(&load(&root), p.as_str());
+        let folder = folder_for(&load(&root)?, p.as_str());
         let disk = if p.is_markdown() { e.read_note(&p).ok() } else { None };
         let h = match disk.as_deref().filter(|d| lock::is_locked(d)) {
             Some(d) => Some(lock::header(d).map_err(err)?),
@@ -192,7 +275,7 @@ pub fn lock_info(state: State<AppState>, locks: State<Locks>, path: String) -> C
 #[tauri::command]
 pub fn locked_paths(state: State<AppState>) -> CmdResult<LockedPaths> {
     with_engine(&state, |e| {
-        let folders = load(e.vault().root()).folders.into_iter().map(|f| f.path).collect();
+        let folders = load(e.vault().root())?.folders.into_iter().map(|f| f.path).collect();
         let notes = e.locked_notes().into_iter().map(|p| p.to_string()).collect();
         Ok(LockedPaths { notes, folders })
     })
@@ -210,7 +293,7 @@ pub fn unlock(app: AppHandle, state: State<AppState>, locks: State<Locks>, path:
                 }
             }
         }
-        folder_for(&load(e.vault().root()), p.as_str())
+        folder_for(&load(e.vault().root())?, p.as_str())
             .map(|f| f.check)
             .ok_or_else(|| "This isn't locked.".to_string())
     })?;
@@ -239,8 +322,8 @@ pub fn lock_note(
             return Err("This note is already locked.".into());
         }
         let ev = e.write_note(&p, &lock::seal(&text, &key, hint.as_deref())).map_err(err)?;
-        // Earlier versions would still be readable: remove them.
-        let _ = marrow_core::history::History::for_vault(e.vault().root()).forget(p.as_str());
+        // Readable copies made before the lock must go too.
+        wipe_plain_copies(&app, e, std::slice::from_ref(&p));
         Ok(ev)
     })?;
     locks.keep(key);
@@ -265,23 +348,24 @@ pub fn lock_folder(
     let key = lock::derive(&password, lock::new_salt(), lock::Cost::default()).map_err(err)?;
     let (events, count) = with_engine(&state, |e| {
         let root = e.vault().root().to_path_buf();
-        let mut reg = load(&root);
+        let mut reg = load(&root)?;
         if let Some(f) = folder_for(&reg, folder.as_str()) {
             return Err(format!("“{}” is already locked.", if f.path.is_empty() { "The vault" } else { &f.path }));
         }
         let notes: Vec<VaultPath> = e.vault().markdown_files().filter(|n| n.starts_with(&folder)).cloned().collect();
-        let history = marrow_core::history::History::for_vault(&root);
         let mut events = Vec::new();
         let mut count = 0;
+        let mut sealed = Vec::new();
         for n in &notes {
             let Ok(text) = e.read_note(n) else { continue };
             if lock::is_locked(&text) {
                 continue;
             }
             events.extend(e.write_note(n, &lock::seal(&text, &key, hint.as_deref())).map_err(err)?);
-            let _ = history.forget(n.as_str());
+            sealed.push(n.clone());
             count += 1;
         }
+        wipe_plain_copies(&app, e, &sealed);
         reg.folders.push(LockedFolder {
             path: folder.to_string(),
             check: lock::seal(CHECK, &key, hint.as_deref()),
@@ -302,7 +386,7 @@ pub fn remove_lock(app: AppHandle, state: State<AppState>, locks: State<Locks>, 
     let p = vp(&path)?;
     let (events, count) = with_engine(&state, |e| {
         let root = e.vault().root().to_path_buf();
-        let mut reg = load(&root);
+        let mut reg = load(&root)?;
         let mut events = Vec::new();
         let mut count = 0;
         let mut open_note = |e: &mut marrow_core::Engine, n: &VaultPath, only_salt: Option<&str>| -> CmdResult<()> {
@@ -402,7 +486,54 @@ mod tests {
         locks.forget_all();
         assert_eq!(conceal(&locks, dir.path(), "F/new.md", None, "hello"), Err("LOCKED_FOLDER:F".into()));
         assert_eq!(conceal(&locks, dir.path(), "F/new.md", None, "  ").unwrap(), "  ");
-        moved(dir.path(), "F", "G");
-        assert_eq!(load(dir.path()).folders[0].path, "G");
+        moved(dir.path(), "F", "G").unwrap();
+        assert_eq!(load(dir.path()).unwrap().folders[0].path, "G");
+    }
+
+    #[test]
+    fn a_damaged_lock_list_fails_closed() {
+        let dir = tempfile::tempdir().unwrap();
+        let locks = Locks::default();
+        std::fs::create_dir_all(dir.path().join(".marrow")).unwrap();
+        std::fs::write(registry_file(dir.path()), "{ this is not json").unwrap();
+        // Saving anything is refused rather than guessed as "not locked".
+        assert!(conceal(&locks, dir.path(), "F/n.md", None, "secret").unwrap_err().contains("locked.json"));
+        assert!(needs_lock(dir.path(), "n.md", None).is_err());
+        assert!(check_move(&locks, dir.path(), "a.md", "F/a.md").is_err());
+        // No file at all simply means nothing is locked.
+        std::fs::remove_file(registry_file(dir.path())).unwrap();
+        assert_eq!(conceal(&locks, dir.path(), "n.md", None, "plain").unwrap(), "plain");
+    }
+
+    #[test]
+    fn moving_into_a_locked_folder_needs_its_password() {
+        let dir = tempfile::tempdir().unwrap();
+        let locks = Locks::default();
+        let key = lock::derive("secret", [5u8; 16], lock::Cost { m: 64, t: 1, p: 1 }).unwrap();
+        store(dir.path(), &Registry { folders: vec![LockedFolder { path: "F".into(), check: lock::seal(CHECK, &key, None) }] }).unwrap();
+        assert_eq!(check_move(&locks, dir.path(), "a.md", "F/a.md"), Err(format!("{LOCKED_FOLDER}F")));
+        // Within the same locked folder, or out of it, is fine.
+        assert!(check_move(&locks, dir.path(), "F/a.md", "F/b.md").is_ok());
+        assert!(check_move(&locks, dir.path(), "a.md", "b.md").is_ok());
+        locks.keep(key);
+        assert!(check_move(&locks, dir.path(), "a.md", "F/a.md").is_ok());
+    }
+
+    #[test]
+    fn notes_moved_into_a_locked_folder_are_sealed() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("F")).unwrap();
+        std::fs::write(dir.path().join("a.md"), "my secret plan").unwrap();
+        let locks = Locks::default();
+        let key = lock::derive("secret", [6u8; 16], lock::Cost { m: 64, t: 1, p: 1 }).unwrap();
+        store(dir.path(), &Registry { folders: vec![LockedFolder { path: "F".into(), check: lock::seal(CHECK, &key, None) }] }).unwrap();
+        locks.keep(key);
+        let mut e = marrow_core::Engine::open(dir.path(), marrow_core::cache::Cache::in_memory().unwrap()).unwrap();
+        let to = VaultPath::new("F/a.md").unwrap();
+        e.rename_with_links(&VaultPath::new("a.md").unwrap(), &to).unwrap();
+        seal_moved_in(&locks, &mut e, &to).unwrap();
+        let on_disk = std::fs::read_to_string(dir.path().join("F/a.md")).unwrap();
+        assert!(lock::is_locked(&on_disk) && !on_disk.contains("secret plan"));
+        assert_eq!(reveal(&locks, on_disk).unwrap(), "my secret plan");
     }
 }
