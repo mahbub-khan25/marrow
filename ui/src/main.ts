@@ -2,6 +2,7 @@ import "./style.css";
 
 import { homeDir } from "@tauri-apps/api/path";
 import { listen } from "@tauri-apps/api/event";
+import { error as logError } from "@tauri-apps/plugin-log";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -30,6 +31,7 @@ import { CanvasView } from "./canvas";
 import { exportHtml, printNote } from "./export";
 import { openHistory } from "./history";
 import { openCapture } from "./capture";
+import { usePropertyTypes } from "./properties";
 import { TasksView } from "./tasks";
 import { openImport } from "./import";
 import { openPublish } from "./publish";
@@ -1650,6 +1652,10 @@ async function openVault(path: string) {
   vaultRoot = info.root;
   vaultName = info.name;
   vaultSettings = await api.getVaultSettings().catch(() => vaultSettings);
+  usePropertyTypes(vaultSettings.propertyTypes, (types) => {
+    vaultSettings = { ...vaultSettings, propertyTypes: types };
+    void api.setVaultSettings(vaultSettings).catch((e) => toast(`Couldn't save the property type: ${e}`, "error"));
+  });
   recent = storage<string[]>(`marrow.recent.${vaultRoot}`, []);
   $("vault-name").textContent = info.name;
   $("vault-name").title = `${info.root}\nClick to open a different folder`;
@@ -2043,6 +2049,9 @@ async function boot() {
   });
   // Putting a note into a locked folder asks for its password first.
   setUnlockHandler((folder) => unlockPath(folder, folder));
+  // Errors in the window go to the diagnostic log too (messages only).
+  window.addEventListener("error", (e) => void logError(`window: ${e.message} at ${e.filename}:${e.lineno}`));
+  window.addEventListener("unhandledrejection", (e) => void logError(`window: unhandled ${String(e.reason).slice(0, 300)}`));
   // Problems the backend wants the person to know about.
   void listen<string>("notice", (e) => toast(e.payload, "error"));
 

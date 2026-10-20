@@ -182,7 +182,7 @@ pub async fn cloud_locations() -> Vec<CloudLocation> {
 }
 
 /// Makes a new, empty vault folder `name` inside `parent` and returns its path.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_vault(parent: String, name: String) -> CmdResult<String> {
     let name = name.trim();
     if name.is_empty() {
@@ -210,7 +210,7 @@ pub async fn vault_cloud(state: State<'_, AppState>) -> CmdResult<Option<CloudLo
     Ok(cloud::provider_of(&root, &cloud::detect()).cloned())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mirror_status(state: State<AppState>) -> Option<MirrorStatus> {
     let slot = state.mirror.lock().ok()?;
     let w = slot.as_ref()?;
@@ -225,7 +225,7 @@ pub async fn mirror_preview(remote: String) -> usize {
 }
 
 /// Turns sync on with `remote`, or off with `None`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_mirror(app: AppHandle, state: State<AppState>, remote: Option<String>) -> CmdResult<()> {
     let root = vault_root(&state)?;
     let key = root.to_string_lossy().into_owned();
@@ -255,7 +255,7 @@ pub fn set_mirror(app: AppHandle, state: State<AppState>, remote: Option<String>
 }
 
 /// Syncs now. `force` goes ahead with a large delete that was paused.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn sync_now(state: State<AppState>, force: bool) {
     if let Ok(slot) = state.mirror.lock() {
         if let Some(w) = slot.as_ref() {
@@ -265,7 +265,7 @@ pub fn sync_now(state: State<AppState>, force: bool) {
 }
 
 /// Conflict copies a sync app left in the vault.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn conflict_copies(state: State<AppState>) -> CmdResult<Vec<ConflictCopy>> {
     with_engine(&state, |e| {
         let paths: Vec<String> = e.vault().markdown_files().map(|p| p.to_string()).collect();
@@ -275,7 +275,7 @@ pub fn conflict_copies(state: State<AppState>) -> CmdResult<Vec<ConflictCopy>> {
 
 /// Merges a conflict copy into its original and moves the copy to the trash.
 /// Returns how many places both versions were kept.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn resolve_conflict(
     app: AppHandle,
     state: State<AppState>,

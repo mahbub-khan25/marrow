@@ -217,6 +217,7 @@ fn wipe_plain_copies(app: &AppHandle, e: &mut marrow_core::Engine, notes: &[Vaul
         problems.push(format!("the search cache ({x})"));
     }
     if !problems.is_empty() {
+        log::warn!("lock: {} readable copies left", problems.len());
         let _ = app.emit(
             "notice",
             format!(
@@ -248,7 +249,7 @@ pub struct LockedPaths {
 }
 
 /// Whether a note (or folder) is locked, and whether it's open this session.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn lock_info(state: State<AppState>, locks: State<Locks>, path: String) -> CmdResult<LockInfo> {
     let p = vp(&path)?;
     with_engine(&state, |e| {
@@ -272,7 +273,7 @@ pub fn lock_info(state: State<AppState>, locks: State<Locks>, path: String) -> C
 }
 
 /// Every locked note and folder, for the file tree's lock icons.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn locked_paths(state: State<AppState>) -> CmdResult<LockedPaths> {
     with_engine(&state, |e| {
         let folders = load(e.vault().root())?.folders.into_iter().map(|f| f.path).collect();
@@ -282,7 +283,7 @@ pub fn locked_paths(state: State<AppState>) -> CmdResult<LockedPaths> {
 }
 
 /// Tries a password on a note or a locked folder; keeps the key if it fits.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn unlock(app: AppHandle, state: State<AppState>, locks: State<Locks>, path: String, password: String) -> CmdResult<()> {
     let p = vp(&path)?;
     let sealed = with_engine(&state, |e| {
@@ -304,7 +305,7 @@ pub fn unlock(app: AppHandle, state: State<AppState>, locks: State<Locks>, path:
 }
 
 /// Locks one note with a new password.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn lock_note(
     app: AppHandle,
     state: State<AppState>,
@@ -334,7 +335,7 @@ pub fn lock_note(
 
 /// Locks every note in a folder (and its subfolders) with one password;
 /// notes added later are locked too. Returns how many notes were locked.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn lock_folder(
     app: AppHandle,
     state: State<AppState>,
@@ -381,7 +382,7 @@ pub fn lock_folder(
 
 /// Removes the lock from a note, or from a folder and every note in it
 /// locked with the folder's password. The password must have been entered.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn remove_lock(app: AppHandle, state: State<AppState>, locks: State<Locks>, path: String) -> CmdResult<usize> {
     let p = vp(&path)?;
     let (events, count) = with_engine(&state, |e| {
@@ -433,7 +434,7 @@ pub fn remove_lock(app: AppHandle, state: State<AppState>, locks: State<Locks>, 
 }
 
 /// Forgets every password entered this session.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn lock_now(app: AppHandle, locks: State<Locks>) {
     locks.forget_all();
     let _ = app.emit("locks-changed", ());

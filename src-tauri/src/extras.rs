@@ -5,7 +5,7 @@
 use std::path::{Component, Path, PathBuf};
 
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::commands::{err, with_engine, AppState, CmdResult};
 
@@ -25,7 +25,7 @@ fn plain_rel(rel: &str) -> CmdResult<&Path> {
 }
 
 /// The folder (created if needed), for "Open folder".
-#[tauri::command]
+#[tauri::command(async)]
 pub fn extras_dir(state: State<AppState>, kind: String) -> CmdResult<String> {
     let d = with_engine(&state, |e| dir(e.vault().root(), &kind))?;
     std::fs::create_dir_all(&d).map_err(err)?;
@@ -39,7 +39,7 @@ pub struct Snippet {
 }
 
 /// Every `.css` file in the snippets folder, by name.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn snippets_list(state: State<AppState>) -> CmdResult<Vec<Snippet>> {
     let d = with_engine(&state, |e| dir(e.vault().root(), "snippets"))?;
     let Ok(rd) = std::fs::read_dir(&d) else { return Ok(Vec::new()) };
@@ -67,7 +67,7 @@ pub struct Plugin {
 }
 
 /// Every plugin folder, with its manifest and code.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn plugins_list(state: State<AppState>) -> CmdResult<Vec<Plugin>> {
     let d = with_engine(&state, |e| dir(e.vault().root(), "plugins"))?;
     let Ok(rd) = std::fs::read_dir(&d) else { return Ok(Vec::new()) };
@@ -90,7 +90,7 @@ pub fn plugins_list(state: State<AppState>) -> CmdResult<Vec<Plugin>> {
 
 /// Writes a file in the snippets or plugins folder (for the examples).
 /// Returns false if it already existed (it's left alone).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn extras_write(state: State<AppState>, kind: String, rel: String, contents: String) -> CmdResult<bool> {
     let d = with_engine(&state, |e| dir(e.vault().root(), &kind))?;
     let dest = d.join(plain_rel(&rel)?);
@@ -116,4 +116,17 @@ mod tests {
         assert!(plain_rel("/x").is_err());
         assert!(dir(Path::new("/v"), "other").is_err());
     }
+}
+
+/// Opens the folder with Marrow's diagnostic log, to attach to a bug report.
+#[tauri::command(async)]
+pub fn open_log_folder(app: AppHandle) -> CmdResult<()> {
+    use tauri::Manager;
+    use tauri_plugin_opener::OpenerExt;
+    let dir = match crate::portable::data("logs") {
+        Some(d) => d,
+        None => app.path().app_log_dir().map_err(err)?,
+    };
+    std::fs::create_dir_all(&dir).map_err(err)?;
+    app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(err)
 }

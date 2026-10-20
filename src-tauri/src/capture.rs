@@ -26,7 +26,7 @@ pub fn plugin<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
 }
 
 /// Sets the quick-capture shortcut ("Ctrl+Alt+N" style), or turns it off.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_capture_shortcut(app: AppHandle, shortcut: Option<String>) -> CmdResult<()> {
     let gs = app.global_shortcut();
     gs.unregister_all().map_err(|e| e.to_string())?;

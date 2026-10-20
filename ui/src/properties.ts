@@ -34,8 +34,17 @@ export interface PropsHost {
   noteNames(): string[];
 }
 
-/** Types picked by hand for empty values, so a new "due" stays a date. */
+/** Types picked by hand for empty values, so a new "due" stays a date.
+ * Kept in the vault's settings, so they last across restarts. */
 const picked = new Map<string, Kind>();
+let savePicked: (types: Record<string, string>) => void = () => {};
+
+/** Loads the vault's picked types, and says how to save changes to them. */
+export function usePropertyTypes(types: Record<string, string> | undefined, save: (types: Record<string, string>) => void) {
+  picked.clear();
+  for (const [k, v] of Object.entries(types ?? {})) picked.set(k, v as Kind);
+  savePicked = save;
+}
 
 export function kindOf(key: string, v: unknown): Kind {
   if (typeof v === "boolean") return "checkbox";
@@ -174,6 +183,7 @@ export class PropertyHeader {
         icon: ic,
         run: () => {
           picked.set(key, k);
+          savePicked(Object.fromEntries(picked));
           this.set(key, convert(value, k));
         },
       })),
