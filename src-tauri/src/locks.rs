@@ -570,13 +570,15 @@ mod tests {
         let from = VaultPath::new("a.md").unwrap();
         let to = VaultPath::new("F/a.md").unwrap();
         let store = marrow_core::BackupStore::new(dir.path().join("backups"));
-        store.put(dir.path(), "a.md", "unsaved secret words").unwrap();
+        // Kept text is filed under the vault's own (resolved) path, as the app does.
+        let root = e.vault().root().to_path_buf();
+        store.put(&root, "a.md", "unsaved secret words").unwrap();
         // Sealed before it moves: even a crash right now leaves no readable copy.
         let (_, sealed) = seal_for_move(&locks, &mut e, &from, &to, Some(&store)).unwrap();
         assert_eq!(sealed, vec![from.clone()]);
         let before_move = std::fs::read_to_string(dir.path().join("a.md")).unwrap();
         assert!(lock::is_locked(&before_move) && !before_move.contains("secret plan"));
-        let kept = store.get(dir.path(), "a.md").unwrap().text;
+        let kept = store.get(&root, "a.md").unwrap().text;
         assert!(lock::is_locked(&kept) && !kept.contains("secret words"));
         e.rename_with_links(&from, &to).unwrap();
         let on_disk = std::fs::read_to_string(dir.path().join("F/a.md")).unwrap();
