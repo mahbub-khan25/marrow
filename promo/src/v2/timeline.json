@@ -1,0 +1,28 @@
+{
+  "fps": 60,
+  "bpm": 120,
+  "total": 3840,
+  "scenes": {
+    "hook": [0, 360],
+    "files": [360, 720],
+    "write": [720, 1440],
+    "speed": [1440, 2160],
+    "safe": [2160, 2760],
+    "features": [2760, 3240],
+    "different": [3240, 3480],
+    "cta": [3480, 3840]
+  },
+  "typing": [
+    { "start": 750, "text": "# Trip plan", "rate": 3 },
+    { "start": 810, "text": "Book the ferry to ", "rate": 3 },
+    { "start": 870, "text": "[[", "rate": 4 },
+    { "start": 890, "text": "Hal", "rate": 5 },
+    { "start": 980, "text": " #travel", "rate": 3 },
+    { "start": 1770, "text": "ferry", "rate": 5 }
+  ],
+  "dings": [20, 50, 80, 105, 130, 150],
+  "pops": [940, 1040, 2540, 3260, 3290, 3320, 3350, 3380, 3410],
+  "impacts": [300, 3500],
+  "zip": [1500],
+  "swipes": [2840, 2920, 3000, 3080, 3160]
+}
