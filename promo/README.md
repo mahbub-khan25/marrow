@@ -12,18 +12,16 @@ npm run render    # writes out\marrow-promo.mp4
 
 ## Sound
 
-`public/soundtrack.wav` is the finished mix: an original ambient piano-and-pad
-track with the voiceover on top, the music dipping under each line.
+`public/music.wav` is an original ambient piano-and-pad track (made by
+`audio/make_soundtrack.py`, free to use under the MIT license).
 
-* `public/vo/*.wav` are the voiceover lines, one per scene, read by the free
-  Piper voice *en_US-lessac-high*. To change a line, regenerate it:
+Run `python audio/make_soundtrack.py` before rendering. It writes
+`public/soundtrack.wav`: the music, with a voiceover mixed on top if
+`public/vo/<scene>.wav` files exist (one per scene, named as in `SCENES` in
+the script). The music dips under each line.
 
-  ```powershell
-  pip install piper-tts
-  # download en_US-lessac-high.onnx and .onnx.json from huggingface.co/rhasspy/piper-voices
-  echo "Your new line." | python -m piper -m en_US-lessac-high.onnx -f public\vo\write.wav
-  ```
-
-* `python audio/make_soundtrack.py` rebuilds the music (`public/music.wav`)
-  and the mix. If you change a scene's length in `src/Promo.tsx`, change it in
-  `SCENES` in that script too, so each line still starts with its scene.
+The voiceover isn't included in this repository. Record your own, or use a
+text-to-speech voice whose license allows commercial use. Many free voices
+are trained on research-only recordings, so check the voice's model card
+before publishing a video with it. If you change a scene's length in
+`src/Promo.tsx`, change it in `SCENES` too.
