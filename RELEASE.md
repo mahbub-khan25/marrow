@@ -78,8 +78,7 @@ These need accounts, money or decisions, so they're left to you.
    GitHub repository; the release workflow then signs and notarizes the app.
 4. **Automatic updates** (optional for a beta). Needs a signing key pair
    (`npx tauri signer generate`) and somewhere to host `latest.json` (GitHub
-   Releases works). Then wire up `tauri-plugin-updater` once you have
-   the key.
+   Releases works). Then wire up `tauri-plugin-updater` with that key.
 5. **A page for people**: a download page, a privacy statement (Marrow sends
    nothing anywhere unless you connect an AI; the log stays on the computer),
    and an email address for bug reports.
