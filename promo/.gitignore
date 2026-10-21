@@ -1,2 +1,5 @@
 node_modules
 out
+# Voice lines and the mix: see README (Sound)
+public/vo/
+public/soundtrack.wav

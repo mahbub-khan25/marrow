@@ -147,7 +147,12 @@ def main():
     at = 0.0
     spans = []
     for name, frames in SCENES:
-        clip = read_wav(PUB / "vo" / f"{name}.wav")
+        f = PUB / "vo" / f"{name}.wav"
+        if not f.exists():
+            # No voice line for this scene: music only.
+            at += (frames - OVERLAP) / FPS
+            continue
+        clip = read_wav(f)
         clip = clip / (np.max(np.abs(clip)) + 1e-9) * 0.92
         start = at + VO_DELAY
         place(voice, clip, start)
