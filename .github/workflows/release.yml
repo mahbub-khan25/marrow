@@ -19,6 +19,9 @@ jobs:
   build:
     permissions:
       contents: write
+      id-token: write   # Windows code signing signs in to Azure without a stored password
+    # Azure trusts this repository's "release" environment (see RELEASE.md, Windows signing)
+    environment: release
     strategy:
       fail-fast: false
       matrix:
@@ -70,6 +73,39 @@ jobs:
           else
             echo "No Apple certificate set up: the Mac app will be unsigned."
           fi
+      # Windows code signing with Azure Artifact Signing, only once the repository variables
+      # SIGNING_ACCOUNT, SIGNING_PROFILE and SIGNING_ENDPOINT and the AZURE_* secrets are set.
+      - name: Azure sign-in (Windows signing)
+        if: runner.os == 'Windows' && vars.SIGNING_ACCOUNT != ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Windows signing tools (if set up)
+        if: runner.os == 'Windows' && vars.SIGNING_ACCOUNT != ''
+        shell: pwsh
+        env:
+          SIGNING_ENDPOINT: ${{ vars.SIGNING_ENDPOINT }}
+          SIGNING_ACCOUNT: ${{ vars.SIGNING_ACCOUNT }}
+          SIGNING_PROFILE: ${{ vars.SIGNING_PROFILE }}
+        run: |
+          $tools = Join-Path $env:RUNNER_TEMP 'signing'
+          nuget install Microsoft.ArtifactSigning.Client -x -OutputDirectory $tools | Out-Null
+          nuget install Microsoft.Windows.SDK.BuildTools -x -OutputDirectory $tools | Out-Null
+          $dlib = Get-ChildItem $tools -Recurse -Filter Azure.CodeSigning.Dlib.dll | Where-Object { $_.DirectoryName -match '\\x64$' } | Select-Object -First 1
+          $signtool = Get-ChildItem $tools -Recurse -Filter signtool.exe | Where-Object { $_.DirectoryName -match '\\x64$' } | Select-Object -First 1
+          if (-not $dlib -or -not $signtool) { Write-Error "signing tools not found"; exit 1 }
+          $meta = Join-Path $tools 'metadata.json'
+          @{ Endpoint = $env:SIGNING_ENDPOINT; CodeSigningAccountName = $env:SIGNING_ACCOUNT; CertificateProfileName = $env:SIGNING_PROFILE; CorrelationId = "marrow-$env:GITHUB_RUN_ID" } | ConvertTo-Json | Set-Content $meta
+          "SIGNTOOL_PATH=$($signtool.FullName)" >> $env:GITHUB_ENV
+          "ARTIFACT_DLIB_PATH=$($dlib.FullName)" >> $env:GITHUB_ENV
+          "ARTIFACT_METADATA_PATH=$meta" >> $env:GITHUB_ENV
+          # Tauri signs every binary it builds through this command
+          $script = Join-Path $env:GITHUB_WORKSPACE 'scripts\azure-sign.ps1'
+          @{ bundle = @{ windows = @{ signCommand = @{ cmd = 'pwsh'; args = @('-NoProfile', '-File', $script, '%1') } } } } | ConvertTo-Json -Depth 6 | Set-Content src-tauri/tauri.signing.json
+          "TAURI_SIGN_ARGS=--config src-tauri/tauri.signing.json" >> $env:GITHUB_ENV
+          Write-Host "Windows binaries will be signed with $env:SIGNING_ACCOUNT / $env:SIGNING_PROFILE."
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -80,4 +116,14 @@ jobs:
           releaseDraft: true
           # Tags like v0.9.0-beta.1 become pre-releases.
           prerelease: ${{ contains(inputs.tag || github.ref_name, '-') }}
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} ${{ env.TAURI_SIGN_ARGS }}
+      - name: Check Windows signatures
+        if: runner.os == 'Windows' && vars.SIGNING_ACCOUNT != ''
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem target/release/bundle -Recurse -Include *.exe, *.msi) + @(Get-Item target/release/*.exe)
+          foreach ($f in $files) {
+            $sig = Get-AuthenticodeSignature $f.FullName
+            Write-Host "$($f.Name): $($sig.Status) — $($sig.SignerCertificate.Subject)"
+            if ($sig.Status -ne 'Valid') { Write-Error "$($f.Name) is not validly signed"; exit 1 }
+          }

@@ -68,11 +68,26 @@ and runs on RHEL 9 and 10 as well as every other distribution.
 These need accounts, money or decisions, so they're left to you.
 
 1. **Put the code on GitHub** (private is fine) so the workflows run.
-2. **Windows signing.** Without it, Windows SmartScreen warns "unknown
-   publisher" on first run. Cheapest good option: Azure Trusted Signing (about
-   US$10/month, needs ID verification). Then add a `signCommand` under
-   `bundle > windows` in `src-tauri/tauri.conf.json`. An OV certificate from a
-   certificate authority works too.
+2. **Windows signing (Azure Artifact Signing).** Without it, Windows SmartScreen
+   warns "unknown publisher" on first run. The release workflow already signs
+   the app and both installers once the settings below exist; until then it
+   builds them unsigned. One Azure signing account and certificate profile can
+   sign all your apps (the same one as Ekushe Next): US$9.99/month.
+   1. Set up the Azure account, identity validation and a **Public Trust**
+      certificate profile (step by step: Ekushe Next's `docs/CODE_SIGNING.md`,
+      sections 1–3; skip them if already done for Ekushe).
+   2. In the Azure app registration used for signing, add a federated credential:
+      **GitHub Actions deploying Azure resources**, organization `mahbub-khan25`,
+      repository `marrow`, entity type **Environment**, environment `release`.
+      (The release runs in the `release` environment, so tags of any name work.)
+   3. Make sure that app has the **Artifact Signing Certificate Profile Signer**
+      role on the certificate profile.
+   4. In this repository: **Settings → Secrets and variables → Actions**.
+      Secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
+      Variables: `SIGNING_ACCOUNT`, `SIGNING_PROFILE`, `SIGNING_ENDPOINT`
+      (e.g. `https://eus.codesigning.azure.net/`).
+   The next release signs `Marrow.exe`, the NSIS `.exe` and the `.msi` (Tauri
+   calls `scripts/azure-sign.ps1` for each) and checks every signature.
 3. **macOS signing and notarization.** Needs the Apple Developer Program
    (US$99/year). Add the `APPLE_*` secrets listed in `release.yml` to the
    GitHub repository; the release workflow then signs and notarizes the app.
