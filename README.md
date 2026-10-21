@@ -3,6 +3,11 @@
 A local-first Markdown notes app in Rust. Your notes are plain `.md` files in
 a folder; Marrow indexes them, resolves `[[wikilinks]]` and shows backlinks.
 
+**[Download the latest beta](https://github.com/mahbub-khan25/marrow/releases)**
+for Windows, macOS and Linux. Marrow is free and open source under the
+[MIT license](LICENSE). Bug reports and pull requests are welcome; see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 **Status:** Phases 0–8 of [PLAN.md](PLAN.md) and the redesign work: open a
 folder, read notes rendered or write them as Markdown, link notes and see
 backlinks, rename or move notes without breaking links, explore a graph, lay
@@ -354,15 +359,20 @@ Copy the folder anywhere (a USB stick, Documents, OneDrive) and run
 * **A save fails** (file locked, disk full): your text is kept in a backup and
   offered back the next time you open the note.
 
-## Requirements (Windows)
+## Build from source
 
-* Rust, stable, MSVC toolchain: <https://rustup.rs>
-* Visual Studio C++ Build Tools ("Desktop development with C++")
-* Node 20+ (WebView2 already ships with Windows 10/11)
+* All systems: Rust (stable, <https://rustup.rs>) and Node 20+.
+* Windows: Visual Studio C++ Build Tools ("Desktop development with C++").
+  WebView2 already ships with Windows 10/11.
+* macOS: Xcode Command Line Tools (`xcode-select --install`).
+* Linux: the Tauri system libraries, for example on Ubuntu
+  `sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev`
+  (see <https://tauri.app/start/prerequisites/>).
 
 ## Run the app
 
 ```powershell
+git clone https://github.com/mahbub-khan25/marrow.git
 cd marrow
 npm install
 npm run tauri dev
@@ -473,6 +483,7 @@ crates/marrow-core/
 
 ## License
 
-MIT for this code. Marrow is not affiliated with Obsidian and contains none
+MIT: see [LICENSE](LICENSE). Bundled fonts and libraries keep their own
+licenses (listed in [THIRD_PARTY.md](THIRD_PARTY.md)). Marrow is not affiliated with Obsidian and contains none
 of its code; behaviour was described in a separate design doc and
 re-implemented from that description.
