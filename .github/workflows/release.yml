@@ -121,7 +121,10 @@ jobs:
         if: runner.os == 'Windows' && vars.SIGNING_ACCOUNT != ''
         shell: pwsh
         run: |
-          $files = @(Get-ChildItem target/release/bundle -Recurse -Include *.exe, *.msi) + @(Get-Item target/release/*.exe)
+          # The installers people download. (Tauri signs the app inside each installer, then puts the
+          # unsigned build back in target/release, so that copy isn't checked.)
+          $files = @(Get-ChildItem target/release/bundle -Recurse -Include *.exe, *.msi)
+          if ($files.Count -lt 2) { Write-Error "expected the NSIS and MSI installers"; exit 1 }
           foreach ($f in $files) {
             $sig = Get-AuthenticodeSignature $f.FullName
             Write-Host "$($f.Name): $($sig.Status) — $($sig.SignerCertificate.Subject)"
