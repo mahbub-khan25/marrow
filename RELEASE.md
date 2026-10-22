@@ -1,6 +1,6 @@
 # Releasing Marrow
 
-## Where things stand (0.9.0)
+## Where things stand (1.0.0)
 
 Every blocker from the readiness reviews is fixed and covered by tests:
 
@@ -38,7 +38,7 @@ Run it yourself: `cargo run --release --example bench -p marrow-core -- 10000`.
 - **CI** (`.github/workflows/ci.yml`) runs on every push: type check, window
   tests, engine and app tests, lint, the crash test and a build, on Windows,
   macOS and Linux.
-- **Release** (`.github/workflows/release.yml`): push a tag such as `v0.9.0`
+- **Release** (`.github/workflows/release.yml`): push a tag such as `v1.0.0`
   and GitHub builds the Windows installers (.exe, .msi) and a macOS app (.dmg,
   Apple Silicon and Intel) and attaches them to a draft release.
 - **On your PC**: double-click `scripts\windows-check.cmd`. It runs every
@@ -97,8 +97,8 @@ These need accounts, money or decisions, so they're left to you.
 5. **A page for people**: a download page, a privacy statement (Marrow sends
    nothing anywhere unless you connect an AI; the log stays on the computer),
    and an email address for bug reports.
-6. **Version**: `0.9.0` is the beta. After the beta, set `1.0.0` in
-   `Cargo.toml` (workspace), `package.json` and `src-tauri/tauri.conf.json`.
+6. **Version**: set the new version in `Cargo.toml` (workspace),
+   `package.json` and `src-tauri/tauri.conf.json`, then push the matching tag.
 
 ## Manual check before each release (15 minutes)
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0
+
+The first stable release.
+- Windows installers and the app are code-signed, so Windows shows the
+  verified publisher instead of "Unknown publisher".
+- Includes every fix from the 0.9.0 betas: crash-safe saving, drafts of
+  unsaved typing, crash-safe renames and locked folders, and canvas
+  conflict handling.
+- Marrow is free and open source under the MIT license.
+
 ## 0.9.0-beta.2
 
 Fixes from the third readiness review:
