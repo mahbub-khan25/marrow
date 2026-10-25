@@ -86,6 +86,7 @@ import { applyPrefs, onPrefs, prefs, setPref, type Mode } from "./prefs";
 import { closeSettings, initSettings, openSettings, settingsOpen, updateSyncLine } from "./settings";
 import { SearchView, TagsView } from "./sidebar";
 import { CalendarView } from "./calendar";
+import { saveFiles } from "./attach";
 import { type DailyLayout, dailyIndex as indexDaily, dailyPathFor, misplaced as misplacedDaily } from "./daily";
 import { Tree } from "./tree";
 import { $, ago, h, icon, isMac, isoDay, kbd, longDate, storage, store, wordCount } from "./util";
@@ -885,12 +886,17 @@ async function appendToToday(line: string, section: "Log" | "Tasks") {
 /** The quick-capture box; `wasHidden` sends Marrow back to the background after. */
 function quickCapture(wasHidden = false) {
   openCapture({
-    save: async (text, asTask) => {
+    save: async (text, asTask, files) => {
       const time = new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-      const one = text.replace(/\s*\n\s*/g, " ");
-      await appendToToday(asTask ? `- [ ] ${one}` : `- ${time} ${one}`, asTask ? "Tasks" : "Log");
+      const label = text || (files.every((f) => f.type.startsWith("audio")) ? "Voice note" : files.every((f) => f.type.startsWith("image")) ? "Photo" : "Attachment");
+      const one = label.replace(/\s*\n\s*/g, " ");
+      // Recordings and photos sit under the line, in the same list item.
+      const embeds = files.length ? "\n" + (await saveFiles(files, await ensureToday(), false, "\n")).split("\n").map((m) => `  ${m}`).join("\n") : "";
+      await appendToToday((asTask ? `- [ ] ${one}` : `- ${time} ${one}`) + embeds, asTask ? "Tasks" : "Log");
       if (side === "tasks" && sideOpen) void tasksView.refresh();
     },
+    transcriber: () => api.aiTranscriber(),
+    transcribe: async (audio) => api.aiTranscribe(new Uint8Array(await audio.arrayBuffer()), audio.name),
     done: () => {
       if (wasHidden && !platform.mobile) void getCurrentWindow().minimize();
     },
@@ -1846,6 +1852,7 @@ function bindChrome() {
   $("rail-tasks").addEventListener("click", () => railSide("tasks"));
   $("rail-calendar").addEventListener("click", () => railSide("calendar"));
   $("rail-ask").addEventListener("click", () => askNotes());
+  $("capture-fab").addEventListener("click", () => quickCapture());
   $("start-ask").addEventListener("click", () => askNotes());
   $("rail-today").addEventListener("click", () => void openToday());
   $("rail-graph").addEventListener("click", () => void openGraph());

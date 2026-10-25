@@ -101,8 +101,10 @@ All of these are plain Markdown, so the notes still open in Obsidian.
   task to today's note.
 * **Quick capture**: press **Ctrl+Alt+N** in any app while Marrow is open
   (even minimised) to jot something into today's note — a timed line under
-  *Log*, or a to-do under *Tasks*. Change or turn off the shortcut in
-  Settings → Editor.
+  *Log*, or a to-do under *Tasks*. Add a voice note or a photo too; with an
+  OpenAI or Groq key in Settings → AI, voice notes are also written out as
+  text. On phones and tablets, tap the round **+** button. Change or turn
+  off the shortcut in Settings → Editor.
 * **Version history**: right-click a note → *Version history…* (or the
   palette). While you edit, Marrow keeps a copy every few minutes in
   `.marrow/history`; older copies thin out to one an hour, then one a day,

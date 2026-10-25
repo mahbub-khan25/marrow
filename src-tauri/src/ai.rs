@@ -181,6 +181,59 @@ pub(crate) mod keys {
     }
 }
 
+// --------------------------------------------------------- transcription
+
+/// Services that turn speech into text, and the model each one uses.
+const TRANSCRIBERS: &[(&str, &str)] = &[("openai", "gpt-4o-mini-transcribe"), ("groq", "whisper-large-v3-turbo")];
+
+/// The AI that can transcribe a voice note, if one is set up (by name), so the
+/// window can say where the recording would go.
+#[tauri::command(async)]
+pub fn ai_transcriber(app: AppHandle) -> Option<String> {
+    transcriber(&app).map(|(p, _, _)| p.name)
+}
+
+fn transcriber(app: &AppHandle) -> Option<(Provider, &'static str, String)> {
+    let cfg = load(app);
+    TRANSCRIBERS.iter().find_map(|(preset, model)| {
+        let p = cfg.providers.iter().find(|p| p.preset == *preset)?.clone();
+        let key = keys::get(app, &p.id)?;
+        Some((p, *model, key))
+    })
+}
+
+/// Turns a voice note into text with the person's own AI service (OpenAI or
+/// Groq). The recording's bytes come as the request body; `name` names it.
+/// None when no such service is set up.
+#[tauri::command]
+pub async fn ai_transcribe(app: AppHandle, request: tauri::ipc::Request<'_>) -> CmdResult<Option<String>> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("Expected the recording's bytes".into());
+    };
+    let name = request
+        .headers()
+        .get("name")
+        .and_then(|v| v.to_str().ok())
+        .map(crate::commands::percent_decode)
+        .unwrap_or_else(|| "voice.webm".into());
+    let Some((p, model, key)) = transcriber(&app) else { return Ok(None) };
+    let part = reqwest::multipart::Part::bytes(bytes.clone()).file_name(name);
+    let form = reqwest::multipart::Form::new().text("model", model.to_string()).part("file", part);
+    let resp = client()?
+        .post(url(&p.base_url, "audio/transcriptions"))
+        .bearer_auth(key)
+        .multipart(form)
+        .timeout(Duration::from_secs(120))
+        .send()
+        .await
+        .map_err(|e| friendly(e, &p))?;
+    if !resp.status().is_success() {
+        return Err(failure(resp).await);
+    }
+    let v: Value = resp.json().await.map_err(err)?;
+    Ok(v.get("text").and_then(|t| t.as_str()).map(|t| t.trim().to_string()))
+}
+
 // -------------------------------------------------------------- requests
 
 pub(crate) fn client() -> CmdResult<reqwest::Client> {

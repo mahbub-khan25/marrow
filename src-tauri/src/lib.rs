@@ -143,6 +143,8 @@ pub fn run() {
             ai::ai_test,
             ai::ai_run,
             ai::ai_cancel,
+            ai::ai_transcriber,
+            ai::ai_transcribe,
             sync::cloud_locations,
             sync::create_vault,
             sync::vault_cloud,

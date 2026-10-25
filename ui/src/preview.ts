@@ -25,6 +25,8 @@ export interface RenderEnv {
 }
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif|ico)$/i;
+const AUDIO_EXT = /\.(m4a|mp3|wav|ogg|oga|opus|flac|aac|webm)$/i;
+const VIDEO_EXT = /\.(mp4|mov|m4v|ogv)$/i;
 
 export function linkTarget(inner: string): string {
   return inner.split("|")[0].replace(/\\$/, "").split("#")[0].trim();
@@ -218,6 +220,9 @@ function makeMd(): MarkdownIt {
       const w = /^\d+(x\d+)?$/.test(size) ? ` width="${size.split("x")[0]}"` : "";
       return `<img data-embed="${esc(target)}" alt="${esc(size && !w ? size : target)}"${w}>`;
     }
+    // Voice notes and clips play in place.
+    if (AUDIO_EXT.test(target)) return `<audio controls preload="metadata" data-embed-media="${esc(target)}"></audio>`;
+    if (VIDEO_EXT.test(target)) return `<video controls preload="metadata" playsinline data-embed-media="${esc(target)}"></video>`;
     const isNote = !/\.[a-z0-9]{1,5}$/i.test(target) || /\.md$/i.test(target);
     if (isNote && env.depth < 1) {
       return `<div class="embed" data-embed-note="${esc(inner.split("|")[0])}"></div>`;
@@ -385,7 +390,7 @@ export function renderMarkdown(text: string, unresolved: Set<string>, depth = 0)
   const env: RenderEnv = { lineOffset: fm.lines, unresolved, depth };
   const html = md.render(fm.text, env);
   return DOMPurify.sanitize(html, {
-    ADD_ATTR: ["data-line", "data-link", "data-tag", "data-task", "data-embed", "data-embed-note", "data-href", "data-heading", "data-callout", "data-button", "data-db", "data-mermaid", "open"],
+    ADD_ATTR: ["data-line", "data-link", "data-tag", "data-task", "data-embed", "data-embed-note", "data-embed-media", "playsinline", "data-href", "data-heading", "data-callout", "data-button", "data-db", "data-mermaid", "open"],
     FORBID_TAGS: ["style", "form", "input", "button", "textarea", "select"],
   });
 }

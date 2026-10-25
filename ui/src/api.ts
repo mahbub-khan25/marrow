@@ -282,6 +282,10 @@ export const api = {
   /** Copies a file from the computer into `folder` (or returns its vault path if it's already in the vault). */
   importFile: (source: string, folder: string) => invoke<string>("import_file", { source, folder }),
   /** Saves pasted or dropped bytes as a file in `folder`; returns its vault path. */
+  /** The AI service that can turn voice notes into text, if one is set up. */
+  aiTranscriber: () => invoke<string | null>("ai_transcriber"),
+  /** A voice note as text, from that service (null when none is set up). */
+  aiTranscribe: (bytes: Uint8Array, name: string) => invoke<string | null>("ai_transcribe", bytes, { headers: { name: encodeURIComponent(name) } }),
   saveAttachment: (bytes: Uint8Array, name: string, folder: string) =>
     invoke<string>("save_attachment", bytes, { headers: { name: encodeURIComponent(name), folder: encodeURIComponent(folder) } }),
   /** Saves the clipboard's image as a PNG (when the webview doesn't pass it on). */

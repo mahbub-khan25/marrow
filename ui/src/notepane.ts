@@ -1163,6 +1163,12 @@ export class NotePane {
       if (path) img.src = this.assetUrl(path);
       else img.replaceWith(h("span.embed-missing", null, `Missing image: ${target}`));
     }
+    for (const media of container.querySelectorAll<HTMLMediaElement>("[data-embed-media]")) {
+      const target = media.dataset.embedMedia!;
+      const path = await api.resolveLink(target, source).catch(() => null);
+      if (path) media.src = this.assetUrl(path);
+      else media.replaceWith(h("span.embed-missing", null, `Missing recording: ${target}`));
+    }
     for (const box of container.querySelectorAll<HTMLElement>("[data-embed-note]")) {
       const link = box.dataset.embedNote!;
       const target = linkTarget(link);

@@ -8,5 +8,12 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<!-- Quick capture: voice notes and photos, only when you tap the buttons. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Marrow records a voice note when you tap Voice note in Quick capture.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Marrow takes a photo for your note when you tap Photo in Quick capture.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Marrow adds the photos you pick to your note.</string>
 </dict>
 </plist>

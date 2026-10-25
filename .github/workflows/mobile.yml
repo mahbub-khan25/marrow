@@ -35,6 +35,10 @@ jobs:
         run: |
           export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
           npx tauri android init --ci
+          # Voice notes in Quick capture need the microphone.
+          m=src-tauri/gen/android/app/src/main/AndroidManifest.xml
+          grep -q RECORD_AUDIO "$m" || sed -i 's#<application#<uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <application#' "$m"
+          grep -n "RECORD_AUDIO" "$m"
       - name: Build the app (debug APK for testing)
         run: |
           export NDK_HOME="$ANDROID_NDK_LATEST_HOME"

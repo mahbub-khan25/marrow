@@ -13,6 +13,11 @@
 - **Ask your notes:** an Ask button in the sidebar and on the start screen,
   one-click private setup with Ollama on this computer, and a clear note of
   where each question goes. Also fixes the Ask panel opening off-screen.
+- **Quick capture with voice and photos:** record a voice note or take a
+  photo straight into today's note. With an OpenAI or Groq key in
+  Settings → AI, voice notes are also turned into text; the recording is
+  always kept. Recordings play right inside the note. On phones and
+  tablets, a round + button opens Quick capture from anywhere.
 - **Mobile groundwork:** Marrow builds for Android and iOS, with layouts for
   phones and tablets.
 

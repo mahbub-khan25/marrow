@@ -6,6 +6,8 @@ import { api, displayName } from "./api";
 export const ATTACHMENT_FOLDER = "attachments";
 
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
+/** Embedded too (they play in place). */
+const MEDIA = /\.(m4a|mp3|wav|ogg|oga|opus|flac|aac|webm|mp4|mov|m4v)$/i;
 
 /** The files in a paste or drop, if any. */
 export function filesIn(data: DataTransfer | null): File[] {
@@ -43,7 +45,7 @@ async function linkFor(path: string, source: string): Promise<string> {
   // The file name alone, unless another file of that name would win.
   const found = await api.resolveLink(file, source).catch(() => null);
   const link = found === path ? file : path;
-  return /\.md$/i.test(file) ? `[[${displayName(path)}]]` : IMAGE.test(file) ? `![[${link}]]` : `[[${link}]]`;
+  return /\.md$/i.test(file) ? `[[${displayName(path)}]]` : IMAGE.test(file) || MEDIA.test(file) ? `![[${link}]]` : `[[${link}]]`;
 }
 
 /**
@@ -59,12 +61,12 @@ export async function pasteClipboardImage(source: string): Promise<string | null
  * Saves the files and returns the Markdown to insert, e.g. `![[photo.png]]`.
  * `source` is the note they go into (for the shortest link that still works).
  */
-export async function saveFiles(files: File[], source: string, pasted: boolean): Promise<string> {
+export async function saveFiles(files: File[], source: string, pasted: boolean, sep?: string): Promise<string> {
   const out: string[] = [];
   for (const f of files) {
     const bytes = new Uint8Array(await f.arrayBuffer());
     const path = await api.saveAttachment(bytes, nameFor(f, pasted), ATTACHMENT_FOLDER);
     out.push(await linkFor(path, source));
   }
-  return out.join(out.some((m) => m.startsWith("!")) ? "\n" : " ");
+  return out.join(sep ?? (out.some((m) => m.startsWith("!")) ? "\n" : " "));
 }
