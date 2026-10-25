@@ -445,6 +445,20 @@ mod tests {
     }
 
     #[test]
+    fn moving_into_new_nested_folders_creates_them() {
+        // Organising daily notes moves them into year/month folders that don't exist yet.
+        let (d, mut e) = setup(&[("Daily/2026-10-24.md", "x"), ("A.md", "see [[2026-10-24]] and [[Daily/2026-10-24]]")]);
+        e.rename_with_links(&p("Daily/2026-10-24.md"), &p("Daily/2026/10 October/2026-10-24.md")).unwrap();
+        assert!(d.path().join("Daily/2026/10 October/2026-10-24.md").exists());
+        assert!(e.vault().get(&p("Daily/2026/10 October")).is_some());
+        assert!(e.vault().get(&p("Daily/2026")).is_some());
+        let a = read(&d, "A.md");
+        assert!(a.contains("[[2026-10-24]]"), "{a}");
+        assert!(!a.contains("[[Daily/2026-10-24]]"), "{a}");
+        assert!(e.graph().incoming_is_consistent());
+    }
+
+    #[test]
     fn backlink_index_stays_in_step() {
         let (d, mut e) = setup(&[
             ("Hub.md", "x"),

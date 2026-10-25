@@ -930,6 +930,8 @@ pub struct VaultSettings {
     pub new_note_location: String,
     pub new_note_folder: String,
     pub daily_folder: String,
+    /// "year-month" (Daily/2026/10 October/2026-10-24.md) or "flat".
+    pub daily_layout: String,
     /** Notes in this folder are offered as templates (/ menu, buttons). */
     pub template_folder: String,
     /// Starred notes, shown at the top of the file tree.
@@ -950,6 +952,7 @@ impl Default for VaultSettings {
             new_note_location: "current".into(),
             new_note_folder: String::new(),
             daily_folder: "Daily".into(),
+            daily_layout: "year-month".into(),
             template_folder: "Templates".into(),
             starred: Vec::new(),
             snippets: Vec::new(),

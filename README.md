@@ -188,6 +188,21 @@ space in the file tree) brings notes in from:
 Everything goes into a new folder (“Notion”, “Evernote”…); the files you
 pick are only read.
 
+## Daily notes and the calendar
+
+Daily notes are kept by year and month, so years of them stay easy to find:
+`Daily/2026/10 October/2026-10-24.md`. The file name is always the date, so
+`[[2026-10-24]]` links never break and other apps sort them correctly.
+
+* **Calendar** (rail): a month of days with a dot where there's a note and a
+  pink dot where tasks are due. Click a day to open its note, or start one.
+  Click the month name to see the whole year at a glance.
+* **On this day**: notes from the same date in earlier years.
+* **Older notes** kept in one folder still work everywhere. The calendar and
+  Settings → Vault offer to move them into year and month folders in one
+  click; links keep working. Prefer one folder? Pick *One folder* in
+  Settings → Vault.
+
 ## Writing comfort
 
 * **Spell check**: misspelt words are underlined in Source; right-click one
@@ -390,9 +405,9 @@ npm run tauri build
 
 This builds an optimised app and two installers:
 
-* `target\release\bundle\nsis\Marrow_1.0.0_x64-setup.exe`, the usual choice. It installs for the
+* `target\release\bundle\nsis\Marrow_1.1.0_x64-setup.exe`, the usual choice. It installs for the
   current user, with no admin prompt, and adds Start menu and uninstall entries.
-* `target\release\bundle\msi\Marrow_1.0.0_x64_en-US.msi`, for managed installs.
+* `target\release\bundle\msi\Marrow_1.1.0_x64_en-US.msi`, for managed installs.
 
 The installers download Microsoft's WebView2 runtime only if the PC doesn't already have it
 (Windows 10 and 11 normally do). The version comes from `src-tauri\tauri.conf.json`
@@ -402,7 +417,8 @@ and shows in Settings → About.
 |---|---|
 | Command palette: notes, text, `#tags`, commands | Ctrl+K (also Ctrl+O, Ctrl+P); Ctrl+T opens the pick in a new tab |
 | New note | Ctrl+N, the pencil above the file tree, or the + in the tab bar |
-| Today's daily note | Ctrl+D, or the calendar in the left rail |
+| Today's daily note | Ctrl+D, or the calendar-page icon in the left rail |
+| Calendar | the calendar icon with dots in the rail: click a day to open or start its note; click the month name for the whole year; *On this day* lists the same date in earlier years. Dots mark days with a note (blue) and tasks due (pink) |
 | Preview / Source | Ctrl+E, or the switch above the title; double-click a paragraph to edit it |
 | Search all notes | Ctrl+Shift+F (select a word first to search for it) |
 | Tags | the # in the left rail; click a `#tag` in a note |

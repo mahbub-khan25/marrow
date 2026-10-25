@@ -16,6 +16,9 @@ export interface SettingsApp {
   folders(): string[];
   vaultSettings(): VaultSettings;
   setVaultSettings(s: VaultSettings): void;
+  /** Daily notes not in the folders the daily layout uses. */
+  misplacedDaily(): number;
+  organizeDaily(): Promise<void>;
   openAnotherVault(): void;
   /** Import from Notion, Evernote, OneNote… */
   importNotes(): void;
@@ -371,6 +374,20 @@ function syncRow(): HTMLElement {
   return h("div.set-row", null, h("div", null, h("div.l", null, "Sync"), desc), control);
 }
 
+/** Offers to move daily notes into the folders the layout uses, when some aren't. */
+function dailyMoveRow(): HTMLElement | null {
+  const n = app.misplacedDaily();
+  if (!n) return null;
+  const btn = h("button.btn.btn-secondary", null, `Move ${n} daily note${n === 1 ? "" : "s"}`) as HTMLButtonElement;
+  btn.onclick = async () => {
+    btn.disabled = true;
+    btn.textContent = "Moving…";
+    await app.organizeDaily();
+    render();
+  };
+  return row("Existing daily notes", `${n} daily note${n === 1 ? " is" : "s are"} not organized this way yet. Moving them keeps every link working.`, btn);
+}
+
 function renderVault(body: HTMLElement) {
   const vs = app.vaultSettings();
   const save = (patch: Partial<VaultSettings>) => {
@@ -413,6 +430,19 @@ function renderVault(body: HTMLElement) {
         ? row("Folder for new notes", "Created if it doesn't exist.", folderInput(vs.newNoteFolder, (v) => save({ newNoteFolder: v }), "Inbox"))
         : null,
       row("Daily notes folder", `Where ${kbd("D")} keeps one note per day, named by date.`, folderInput(vs.dailyFolder, (v) => save({ dailyFolder: v }), "Vault root")),
+      row(
+        "Organize daily notes",
+        "Year and month folders keep years of notes easy to browse, e.g. Daily › 2026 › 10 October › 2026-10-24.",
+        seg(
+          [
+            ["year-month", "Year and month"],
+            ["flat", "One folder"],
+          ] as ["year-month" | "flat", string][],
+          vs.dailyLayout ?? "year-month",
+          (v) => save({ dailyLayout: v }),
+        ),
+      ),
+      dailyMoveRow(),
       row(
         "Templates folder",
         "Notes here appear under Templates in the / menu and can be used by buttons.",

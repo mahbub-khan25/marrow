@@ -85,8 +85,10 @@ import { closePalette, initPalette, openPalette, paletteOpen, type Command, type
 import { applyPrefs, onPrefs, prefs, setPref, type Mode } from "./prefs";
 import { closeSettings, initSettings, openSettings, settingsOpen, updateSyncLine } from "./settings";
 import { SearchView, TagsView } from "./sidebar";
+import { CalendarView } from "./calendar";
+import { type DailyLayout, dailyIndex as indexDaily, dailyPathFor, misplaced as misplacedDaily } from "./daily";
 import { Tree } from "./tree";
-import { $, ago, h, icon, isDayName, isMac, isoDay, kbd, longDate, storage, store, wordCount } from "./util";
+import { $, ago, h, icon, isMac, isoDay, kbd, longDate, storage, store, wordCount } from "./util";
 
 // ------------------------------------------------------------------ state
 
@@ -114,6 +116,7 @@ let vaultSettings: VaultSettings = {
   newNoteLocation: "current",
   newNoteFolder: "",
   dailyFolder: "Daily",
+  dailyLayout: "year-month",
   templateFolder: "Templates",
   starred: [],
   snippets: [],
@@ -122,7 +125,7 @@ let vaultSettings: VaultSettings = {
 let tabs: Tab[] = [];
 let active = -1;
 let split: { doc: Doc; mode: Mode } | null = null;
-let side = "files" as "files" | "search" | "tags" | "tasks";
+let side = "files" as "files" | "search" | "tags" | "tasks" | "calendar";
 let sideOpen = true;
 let recent: string[] = [];
 let stats = { notes: 0, links: 0 };
@@ -132,6 +135,7 @@ let splitPane: NotePane;
 let tree: Tree;
 let searchView: SearchView;
 let tagsView: TagsView;
+let calendarView: CalendarView;
 let tasksView: TasksView;
 let inspector: Inspector;
 let graphPanel: GraphPanel | null = null;
@@ -274,6 +278,10 @@ function showStage() {
   // Rail
   const daily = t?.kind === "note" && dailyNav(t.doc.path) !== null && displayName(t.doc.path) === isoDay();
   $("rail-today").setAttribute("aria-pressed", String(daily));
+  // The calendar follows the daily note that's open.
+  const shownDay = t?.kind === "note" && dailyNav(t.doc.path) ? displayName(t.doc.path) : null;
+  if (shownDay && side === "calendar" && sideOpen && shownDay !== lastCalendarDay) calendarView.reveal(shownDay);
+  if (shownDay) lastCalendarDay = shownDay;
   $("rail-graph").setAttribute("aria-pressed", String(view === "graph"));
   $("rail-canvas").setAttribute("aria-pressed", String(view === "canvas"));
   if (view === "start") void renderStart();
@@ -762,35 +770,60 @@ async function newDatabase(folder: string) {
 
 // ------------------------------------------------------------------ daily
 
+const dailyLayout = (): DailyLayout => vaultSettings.dailyLayout ?? "year-month";
+let lastCalendarDay: string | null = null;
+
 function dailyPath(day: string) {
-  const f = vaultSettings.dailyFolder.replace(/^\/+|\/+$/g, "");
-  return (f ? `${f}/` : "") + `${day}.md`;
+  return dailyPathFor(vaultSettings.dailyFolder, day, dailyLayout());
 }
 
-/** Daily notes in the daily folder, oldest first. */
-function dailyNotes(): string[] {
-  const f = vaultSettings.dailyFolder.replace(/^\/+|\/+$/g, "");
-  return tree
-    .files()
-    .filter((p) => isNotePath(p) && parentOf(p) === f && isDayName(displayName(p)))
-    .sort((a, b) => displayName(a).localeCompare(displayName(b)));
+/** Daily notes by day, wherever they are in the daily folder. */
+function dailyIndex(): Map<string, string> {
+  return indexDaily(tree.files(), vaultSettings.dailyFolder);
 }
 
 function dailyNav(path: string) {
-  const f = vaultSettings.dailyFolder.replace(/^\/+|\/+$/g, "");
   const name = displayName(path);
-  if (parentOf(path) !== f || !isDayName(name) || !isNotePath(path)) return null;
-  const all = dailyNotes();
-  const prev = [...all].reverse().find((p) => displayName(p) < name) ?? null;
-  const next = all.find((p) => displayName(p) > name) ?? null;
-  return { label: longDate(name), prev, next };
+  const all = dailyIndex();
+  if (all.get(name) !== path) return null;
+  const days = [...all.keys()];
+  const i = days.indexOf(name);
+  return { label: longDate(name), prev: i > 0 ? all.get(days[i - 1])! : null, next: i < days.length - 1 ? all.get(days[i + 1])! : null };
+}
+
+/** Daily notes that aren't in the folders the layout uses. */
+function misplacedDailyNotes() {
+  return misplacedDaily(tree.files(), vaultSettings.dailyFolder, dailyLayout());
+}
+
+/** Moves daily notes into their year/month folders (or back into one folder). */
+async function organizeDaily() {
+  const moves = misplacedDailyNotes();
+  if (!moves.length) return;
+  // Open notes are saved first, so nothing typed is left behind in the old place.
+  if (!(await settleEdits("Organize daily notes"))) return;
+  let done = 0;
+  const failed: string[] = [];
+  for (const [path, folder] of moves) {
+    try {
+      await api.movePath(path, folder);
+      done++;
+    } catch (e) {
+      failed.push(`${displayName(path)} (${e})`);
+    }
+    if (done % 25 === 0) toast(`Organizing daily notes… ${done} of ${moves.length}`);
+  }
+  await refreshTree();
+  if (failed.length) toast(`Moved ${done} daily notes. These couldn't be moved: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? ` and ${failed.length - 3} more` : ""}.`, "error");
+  else toast(dailyLayout() === "year-month" ? `Organized ${done} daily notes into year and month folders.` : `Moved ${done} daily notes into one folder.`);
 }
 
 /** Today's daily note, created if needed. Returns its path. */
 async function ensureToday(): Promise<string> {
   const day = isoDay();
+  const existing = dailyIndex().get(day);
+  if (existing) return existing;
   const path = dailyPath(day);
-  if (tree.find(path)) return path;
   const made = await api.createFile(parentOf(path), day, "md", "## Log\n- \n\n## Tasks\n- [ ] \n");
   await refreshTree();
   return made;
@@ -850,15 +883,20 @@ function applyCaptureKey() {
 }
 
 async function openToday(how: OpenHow = "replace") {
-  const day = isoDay();
+  return openDay(isoDay(), how);
+}
+
+/** Opens a day's daily note, creating it if it doesn't exist yet. */
+async function openDay(day: string, how: OpenHow = "replace") {
+  const existing = dailyIndex().get(day);
+  if (existing) return openNote(existing, how);
   const path = dailyPath(day);
-  if (tree.find(path)) return openNote(path, how);
   try {
     const made = await api.createFile(parentOf(path), day, "md", "## Log\n- \n\n## Tasks\n- [ ] \n");
     await refreshTree();
     await openNote(made, how, undefined, { mode: "source" });
   } catch (e) {
-    toast(`Couldn't create today's note: ${e}`, "error");
+    toast(`Couldn't create the note for ${longDate(day)}: ${e}`, "error");
   }
 }
 
@@ -1162,12 +1200,13 @@ function setSide(v: typeof side, open = true) {
   side = v;
   sideOpen = open;
   $("app").classList.toggle("no-sidebar", !sideOpen);
-  for (const name of ["files", "search", "tags", "tasks"] as const) {
+  for (const name of ["files", "search", "tags", "tasks", "calendar"] as const) {
     $(`side-${name}`).hidden = name !== v;
     $(`rail-${name}`).setAttribute("aria-pressed", String(sideOpen && name === v));
   }
   if (v === "tags" && sideOpen) void tagsView.refresh();
   if (v === "tasks" && sideOpen) void tasksView.refresh();
+  if (v === "calendar" && sideOpen) void calendarView.refresh();
   persistSession();
 }
 
@@ -1183,6 +1222,7 @@ function railSide(v: typeof side) {
 
 async function refreshTree() {
   tree.set(await api.tree());
+  if (side === "calendar" && sideOpen) void calendarView?.refresh();
 }
 
 // ------------------------------------------------------------------ graph
@@ -1353,6 +1393,8 @@ function commands(): Command[] {
   return [
     cmd("New note", "note-pencil", () => void newNote(), kbd("N")),
     cmd("Open today's daily note", "calendar-blank", () => void openToday(), kbd("D")),
+    cmd("Show the calendar", "calendar-dots", () => setSide("calendar", true)),
+    cmd("Organize daily notes into year and month folders", "folders", () => void organizeDaily()),
     cmd("Open graph view", "graph", () => void openGraph(), kbd("G")),
     cmd("Open canvas", "squares-four", () => void openSomeCanvas()),
     cmd("Toggle split pane", "columns", () => void toggleSplit(), kbd("\\")),
@@ -1766,6 +1808,7 @@ function bindChrome() {
   $("rail-search").addEventListener("click", () => railSide("search"));
   $("rail-tags").addEventListener("click", () => railSide("tags"));
   $("rail-tasks").addEventListener("click", () => railSide("tasks"));
+  $("rail-calendar").addEventListener("click", () => railSide("calendar"));
   $("rail-today").addEventListener("click", () => void openToday());
   $("rail-graph").addEventListener("click", () => void openGraph());
   $("rail-canvas").addEventListener("click", () => void openSomeCanvas());
@@ -1967,6 +2010,14 @@ async function boot() {
   const sideApp = { openNote: (path: string, at?: At, newTab?: boolean) => void openPath(path, newTab ? "tab" : "replace", at), toast };
   searchView = new SearchView(sideApp);
   tagsView = new TagsView(sideApp);
+  calendarView = new CalendarView({
+    dailyIndex,
+    openDay: (day, newTab) => void openDay(day, newTab ? "tab" : "replace"),
+    openNote: (path, newTab) => void openPath(path, newTab ? "tab" : "replace"),
+    misplacedCount: () => misplacedDailyNotes().length,
+    layout: dailyLayout,
+    organize: organizeDaily,
+  });
   tasksView = new TasksView({ openNote: sideApp.openNote, addTask: (text) => appendToToday(`- [ ] ${text}`, "Tasks"), toast });
 
   inspector = new Inspector({
@@ -1995,14 +2046,17 @@ async function boot() {
     vaultRoot: () => vaultRoot,
     folders: () => tree.folders(),
     vaultSettings: () => vaultSettings,
+    misplacedDaily: () => misplacedDailyNotes().length,
+    organizeDaily,
     setVaultSettings: (s) => {
-      const dailyChanged = s.dailyFolder !== vaultSettings.dailyFolder;
+      const dailyChanged = s.dailyFolder !== vaultSettings.dailyFolder || s.dailyLayout !== vaultSettings.dailyLayout;
       vaultSettings = s;
       void api.setVaultSettings(s).catch((e) => toast(`Couldn't save the setting: ${e}`, "error"));
       if (dailyChanged) {
         tree.render();
         primary.pathChanged();
         renderTabs();
+        if (side === "calendar" && sideOpen) void calendarView.refresh();
       }
     },
     openAnotherVault: () => void chooseVault(),

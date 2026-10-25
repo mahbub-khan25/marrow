@@ -12,7 +12,7 @@ body:
     attributes:
       label: Marrow version
       description: Settings → About
-      placeholder: 1.0.0
+      placeholder: 1.1.0
     validations:
       required: true
   - type: dropdown

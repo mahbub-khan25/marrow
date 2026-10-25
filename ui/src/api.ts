@@ -115,6 +115,8 @@ export interface VaultSettings {
   newNoteLocation: "root" | "current" | "folder";
   newNoteFolder: string;
   dailyFolder: string;
+  /** "year-month": Daily/2026/10 October/2026-10-24.md. "flat": all in the daily folder. */
+  dailyLayout?: "year-month" | "flat";
   templateFolder: string;
   /** Starred notes, shown at the top of the file tree. */
   starred: string[];

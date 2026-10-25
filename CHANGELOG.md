@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.0
+
+- **Calendar:** a new view in the sidebar. See a month of daily notes and the
+  days tasks are due, open or start any day's note in one click, or see the
+  whole year at a glance.
+- **On this day:** the same date in earlier years, with the first line of
+  each note.
+- **Daily notes by year and month:** new daily notes go into
+  `Daily/2026/10 October/2026-10-24.md`. Older notes in one folder keep
+  working, and one click moves them into place with every link intact.
+  Choose *One folder* in Settings → Vault to keep the old way.
+- Previous/next day and the Tasks view work across all of these folders.
+
 ## 1.0.0
 
 The first stable release.

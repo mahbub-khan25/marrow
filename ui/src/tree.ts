@@ -132,12 +132,15 @@ export class Tree {
   }
 
   private sorted(nodes: TreeNode[], folder: string): TreeNode[] {
-    const daily = folder !== "" && folder === this.app.dailyFolder();
+    // Inside the daily folder, newest first: years, then months, then days.
+    const df = this.app.dailyFolder();
+    const daily = folder !== "" && (folder === df || (df !== "" && folder.startsWith(df + "/")));
     const coll = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
     return [...nodes].sort((a, b) => {
       if (a.kind !== b.kind) return a.kind === "Folder" ? -1 : 1;
       const c = coll.compare(displayName(a.path), displayName(b.path));
-      return daily && a.kind === "File" ? -c : c;
+      const dated = a.kind === "File" || /^\d{2,4}( |$)/.test(displayName(a.path));
+      return daily && dated ? -c : c;
     });
   }
 

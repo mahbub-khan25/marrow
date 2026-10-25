@@ -29,6 +29,7 @@
         <button class="rail-btn" id="rail-search" title="Search" aria-pressed="false"><i class="ph-duotone ph-magnifying-glass"></i></button>
         <button class="rail-btn" id="rail-tags" title="Tags" aria-pressed="false"><i class="ph-duotone ph-hash"></i></button>
         <button class="rail-btn" id="rail-tasks" title="Tasks" aria-pressed="false"><i class="ph-duotone ph-check-square"></i></button>
+        <button class="rail-btn" id="rail-calendar" title="Calendar" aria-pressed="false"><i class="ph-duotone ph-calendar-dots"></i></button>
         <div class="grow"></div>
         <button class="rail-btn" id="rail-today" title="Today's note" aria-pressed="false"><i class="ph-duotone ph-calendar-blank"></i></button>
         <button class="rail-btn" id="rail-graph" title="Graph view" aria-pressed="false"><i class="ph-duotone ph-graph"></i></button>
@@ -67,6 +68,11 @@
             <label class="task-done-toggle"><input id="task-show-done" type="checkbox" /> Show done</label>
           </div>
           <div id="task-list" class="task-list"></div>
+        </div>
+
+        <div id="side-calendar" class="side-view" hidden>
+          <div id="cal-main" class="cal-main"></div>
+          <div id="cal-otd" class="cal-otd"></div>
         </div>
 
         <div id="side-tags" class="side-view" hidden>
