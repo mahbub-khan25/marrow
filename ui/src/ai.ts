@@ -66,6 +66,43 @@ export function defaultProvider(): AiProvider | undefined {
   return config.providers.find((p) => p.id === config.defaultId) ?? config.providers[0];
 }
 
+/** True for an AI running on this computer (Ollama, LM Studio): nothing leaves it. */
+export const isLocal = (p: AiProvider | undefined) => !!p && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/)/.test(p.baseUrl);
+
+/** Chat models first: embedding models can't answer questions. */
+const isEmbedModel = (m: string) => /embed|bge-|minilm|e5-/i.test(m);
+const CHAT_PREFERENCE = ["llama3.2", "llama3.1", "qwen2.5", "qwen3", "gemma3", "gemma2", "mistral", "phi4", "phi3", "llama3"];
+const EMBED_PREFERENCE = ["nomic-embed-text", "mxbai-embed-large", "bge-m3", "all-minilm"];
+
+/**
+ * Connects Ollama on this computer in one step: picks a chat model (and an
+ * embedding model for search by meaning, when one is installed).
+ * Returns what's missing, if anything.
+ */
+export async function setUpOllama(): Promise<{ ok: true; model: string } | { ok: false; reason: "not-running" | "no-model" }> {
+  const base = preset("ollama");
+  const draft: AiProvider = { id: "", preset: "ollama", name: "Ollama (on this computer)", protocol: base.protocol, baseUrl: base.baseUrl, model: "", hasKey: false };
+  let models: string[];
+  try {
+    models = await api.aiModels(draft);
+  } catch {
+    return { ok: false, reason: "not-running" };
+  }
+  const pick = (list: string[], prefs: string[]) => prefs.map((p) => list.find((m) => m.startsWith(p))).find(Boolean) ?? list[0];
+  const chat = pick(models.filter((m) => !isEmbedModel(m)), CHAT_PREFERENCE);
+  if (!chat) return { ok: false, reason: "no-model" };
+  const saved = await api.aiSaveProvider({ ...draft, model: chat });
+  const mine = saved.providers.find((p) => p.preset === "ollama" && p.model === chat) ?? saved.providers[saved.providers.length - 1];
+  let cfg = await api.aiSetDefault(mine.id);
+  const embed = pick(models.filter(isEmbedModel), EMBED_PREFERENCE);
+  if (embed) {
+    await api.aiSetEmbedding(mine.id, embed);
+    cfg = await api.aiConfig();
+  }
+  setAiConfig(cfg);
+  return { ok: true, model: chat };
+}
+
 // ----------------------------------------------------------------- running
 
 const handlers = new Map<string, (e: AiEvent) => void>();

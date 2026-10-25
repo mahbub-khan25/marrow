@@ -1735,6 +1735,9 @@ body.block-dragging, body.block-dragging * { cursor: grabbing !important; user-s
 .ai-buttons .icon-btn:first-of-type { margin-left: auto; }
 .ai-setup { padding: 4px 16px 16px; }
 .ai-setup p { margin: 0 0 14px; line-height: 1.5; }
+.ai-setup-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.ai-setup .ai-hint { margin-top: 12px; line-height: 1.5; }
+.ai-setup .ai-hint code { font-size: 0.92em; padding: 1px 5px; border-radius: 3px; background: var(--hover); }
 
 /* Settings → AI */
 .ai-list { display: flex; flex-direction: column; border-radius: 8px; box-shadow: 0 0 0 1px var(--color-divider); }
@@ -1826,7 +1829,7 @@ body.block-dragging, body.block-dragging * { cursor: grabbing !important; user-s
     padding: 4px 6px env(safe-area-inset-bottom); gap: 0;
     border-top: 1px solid var(--color-divider);
   }
-  .rail .logo-mark, .rail .grow, #rail-tags, #rail-graph, #rail-canvas { display: none; }
+  .rail .logo-mark, .rail .grow, #rail-tags, #rail-graph, #rail-canvas, #rail-palette { display: none; }
   .sidebar {
     position: fixed; z-index: 30;
     top: env(safe-area-inset-top); left: 0; right: 0; bottom: calc(60px + env(safe-area-inset-bottom));

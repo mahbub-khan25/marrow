@@ -5,7 +5,7 @@
 import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 
-import { aiConfig, aiReady, defaultProvider, loadAiConfig, runAi, type AiRun } from "./ai";
+import { aiConfig, aiReady, defaultProvider, isLocal, loadAiConfig, runAi, setUpOllama, type AiRun } from "./ai";
 import { api, type AiMessage, type RecallHit } from "./api";
 import { renderMarkdown } from "./preview";
 import { openSettings } from "./settings";
@@ -273,23 +273,58 @@ function open(o: Options) {
 
   if (!aiReady()) {
     el.dataset.state = "setup";
+    const status = h("div.ai-hint");
+    // Phones and tablets can't run Ollama; they use an AI service.
+    const mobile = document.documentElement.hasAttribute("data-mobile");
+    const privateBtn = mobile
+      ? null
+      : (h("button.btn.btn-primary", null, icon("lock-simple"), "Private: use Ollama on this computer") as HTMLButtonElement);
+    if (privateBtn)
+      privateBtn.onclick = async () => {
+        privateBtn.disabled = true;
+        status.textContent = "Looking for Ollama…";
+        const r = await setUpOllama().catch(() => ({ ok: false as const, reason: "not-running" as const }));
+        privateBtn.disabled = false;
+        if (r.ok) {
+          closeAiPanel();
+          open(o);
+          return;
+        }
+        status.replaceChildren(
+          ...(r.reason === "not-running"
+            ? ["Ollama isn't running. Install it free from ", h("a", { href: "https://ollama.com/download", target: "_blank" }, "ollama.com"), ", open it, then try again."]
+            : ["Ollama is running but has no model yet. In a terminal, run ", h("code", null, "ollama pull llama3.2"), " (and ", h("code", null, "ollama pull nomic-embed-text"), " for search by meaning), then try again."]),
+        );
+      };
     el.append(
       header(null),
       h(
         "div.ai-setup",
         null,
-        h("p", null, "Connect an AI first. Use your own key for ChatGPT, Claude, Gemini, DeepSeek, Qwen, Kimi and others, or a free model on this computer with Ollama."),
         h(
-          "button.btn",
-          {
-            onclick: () => {
-              closeAiPanel();
-              openSettings("ai");
-            },
-          },
-          icon("plus"),
-          "Set up AI…",
+          "p",
+          null,
+          mobile
+            ? "Connect an AI first, with your own key for ChatGPT, Claude, Gemini, DeepSeek, Qwen, Kimi or others."
+            : "Connect an AI first. The private way runs a free model on this computer with Ollama, so your notes never leave it. Or use your own key for ChatGPT, Claude, Gemini, DeepSeek and others.",
         ),
+        h(
+          "div.ai-setup-acts",
+          null,
+          privateBtn,
+          h(
+            "button.btn.btn-secondary",
+            {
+              onclick: () => {
+                closeAiPanel();
+                openSettings("ai");
+              },
+            },
+            icon("plus"),
+            "Use an AI service…",
+          ),
+        ),
+        status,
       ),
     );
     place();
@@ -340,7 +375,11 @@ function open(o: Options) {
   el.dataset.state = "menu";
   el.append(header(null), h("div.ai-ask", null, icon("sparkle"), prompt), list);
   if (o.actions.length) showActions(o.actions);
-  else if (o.hint) list.replaceChildren(h("div.ai-hint-line", null, o.hint));
+  else {
+    // Ask my notes has no menu, only a line about where the question goes.
+    if (o.hint) list.replaceChildren(h("div.ai-hint-line", null, o.hint));
+    place();
+  }
   prompt.focus();
 
   // ---- answer
@@ -555,7 +594,9 @@ export function aiOnVault(hooks: VaultHooks) {
     actions: [],
     width: 600,
     placeholder: "Ask your notes anything…",
-    hint: "Marrow finds the parts of your notes that match, sends only those to the AI, and shows where each point comes from.",
+    hint: isLocal(defaultProvider())
+      ? "Private: answered on this computer by your own AI. Nothing leaves it. Each point links to the note it comes from."
+      : `Marrow finds the parts of your notes that match and sends only those to ${defaultProvider()?.name ?? "your AI"}. Each point links to the note it comes from.`,
     system: VAULT_SYSTEM,
     message: async (q) => {
       question = q;

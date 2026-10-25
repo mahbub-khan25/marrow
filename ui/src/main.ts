@@ -1845,6 +1845,8 @@ function bindChrome() {
   $("rail-tags").addEventListener("click", () => railSide("tags"));
   $("rail-tasks").addEventListener("click", () => railSide("tasks"));
   $("rail-calendar").addEventListener("click", () => railSide("calendar"));
+  $("rail-ask").addEventListener("click", () => askNotes());
+  $("start-ask").addEventListener("click", () => askNotes());
   $("rail-today").addEventListener("click", () => void openToday());
   $("rail-graph").addEventListener("click", () => void openGraph());
   $("rail-canvas").addEventListener("click", () => void openSomeCanvas());
@@ -1869,10 +1871,14 @@ function bindChrome() {
 
   // Shortcut hints follow the platform.
   $("jump-kbd").textContent = isMac ? "⌘K" : "Ctrl K";
-  for (const el of document.querySelectorAll<HTMLElement>("[data-kbd]")) el.textContent = kbd(el.dataset.kbd!);
+  for (const el of document.querySelectorAll<HTMLElement>("[data-kbd]")) {
+    const k = el.dataset.kbd!;
+    el.textContent = k.startsWith("shift+") ? kbd(k.slice(6), true) : kbd(k);
+  }
   const tips: [string, string][] = [
     ["rail-search", `Search (${kbd("F", true)})`],
     ["rail-today", `Today's note (${kbd("D")})`],
+    ["rail-ask", `Ask your notes (${kbd("J", true)})`],
     ["rail-graph", `Graph view (${kbd("G")})`],
     ["rail-palette", `Command palette (${kbd("K")})`],
     ["rail-settings", `Settings (${kbd(",")})`],
