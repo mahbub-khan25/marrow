@@ -68,6 +68,9 @@ pub(crate) struct Settings {
     /// Vault folder → the cloud service it syncs with directly (no password here;
     /// that's in the system's credential store).
     pub clouds: std::collections::BTreeMap<String, crate::sync::CloudTarget>,
+    /// Vaults whose sync is end-to-end encrypted (the passphrase is in the
+    /// system's credential store).
+    pub encrypted: std::collections::BTreeSet<String>,
 }
 
 fn settings_path(app: &AppHandle) -> CmdResult<PathBuf> {

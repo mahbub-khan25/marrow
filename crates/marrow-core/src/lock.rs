@@ -75,6 +75,11 @@ pub struct Key {
 }
 
 impl Key {
+    /// The raw key, for deriving the keys encrypted sync uses.
+    pub(crate) fn bytes(&self) -> &[u8; 32] {
+        &self.bytes
+    }
+
     /// The salt as written in the file, used to find a cached key.
     pub fn salt_id(&self) -> String {
         B64.encode(self.salt)

@@ -93,6 +93,19 @@ impl CloudTarget {
     }
 }
 
+fn passphrase_id(local: &Path) -> String {
+    format!("sync:passphrase:{}", local.to_string_lossy())
+}
+
+/// Wraps a remote in end-to-end encryption when this vault's sync is encrypted.
+fn maybe_sealed(app: &AppHandle, local: &Path, remote: Box<dyn Remote>) -> Result<Box<dyn Remote>, String> {
+    if !load_settings(app).encrypted.contains(local.to_string_lossy().as_ref()) {
+        return Ok(remote);
+    }
+    let pass = crate::ai::keys::get(app, &passphrase_id(local)).ok_or("The sync passphrase is missing on this device. Set up sync again.")?;
+    Ok(Box::new(marrow_core::sealed::Sealed::new(remote, &pass)))
+}
+
 /// Starts syncing `local` with the folder `remote` (stopping any earlier sync).
 pub fn start_mirror(app: &AppHandle, state: &State<AppState>, local: &Path, remote: PathBuf) {
     let label = remote
@@ -100,6 +113,8 @@ pub fn start_mirror(app: &AppHandle, state: &State<AppState>, local: &Path, remo
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| remote.to_string_lossy().into_owned());
     let status = MirrorStatus { remote: remote.to_string_lossy().into_owned(), label, ..Default::default() };
+    let app2 = app.clone();
+    let local2 = local.to_path_buf();
     start_worker(app, state, local, status, move |status| {
         // Name the provider (looking for cloud folders can be slow, so it's done here).
         if let Some(l) = cloud::provider_of(&remote, &cloud::detect()) {
@@ -108,7 +123,7 @@ pub fn start_mirror(app: &AppHandle, state: &State<AppState>, local: &Path, remo
                 s.provider = Some(l.provider.clone());
             }
         }
-        Ok(Box::new(mirror::FolderRemote::new(remote)))
+        maybe_sealed(&app2, &local2, Box::new(mirror::FolderRemote::new(remote)))
     });
 }
 
@@ -122,7 +137,8 @@ pub fn start_cloud(app: &AppHandle, state: &State<AppState>, local: &Path, targe
     };
     let status = MirrorStatus { remote, label, provider: Some(provider.into()), ..Default::default() };
     let app2 = app.clone();
-    start_worker(app, state, local, status, move |_| target.connect(&app2));
+    let local2 = local.to_path_buf();
+    start_worker(app, state, local, status, move |_| maybe_sealed(&app2, &local2, target.connect(&app2)?));
 }
 
 fn start_worker(
@@ -289,27 +305,72 @@ async fn on_blocking_thread<T: Send + 'static>(f: impl FnOnce() -> CmdResult<T> 
     tauri::async_runtime::spawn_blocking(f).await.map_err(err)?
 }
 
+/// What's already in a place before syncing with it.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TargetInfo {
+    pub files: usize,
+    /// It holds a vault encrypted by Marrow: its passphrase is needed.
+    pub encrypted: bool,
+}
+
 /// Checks a WebDAV server before syncing with it: signs in, makes the sync
-/// folder if needed, and says how many files are already there.
+/// folder if needed, and says what's already there.
 #[tauri::command]
-pub async fn webdav_check(url: String, user: String, password: String) -> CmdResult<usize> {
+pub async fn webdav_check(url: String, user: String, password: String) -> CmdResult<TargetInfo> {
     on_blocking_thread(move || {
         let dav = crate::webdav::WebDav::new(&url, &user, &password)?;
         dav.check().map_err(|e| e.to_string())?;
-        dav.list().map(|l| l.len()).map_err(err)
+        Ok(TargetInfo { files: dav.list().map(|l| l.len()).map_err(err)?, encrypted: marrow_core::sealed::is_encrypted(&dav) })
     })
     .await
 }
 
+/// Checks the passphrase against an encrypted place (or sets up encryption in an empty one).
+fn check_sealed(remote: Box<dyn Remote>, passphrase: &str) -> CmdResult<()> {
+    if passphrase.chars().count() < 8 {
+        return Err("Use a sync passphrase of at least 8 characters.".into());
+    }
+    marrow_core::sealed::Sealed::new(remote, passphrase).check().map_err(|e| e.to_string())
+}
+
+/// Remembers (or forgets) this vault's encryption and passphrase.
+fn set_encryption(app: &AppHandle, settings: &mut crate::commands::Settings, root: &Path, passphrase: Option<&str>) -> CmdResult<()> {
+    let key = root.to_string_lossy().into_owned();
+    match passphrase {
+        Some(p) => {
+            crate::ai::keys::set(app, &passphrase_id(root), Some(p))?;
+            settings.encrypted.insert(key);
+        }
+        None => {
+            let _ = crate::ai::keys::set(app, &passphrase_id(root), None);
+            settings.encrypted.remove(&key);
+        }
+    }
+    Ok(())
+}
+
 /// Turns on sync with a WebDAV server (turning off any other sync for this vault).
 #[tauri::command]
-pub async fn set_cloud_sync(app: AppHandle, state: State<'_, AppState>, url: String, user: String, password: String) -> CmdResult<()> {
+pub async fn set_cloud_sync(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    url: String,
+    user: String,
+    password: String,
+    passphrase: Option<String>,
+) -> CmdResult<()> {
     let root = vault_root(&state)?;
     let key = root.to_string_lossy().into_owned();
-    let (u, n, p) = (url.clone(), user.clone(), password.clone());
+    let (u, n, p, pp) = (url.clone(), user.clone(), password.clone(), passphrase.clone());
     on_blocking_thread(move || {
         let dav = crate::webdav::WebDav::new(&u, &n, &p)?;
-        dav.check().map_err(|e| e.to_string())
+        dav.check().map_err(|e| e.to_string())?;
+        match pp {
+            Some(pp) => check_sealed(Box::new(dav), &pp),
+            None if marrow_core::sealed::is_encrypted(&dav) => Err("That folder holds an encrypted vault. Turn on encryption and enter its sync passphrase.".into()),
+            None => Ok(()),
+        }
     })
     .await?;
     let target = CloudTarget::Webdav { url: url.trim().to_string(), user: user.trim().to_string() };
@@ -318,15 +379,23 @@ pub async fn set_cloud_sync(app: AppHandle, state: State<'_, AppState>, url: Str
     if let Some(old) = settings.mirrors.remove(&key) {
         Mirror::new(&root, old).reset();
     }
+    Mirror::new(&root, "").reset();
+    set_encryption(&app, &mut settings, &root, passphrase.as_deref())?;
     settings.clouds.insert(key, target.clone());
     save_settings(&app, &settings)?;
     start_cloud(&app, &state, &root, target);
     Ok(())
 }
 
+/// Whether a folder holds a vault encrypted by Marrow.
+#[tauri::command]
+pub async fn folder_encrypted(remote: String) -> bool {
+    marrow_core::sealed::is_encrypted(&mirror::FolderRemote::new(remote))
+}
+
 /// Turns sync on with `remote`, or off with `None`.
 #[tauri::command(async)]
-pub fn set_mirror(app: AppHandle, state: State<AppState>, remote: Option<String>) -> CmdResult<()> {
+pub fn set_mirror(app: AppHandle, state: State<AppState>, remote: Option<String>, passphrase: Option<String>) -> CmdResult<()> {
     let root = vault_root(&state)?;
     let key = root.to_string_lossy().into_owned();
     let mut settings = load_settings(&app);
@@ -339,6 +408,18 @@ pub fn set_mirror(app: AppHandle, state: State<AppState>, remote: Option<String>
             if r.starts_with(&l) || l.starts_with(&r) {
                 return Err("Pick a folder outside this vault (and not one that contains it).".into());
             }
+            let folder = Box::new(mirror::FolderRemote::new(&r));
+            match passphrase.as_deref() {
+                Some(p) => check_sealed(folder, p)?,
+                None if marrow_core::sealed::is_encrypted(folder.as_ref()) => {
+                    return Err("That folder holds an encrypted vault. Turn on encryption and enter its sync passphrase.".into())
+                }
+                None => {}
+            }
+            if settings.mirrors.get(&key) != Some(&r.to_string_lossy().into_owned()) || settings.encrypted.contains(&key) != passphrase.is_some() {
+                Mirror::new(&root, "").reset();
+            }
+            set_encryption(&app, &mut settings, &root, passphrase.as_deref())?;
             settings.mirrors.insert(key.clone(), r.to_string_lossy().into_owned());
             if let Some(old) = settings.clouds.remove(&key) {
                 let _ = crate::ai::keys::set(&app, &old.secret_id(), None);
@@ -356,6 +437,7 @@ pub fn set_mirror(app: AppHandle, state: State<AppState>, remote: Option<String>
                 let _ = crate::ai::keys::set(&app, &old.secret_id(), None);
                 Mirror::new(&root, "").reset();
             }
+            set_encryption(&app, &mut settings, &root, None)?;
             save_settings(&app, &settings)?;
         }
     }

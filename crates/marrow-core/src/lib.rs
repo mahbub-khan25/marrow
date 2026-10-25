@@ -39,6 +39,7 @@ pub mod merge;
 pub mod mirror;
 pub mod parse;
 pub mod path;
+pub mod sealed;
 pub mod service;
 pub mod vault;
 pub mod vectors;

@@ -98,6 +98,25 @@ impl WebDav {
         Ok(())
     }
 
+    /// Makes the sync folder, one level at a time from the top (folders that
+    /// already exist are skipped).
+    fn make_base(&self) -> Result<(), String> {
+        let segments: Vec<String> = self.base.path_segments().map(|s| s.filter(|p| !p.is_empty()).map(str::to_string).collect()).unwrap_or_default();
+        let mut last = StatusCode::OK;
+        for i in 1..=segments.len() {
+            let mut u = self.base.clone();
+            u.set_path(&format!("/{}/", segments[..i].join("/")));
+            let r = self.send(Method::from_bytes(b"MKCOL").expect("method"), u, None, None).map_err(|e| e.to_string())?;
+            last = r.status();
+        }
+        // 201 made it; 405 means it was already there.
+        if last.is_success() || last == StatusCode::METHOD_NOT_ALLOWED {
+            Ok(())
+        } else {
+            Err(format!("couldn't make the sync folder (the server answered {last})"))
+        }
+    }
+
     fn version_of(&self, key: &str) -> io::Result<Version> {
         let (status, entries) = self.propfind(self.url_for(key), "0")?;
         if !status.is_success() {
@@ -146,17 +165,8 @@ impl Remote for WebDav {
         match status.as_u16() {
             200..=299 => Ok(()),
             401 | 403 => Err(SyncStop::SignIn { message: "user name or password not accepted".into() }),
-            // The sync folder doesn't exist yet: make it.
-            404 => {
-                let r = self
-                    .send(Method::from_bytes(b"MKCOL").expect("method"), self.base.clone(), None, None)
-                    .map_err(|e| SyncStop::Offline { message: e.to_string() })?;
-                if r.status().is_success() {
-                    Ok(())
-                } else {
-                    Err(SyncStop::Offline { message: format!("couldn't make the sync folder (the server answered {})", r.status()) })
-                }
-            }
+            // The sync folder doesn't exist yet: make it, and any folders above it.
+            404 => self.make_base().map_err(|e| SyncStop::Offline { message: e }),
             _ => Err(SyncStop::Offline { message: format!("the server answered {status}") }),
         }
     }
@@ -447,5 +457,35 @@ mod tests {
         a.sync(false).unwrap();
         assert!(!pc.join("Trip plan.md").exists());
         assert!(pc.join(".marrow/trash/Trip plan.md").exists());
+    }
+
+    /// Encrypted sync through a real server: nothing readable reaches it.
+    #[test]
+    #[ignore]
+    fn encrypted_sync_through_a_real_server() {
+        use marrow_core::mirror::Mirror;
+        use marrow_core::sealed::Sealed;
+        let raw = std::env::var("MARROW_WEBDAV_URL").expect("MARROW_WEBDAV_URL");
+        let u = Url::parse(&raw).unwrap();
+        let (user, pass) = (u.username().to_string(), u.password().unwrap_or("").to_string());
+        let mut clean = u.join("encrypted/").unwrap();
+        clean.set_username("").unwrap();
+        clean.set_password(None).unwrap();
+        let sealed = || Box::new(Sealed::new(Box::new(WebDav::new(clean.as_str(), &user, &pass).unwrap()), "a long sync passphrase"));
+        let t = tempfile::tempdir().unwrap();
+        let (pc, phone) = (t.path().join("pc"), t.path().join("phone"));
+        std::fs::create_dir_all(pc.join("Health")).unwrap();
+        std::fs::create_dir_all(&phone).unwrap();
+        std::fs::write(pc.join("Health/Blood test.md"), "Cholesterol 4.2\n").unwrap();
+        Mirror::with_remote(&pc, sealed()).sync(false).unwrap();
+        Mirror::with_remote(&phone, sealed()).sync(false).unwrap();
+        assert_eq!(std::fs::read_to_string(phone.join("Health/Blood test.md")).unwrap(), "Cholesterol 4.2\n");
+        // What the server holds: one hidden settings file and scrambled names.
+        let dav = WebDav::new(clean.as_str(), &user, &pass).unwrap();
+        let names: Vec<String> = dav.list().unwrap().into_keys().collect();
+        assert_eq!(names.len(), 1);
+        assert!(!names[0].contains("Health") && !names[0].contains("Blood"));
+        let body = String::from_utf8_lossy(&dav.read(&names[0]).unwrap()).into_owned();
+        assert!(!body.contains("Cholesterol"));
     }
 }

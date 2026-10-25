@@ -7,6 +7,12 @@
   folders: notes edited in two places are merged, deletions go to the trash,
   and sync pauses rather than empty a vault. Being offline is fine; sync
   resumes by itself.
+- **End-to-end encrypted sync:** optional, for cloud folders and servers.
+  Notes and their names are encrypted before they leave the device, so the
+  cloud stores only scrambled data. Other devices join with the passphrase.
+- **Ask your notes:** an Ask button in the sidebar and on the start screen,
+  one-click private setup with Ollama on this computer, and a clear note of
+  where each question goes. Also fixes the Ask panel opening off-screen.
 - **Mobile groundwork:** Marrow builds for Android and iOS, with layouts for
   phones and tablets.
 

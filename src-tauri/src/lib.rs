@@ -151,6 +151,7 @@ pub fn run() {
             sync::set_mirror,
             sync::webdav_check,
             sync::set_cloud_sync,
+            sync::folder_encrypted,
             sync::sync_now,
             sync::conflict_copies,
             sync::resolve_conflict,

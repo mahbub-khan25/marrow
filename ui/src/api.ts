@@ -319,11 +319,15 @@ export const api = {
   /** How many files a folder already holds. */
   mirrorPreview: (remote: string) => invoke<number>("mirror_preview", { remote }),
   /** Keeps the vault in two-way sync with `remote`, or stops with null. */
-  setMirror: (remote: string | null) => invoke<void>("set_mirror", { remote }),
+  /** Syncs with a folder (end-to-end encrypted with `passphrase`), or turns sync off with null. */
+  setMirror: (remote: string | null, passphrase?: string) => invoke<void>("set_mirror", { remote, passphrase: passphrase ?? null }),
+  /** Whether a folder holds a vault Marrow encrypted. */
+  folderEncrypted: (remote: string) => invoke<boolean>("folder_encrypted", { remote }),
   /** Signs in to a WebDAV server and says how many files its sync folder has. */
-  webdavCheck: (url: string, user: string, password: string) => invoke<number>("webdav_check", { url, user, password }),
+  webdavCheck: (url: string, user: string, password: string) => invoke<{ files: number; encrypted: boolean }>("webdav_check", { url, user, password }),
   /** Syncs this vault with a WebDAV server from now on. */
-  setCloudSync: (url: string, user: string, password: string) => invoke<void>("set_cloud_sync", { url, user, password }),
+  setCloudSync: (url: string, user: string, password: string, passphrase?: string) =>
+    invoke<void>("set_cloud_sync", { url, user, password, passphrase: passphrase ?? null }),
   syncNow: (force = false) => invoke<void>("sync_now", { force }),
   conflictCopies: () => invoke<ConflictCopy[]>("conflict_copies"),
   /** Merges a conflict copy into its original; returns places where both versions were kept. */

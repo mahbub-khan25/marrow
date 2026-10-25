@@ -1326,6 +1326,11 @@ mark { background: var(--color-accent-100); color: var(--color-accent-900); padd
 .dlg-error { font-size: 14px; color: var(--color-accent-2-700); }
 .dlg-foot { display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
 .dlg-server { display: flex; flex-direction: column; gap: 12px; }
+.dlg-enc { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: var(--radius-lg); background: color-mix(in srgb, var(--color-accent) 8%, transparent); }
+.dlg-check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; cursor: pointer; }
+.dlg-check input { margin-top: 3px; flex: none; }
+.dlg-enc-fields { display: flex; flex-direction: column; gap: 8px; }
+.dlg-enc-fields[hidden], .dlg-enc [hidden] { display: none; }
 .dlg-server[hidden] { display: none; }
 .dlg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .dlg-field { display: flex; flex-direction: column; gap: 5px; font-size: 14px; color: var(--ink-78); min-width: 0; }

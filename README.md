@@ -339,6 +339,14 @@ tablets, it can also sync directly with your own server.
   system's credential store. Works with Nextcloud, ownCloud, Synology, pCloud,
   Koofr and other WebDAV servers, the same way as the cloud folders above.
   Direct Google Drive, OneDrive, Dropbox and iCloud sync are coming next.
+* **End-to-end encryption** (optional, in the same setup): tick *Encrypt
+  everything before it leaves this device* and choose a sync passphrase.
+  Every file and every file name is encrypted on your device (Argon2id and
+  XChaCha20-Poly1305, as for locked notes), so the cloud or server only holds
+  scrambled data. Enter the same passphrase on your other devices. Marrow
+  can't recover a lost passphrase: the copy in the cloud then can't be read,
+  but the notes on your devices are fine. Encrypted sync needs an empty
+  folder, so plain and encrypted files never mix.
 * **Conflict copies**: when a cloud app keeps two versions of a note (for
   example `Note (Khan's conflicted copy …).md`), Marrow offers to merge them
   back into one.

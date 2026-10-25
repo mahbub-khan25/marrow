@@ -173,6 +173,42 @@ export async function setupSyncDialog(vaultName: string, onDone: () => void, mob
       "Nextcloud: create an app password in Settings › Security, and use the WebDAV address from Files › Settings with a folder name added, such as …/Marrow. Synology, pCloud and Koofr show their WebDAV address in their settings.",
     ),
   );
+  // End-to-end encryption: on, and (for a place already encrypted) joining it.
+  const encOn = h("input", { type: "checkbox" }) as HTMLInputElement;
+  const pp1 = h("input.input", { type: "password", autocomplete: "new-password" }) as HTMLInputElement;
+  const pp2 = h("input.input", { type: "password", autocomplete: "new-password" }) as HTMLInputElement;
+  const pp2Field = field("Type it again", pp2);
+  const encHint = h("div.dlg-hint");
+  const encFields = h("div.dlg-enc-fields", { hidden: true }, h("div.dlg-row", null, field("Sync passphrase", pp1), pp2Field), encHint);
+  const encBox = h(
+    "div.dlg-enc",
+    null,
+    h(
+      "label.dlg-check",
+      null,
+      encOn,
+      h("span", null, h("b", null, "Encrypt everything before it leaves this device. "), "The cloud stores only scrambled data, even the file names."),
+    ),
+    encFields,
+  );
+  let joining = false;
+  const setEnc = (mode: "off" | "new" | "join" | "unavailable") => {
+    joining = mode === "join";
+    encOn.disabled = mode === "join" || mode === "unavailable";
+    encOn.checked = mode === "new" || mode === "join" ? true : mode === "unavailable" ? false : encOn.checked;
+    encFields.hidden = !encOn.checked;
+    pp2Field.hidden = joining;
+    encHint.textContent = joining
+      ? "This place holds a vault Marrow encrypted. Enter its sync passphrase."
+      : mode === "unavailable"
+        ? "Encrypted sync needs an empty folder, or one Marrow already encrypted."
+        : "Use the same passphrase on your other devices. Marrow can't recover it: if it's lost, the copy in the cloud can't be read (the notes on your devices are fine).";
+    // Unavailable: explain why, without passphrase boxes.
+    const boxes = encFields.firstElementChild as HTMLElement;
+    boxes.hidden = mode === "unavailable";
+    if (mode === "unavailable") encFields.hidden = false;
+  };
+  encOn.addEventListener("change", () => setEnc(encOn.checked ? "new" : "off"));
   const places: Place[] = [
     ...clouds.map((c, i) => ({ key: `cloud${i}`, label: c.label, path: join(c.path, vaultName), provider: c.provider })),
     { key: "webdav", label: "Nextcloud, Synology or another WebDAV server", path: "", provider: "webdav" as const },
@@ -184,16 +220,20 @@ export async function setupSyncDialog(vaultName: string, onDone: () => void, mob
     note.textContent = "";
     error.hidden = true;
     server.hidden = p.key !== "webdav";
+    setEnc("off");
     if (p.key === "webdav") {
-      note.textContent = "Notes stay plain Markdown files in that folder on your server. Marrow checks the sign-in before it starts.";
+      note.textContent = "Marrow checks the sign-in before it starts. Without encryption, notes stay plain Markdown files in that folder.";
       window.setTimeout(() => url.focus(), 0);
       return;
     }
     if (!target) return;
-    const n = await api.mirrorPreview(target).catch(() => 0);
+    const [n, enc] = await Promise.all([api.mirrorPreview(target).catch(() => 0), api.folderEncrypted(target).catch(() => false)]);
     if (where.selected()?.path !== target) return;
-    note.textContent =
-      n > 0
+    if (enc) setEnc("join");
+    else if (n > 0) setEnc("unavailable");
+    note.textContent = enc
+      ? "That folder holds this vault encrypted. Your notes will be combined with it."
+      : n > 0
         ? `That folder already has ${n} ${n === 1 ? "file" : "files"}. They'll be combined with this vault — nothing is deleted, and notes that differ are merged.`
         : "Everything in this vault will be copied there, and kept in sync both ways from then on.";
   });
@@ -212,6 +252,7 @@ export async function setupSyncDialog(vaultName: string, onDone: () => void, mob
       clouds.length || mobile ? null : h("div.dlg-hint", null, "No Dropbox, OneDrive or Google Drive folder was found on this computer. Install its desktop app, or choose any folder."),
       where.el,
       server,
+      encBox,
       note,
       error,
     ],
@@ -222,15 +263,35 @@ export async function setupSyncDialog(vaultName: string, onDone: () => void, mob
     error.hidden = false;
     error.textContent = msg;
   };
+  /** The passphrase to use, or undefined when not encrypting; throws a message when it isn't right yet. */
+  const passphrase = (): string | undefined => {
+    if (!encOn.checked) return undefined;
+    if (pp1.value.length < 8) throw "Use a sync passphrase of at least 8 characters.";
+    if (!joining && pp1.value !== pp2.value) throw "The two passphrases don't match.";
+    return pp1.value;
+  };
   start.addEventListener("click", async () => {
     error.hidden = true;
+    let phrase: string | undefined;
+    try {
+      phrase = passphrase();
+    } catch (e) {
+      return fail(String(e));
+    }
     if (where.selected()?.key === "webdav") {
       if (!url.value.trim() || !user.value.trim() || !pass.value) return fail("Fill in the server address, user name and password.");
       start.disabled = true;
       label.textContent = "Checking…";
       try {
-        await api.webdavCheck(url.value.trim(), user.value.trim(), pass.value);
-        await api.setCloudSync(url.value.trim(), user.value.trim(), pass.value);
+        const info = await api.webdavCheck(url.value.trim(), user.value.trim(), pass.value);
+        if (info.encrypted && !joining) {
+          setEnc("join");
+          pp1.value = "";
+          return fail("That server folder holds an encrypted vault. Enter its sync passphrase, then start again.");
+        }
+        if (!info.encrypted && info.files > 0 && phrase) return fail("Encrypted sync needs an empty folder. That one already has files: add a new folder name to the address.");
+        if (phrase) label.textContent = "Setting up encryption…";
+        await api.setCloudSync(url.value.trim(), user.value.trim(), pass.value, phrase);
         close();
         onDone();
       } catch (e) {
@@ -243,7 +304,7 @@ export async function setupSyncDialog(vaultName: string, onDone: () => void, mob
     }
     if (!target) return fail("Pick a folder to sync with.");
     try {
-      await api.setMirror(target);
+      await api.setMirror(target, phrase);
       close();
       onDone();
     } catch (e) {
