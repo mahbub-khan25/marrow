@@ -148,6 +148,22 @@ export interface TaskItem {
   fromNote: boolean;
 }
 
+/** A Notion or Evernote export found in Downloads. */
+export interface FoundExport {
+  path: string;
+  name: string;
+  size: number;
+  modifiedMs: number;
+}
+
+/** A note as it was at some moment (the time machine). */
+export interface ThenNote {
+  path: string;
+  state: "same" | "changed" | "gone";
+  /** The kept version holding it then; null: the note as it is now. */
+  version: number | null;
+}
+
 /** An earlier version of a note. */
 export interface NoteVersion {
   timeMs: number;
@@ -267,6 +283,8 @@ export const api = {
   historyList: (path: string) => invoke<NoteVersion[]>("history_list", { path }),
   historyRead: (path: string, timeMs: number) => invoke<string>("history_read", { path, timeMs }),
   /** Keeps `text` as a version of the note now. */
+  historyVaultAt: (timeMs: number) => invoke<ThenNote[]>("history_vault_at", { timeMs }),
+  historyTimeline: () => invoke<{ days: [number, number][]; firstMs: number | null }>("history_timeline"),
   historySnapshot: (path: string, text: string) => invoke<void>("history_snapshot", { path, text }),
   unlinkedMentions: (path: string, names: string[]) => invoke<Mention[]>("unlinked_mentions", { path, names }),
   resolveLink: (link: string, source: string) => invoke<string | null>("resolve_link", { link, source }),
@@ -291,6 +309,8 @@ export const api = {
   /** Saves the clipboard's image as a PNG (when the webview doesn't pass it on). */
   saveClipboardImage: (name: string, folder: string) => invoke<string | null>("save_clipboard_image", { name, folder }),
   /** Converts picked files (Notion zip, .enex, .docx, .html, .md) into a new vault folder. */
+  /** Recent Notion or Evernote exports in Downloads. */
+  findExports: (kind: "notion" | "evernote") => invoke<FoundExport[]>("find_exports", { kind }),
   importFiles: (kind: string, paths: string[], folder: string) =>
     invoke<{ folder: string; notes: number; attachments: number; warnings: string[] }>("import_files", { kind, paths, folder }),
   /** Writes an exported file anywhere (the person picked the place). */

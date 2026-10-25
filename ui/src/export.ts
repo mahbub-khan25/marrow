@@ -134,12 +134,13 @@ function covers(range: string, code: number): boolean {
 export async function usedFonts(fonts: CSSFontFaceRule[], content: HTMLElement): Promise<string> {
   const hasMath = !!content.querySelector(".katex");
   const hasIcons = !!content.querySelector("[class*='ph-']");
+  const hasBangla = /[\u0980-\u09FF]/.test(content.textContent ?? "");
   const out: string[] = [];
   for (const f of fonts) {
     const family = f.style.getPropertyValue("font-family").replace(/["']/g, "");
     const range = f.style.getPropertyValue("unicode-range");
     const want =
-      (/garamond/i.test(family) && (!range || covers(range, 0x41) || covers(range, 0x101))) || (hasMath && /^KaTeX/i.test(family)) || (hasIcons && /phosphor/i.test(family) && /duotone/i.test(family));
+      (/garamond/i.test(family) && (!range || covers(range, 0x41) || covers(range, 0x101))) || (hasMath && /^KaTeX/i.test(family)) || (hasIcons && /phosphor/i.test(family) && /duotone/i.test(family)) || (hasBangla && /noto serif bengali/i.test(family) && !!range && covers(range, 0x985));
     if (!want) continue;
     const src = f.style.getPropertyValue("src");
     // The first url() of a woff2 (or the first one at all).

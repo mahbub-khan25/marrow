@@ -30,6 +30,11 @@ import { aiOnEditor, aiOnNote, aiOnVault } from "./ai-panel";
 import { CanvasView } from "./canvas";
 import { exportHtml, printNote } from "./export";
 import { openHistory } from "./history";
+import { openTimeMachine } from "./timemachine";
+import { openSwitch, type SwitchFrom } from "./switch";
+import { banglaTyping, installBanglaInputs, onBanglaTyping, setBanglaTyping } from "./bangla";
+import { setLanguage } from "./i18n";
+import { markSeen, openWeeklyReview, renderResurface, seenMoved, type ResurfaceApp } from "./resurface";
 import { openCapture } from "./capture";
 import { usePropertyTypes } from "./properties";
 import { TasksView } from "./tasks";
@@ -297,7 +302,42 @@ function showStage() {
   updateSaveState();
 }
 
+const resurfaceApp: ResurfaceApp = {
+  vault: () => vaultRoot,
+  dailyIndex: () => dailyIndex(),
+  dailyFolder: () => vaultSettings.dailyFolder,
+  templateFolder: () => vaultSettings.templateFolder,
+  open: (p) => void openPath(p, "replace"),
+  create: (folder, name, text) => api.createFile(folder, name, "md", text),
+  toast: (t, k) => toast(t, k),
+};
+
 async function renderStart() {
+  // A new, nearly empty vault: offer to bring notes over.
+  const sw = $("switch-from");
+  const stats = await api.vaultStats().catch(() => null);
+  sw.replaceChildren(
+    ...(stats && stats.notes < 15
+      ? [
+          h(
+            "div.rs-card.rs-switch",
+            null,
+            h("div.rs-k", null, icon("signpost"), "Coming from another app?"),
+            h("p.rs-t", null, "Bring all your notes over, with their links, pictures and databases. Marrow shows you each step."),
+            h(
+              "div.rs-acts",
+              null,
+              h("button.btn.btn-secondary", { onclick: () => moveFrom("notion") }, icon("notion-logo"), "From Notion"),
+              h("button.btn.btn-secondary", { onclick: () => moveFrom("evernote") }, icon("notebook"), "From Evernote"),
+              h("button.btn.btn-ghost", { onclick: () => importNotes() }, "Other apps…"),
+            ),
+          ),
+        ]
+      : []),
+  );
+  const rs = $("resurface");
+  if (prefs.resurface) void renderResurface(rs, resurfaceApp).catch(() => rs.replaceChildren());
+  else rs.replaceChildren();
   const files = await api.recentFiles(6).catch(() => []);
   const box = $("recent");
   if (files.length === 0) {
@@ -487,6 +527,7 @@ function docsInUse(): Set<Doc> {
 }
 
 function remember(path: string) {
+  markSeen(vaultRoot, path);
   recent = [path, ...recent.filter((p) => p !== path)].slice(0, 30);
   store(`marrow.recent.${vaultRoot}`, recent);
 }
@@ -1062,6 +1103,30 @@ async function showHistory(path: string) {
   });
 }
 
+/** The time machine, on a note or (path null) the whole vault. */
+async function timeMachine(path: string | null) {
+  for (const d of docsInUse()) if (d.dirty) await save(d);
+  await openTimeMachine({
+    path,
+    current: async (p) => findDoc(p)?.text ?? (await api.readNote(p)),
+    restore: async (p, text) => {
+      const doc = findDoc(p);
+      if (doc) replaceText(doc, text);
+      else await editNote(p, () => text);
+      await openPath(p, "replace");
+    },
+    bringBack: async (p, text) => {
+      const slash = p.lastIndexOf("/");
+      const folder = slash >= 0 ? p.slice(0, slash) : "";
+      const name = displayName(p);
+      const made = await api.createFile(folder, name, "md", text).catch(() => api.createFile("", name, "md", text));
+      await openPath(made, "replace");
+    },
+    open: (p) => void openPath(p, "replace"),
+    toast,
+  });
+}
+
 // ------------------------------------------------------ unlinked mentions
 
 /** Turns a plain-text mention in another note into a link to `target`. */
@@ -1113,6 +1178,7 @@ const movedPath = (p: string, from: string, to: string) =>
 
 function afterMove(oldPath: string, r: RenameReport, verb: string) {
   pathMoved(oldPath, r.newPath);
+  seenMoved(vaultRoot, oldPath, r.newPath);
   void refreshTree();
   const n = r.linksUpdated;
   const m = r.filesUpdated.length;
@@ -1423,6 +1489,7 @@ function commands(): Command[] {
     cmd("New note", "note-pencil", () => void newNote(), kbd("N")),
     cmd("Open today's daily note", "calendar-blank", () => void openToday(), kbd("D")),
     cmd("Show the calendar", "calendar-dots", () => setSide("calendar", true)),
+    cmd("Weekly review", "sun-horizon", () => void openWeeklyReview(resurfaceApp)),
     cmd("Organize daily notes into year and month folders", "folders", () => void organizeDaily()),
     cmd("Open graph view", "graph", () => void openGraph(), kbd("G")),
     cmd("Open canvas", "squares-four", () => void openSomeCanvas()),
@@ -1447,6 +1514,12 @@ function commands(): Command[] {
       if (d) void showHistory(d.path);
       else toast("Open a note first.");
     }),
+    cmd("Time machine: this note on any past date", "clock-clockwise", () => {
+      const d = focusedPane().doc;
+      if (d) void timeMachine(d.path);
+      else toast("Open a note first.");
+    }),
+    cmd("Time machine: the whole vault on any past date", "clock-clockwise", () => void timeMachine(null)),
     cmd("Lock this note with a password…", "lock-simple", () => {
       const d = focusedPane().doc;
       if (!d) return toast("Open a note first.");
@@ -1476,8 +1549,11 @@ function commands(): Command[] {
         tree.reveal(p);
       }
     }),
+    cmd("Bangla typing on / off (F12)", "keyboard", () => toggleBangla(), "F12"),
     cmd("Toggle dark mode", "moon", () => setPref("theme", document.documentElement.dataset.theme === "dark" || (prefs.theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches) ? "light" : "dark")),
     cmd("Import from Notion, Evernote, OneNote…", "tray-arrow-down", () => importNotes()),
+    cmd("Move from Notion (step by step)…", "notion-logo", () => moveFrom("notion")),
+    cmd("Move from Evernote (step by step)…", "notebook", () => moveFrom("evernote")),
     cmd("Open another vault", "folder-open", () => void chooseVault()),
     cmd("Create a new vault", "folder-simple-plus", () => void createVaultDialog(openVault)),
     cmd("AI: Ask about this note (summarize, key points, translate…)", "sparkle", () => aiAboutNote()),
@@ -1528,8 +1604,24 @@ async function exportNote(as: "pdf" | "html" | "print") {
   }
 }
 
+/** After an import: the new folder in the file tree, its first note open. */
+async function showImported(folder: string) {
+  await refreshTree();
+  setSide("files");
+  const first = tree.files().find((p) => p.startsWith(folder + "/") && isNotePath(p));
+  if (first) {
+    tree.reveal(first);
+    void openPath(first, "replace");
+  }
+}
+
+function moveFrom(from: SwitchFrom) {
+  openSwitch({ done: (folder) => void showImported(folder), mobile: platform.mobile }, from);
+}
+
 function importNotes() {
   openImport({
+    guided: moveFrom,
     done: (folder) =>
       void (async () => {
         await refreshTree();
@@ -1787,6 +1879,22 @@ function showWelcome(error?: string) {
   if (error) el.textContent = error;
 }
 
+// ---------------------------------------------------------------- Bangla
+
+function toggleBangla() {
+  if (!prefs.banglaKeys) setPref("banglaKeys", true);
+  setBanglaTyping(!banglaTyping());
+  toast(banglaTyping() ? "বাংলা টাইপিং চালু: ami → আমি. F12 to switch back to English." : "English typing. F12 for Bangla.");
+}
+
+function showBanglaButton() {
+  const b = $("bangla-toggle");
+  b.hidden = !prefs.banglaKeys;
+  b.setAttribute("aria-pressed", String(banglaTyping()));
+  b.textContent = banglaTyping() ? "অ" : "A";
+  if (!prefs.banglaKeys && banglaTyping()) setBanglaTyping(false);
+}
+
 // ------------------------------------------------------------------- boot
 
 function bindKeys() {
@@ -1794,6 +1902,10 @@ function bindKeys() {
     if (e.key === "F11" && !$("app").hidden) {
       e.preventDefault();
       toggleFocus();
+    } else if (e.key === "F12" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      // Avro's own key for switching between Bangla and English.
+      e.preventDefault();
+      toggleBangla();
     }
   });
   // A file dropped where nothing takes it mustn't replace the app with the file.
@@ -1962,6 +2074,11 @@ async function boot() {
   document.documentElement.dataset.os = platform.os;
   document.documentElement.toggleAttribute("data-mobile", platform.mobile);
   applyPrefs();
+  setLanguage(prefs.language);
+  installBanglaInputs();
+  onBanglaTyping(() => showBanglaButton());
+  $("bangla-toggle").addEventListener("click", () => toggleBangla());
+  showBanglaButton();
   pluginHooks();
   onVimWrite(() => {
     const d = focusedPane().doc;
@@ -2052,6 +2169,7 @@ async function boot() {
       await openPath(path, "replace");
       await showHistory(path);
     })(),
+    timeMachine: (path) => void timeMachine(path),
     exportNote: (path, as) =>
       void (async () => {
         await openPath(path, "replace");
@@ -2137,8 +2255,11 @@ async function boot() {
 
   applyCaptureKey();
   void listen<boolean>("quick-capture", (e) => quickCapture(e.payload));
+  let lang = prefs.language;
   onPrefs(() => {
     applyCaptureKey();
+    if (prefs.language !== lang) setLanguage((lang = prefs.language));
+    showBanglaButton();
     for (const p of [primary, splitPane]) {
       setLivePreview(p.view, prefs.livePreview);
       applyWriting(p.view);

@@ -209,7 +209,7 @@ function render() {
   }
   list.replaceChildren(
     ...items.map((it, i) => {
-      const lbl = h("span.lbl", null, h("span.l", null, it.label));
+      const lbl = h("span.lbl", null, h("span.l", it.kind === "note" ? { translate: "no" } : null, it.label));
       if (it.snip) {
         const s = h("span.s");
         appendHighlighted(s, it.snip.text, it.snip.ranges);

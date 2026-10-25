@@ -16,6 +16,11 @@
 //! | `tag:#idea` / `#idea` | carry the tag or a sub-tag (`#idea/later`)  |
 //! | `path:projects`  | live under a path containing the text            |
 //! | `file:2026`      | have a name containing the text                  |
+//!
+//! Bangla is matched forgivingly: the spellings people mix up (ি/ী, ু/ূ,
+//! ন/ণ, শ/ষ/স, জ/য, ং/ঙ, ড়/র, ৎ/ত), chandrabindu, joiners and the two ways
+//! of writing য়, ো and ৌ all count as the same, and Bangla digits match
+//! 0-9.
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
@@ -77,7 +82,7 @@ fn parse_query(q: &str) -> Query {
         }
         let lower = token.to_lowercase();
         let term = if quoted && !lower.contains(':') {
-            Term::Text(lower)
+            Term::Text(fold(&token))
         } else if let Some(t) = lower.strip_prefix("tag:") {
             Term::Tag(t.trim_start_matches('#').to_string())
         } else if let Some(t) = lower.strip_prefix("path:") {
@@ -87,7 +92,7 @@ fn parse_query(q: &str) -> Query {
         } else if lower.len() > 1 && lower.starts_with('#') {
             Term::Tag(lower[1..].to_string())
         } else {
-            Term::Text(lower)
+            Term::Text(fold(&token))
         };
         if matches!(&term, Term::Tag(t) | Term::Path(t) | Term::File(t) | Term::Text(t) if t.is_empty())
         {
@@ -147,6 +152,9 @@ pub(super) struct CachedText {
     size: u64,
     pub(super) text: Arc<str>,
     pub(super) lower: Arc<str>,
+    /// `lower` with Bangla spelling variations folded (see [`fold`]); the
+    /// same text as `lower` for notes without Bangla.
+    pub(super) folded: Arc<str>,
     /// A password-locked note (its text is left out).
     pub(super) locked: bool,
 }
@@ -203,14 +211,16 @@ impl Engine {
                 // Locked notes aren't searched (nor used for tasks, mentions or AI).
                 let locked = crate::lock::is_locked(&text);
                 let text = if locked { String::new() } else { text };
-                let lower = text.to_lowercase();
+                let lower: Arc<str> = text.to_lowercase().into();
+                let folded = if has_bangla(&text) { fold(&text).into() } else { lower.clone() };
                 Some((
                     p,
                     CachedText {
                         mtime_ms,
                         size,
                         text: text.into(),
-                        lower: lower.into(),
+                        lower,
+                        folded,
                         locked,
                     },
                 ))
@@ -255,7 +265,7 @@ impl Engine {
         let matches = |term: &Term, p: &VaultPath, c: &CachedText| -> bool {
             match term {
                 Term::Text(s) => {
-                    c.lower.contains(s.as_str()) || p.stem().to_lowercase().contains(s.as_str())
+                    c.folded.contains(s.as_str()) || fold(p.stem()).contains(s.as_str())
                 }
                 Term::Tag(t) => note_tags(p)
                     .iter()
@@ -275,7 +285,7 @@ impl Engine {
             })
             .map(|(p, c)| {
                 let name = p.stem().to_string();
-                let name_lower = name.to_lowercase();
+                let name_lower = fold(&name);
                 let title_match = words.iter().any(|w| name_lower.contains(w));
                 let mut snippets = Vec::new();
                 let mut count = 0u32;
@@ -319,26 +329,84 @@ impl Engine {
     }
 }
 
-/// Lower-cases `s`, recording for each byte of the result the byte offset in
-/// `s` of the character it came from (plus a final entry for `s.len()`).
-fn lower_with_map(s: &str) -> (String, Vec<usize>) {
-    let mut lower = String::with_capacity(s.len());
+const NUKTA: char = '\u{09BC}';
+
+fn has_bangla(s: &str) -> bool {
+    s.chars().any(|c| ('\u{0980}'..='\u{09FF}').contains(&c))
+}
+
+/// One Bangla character as search sees it (None: ignored).
+fn fold_one(c: char) -> Option<char> {
+    Some(match c {
+        'ী' => 'ি',
+        'ঈ' => 'ই',
+        'ূ' => 'ু',
+        'ঊ' => 'উ',
+        'ণ' => 'ন',
+        'শ' | 'ষ' => 'স',
+        'য' => 'জ',
+        '\u{09DC}' | '\u{09DD}' => 'র',
+        'ঙ' => 'ং',
+        'ৎ' => 'ত',
+        '\u{0981}' | '\u{200C}' | '\u{200D}' | NUKTA => return None,
+        '\u{09E6}'..='\u{09EF}' => char::from(b'0' + (c as u32 - 0x09E6) as u8),
+        _ => c,
+    })
+}
+
+/// Lower-cases `s` and folds Bangla spelling variations, recording for each
+/// byte of the result the byte offset in `s` of the character it came from
+/// (plus a final entry for `s.len()`).
+fn fold_with_map(s: &str) -> (String, Vec<usize>) {
+    let mut out = String::with_capacity(s.len());
     let mut map = Vec::with_capacity(s.len() + 1);
-    for (i, ch) in s.char_indices() {
-        for lc in ch.to_lowercase() {
-            let before = lower.len();
-            lower.push(lc);
-            map.extend(std::iter::repeat_n(i, lower.len() - before));
+    let mut push = |c: char, at: usize, out: &mut String| {
+        let before = out.len();
+        out.push(c);
+        map.extend(std::iter::repeat_n(at, out.len() - before));
+    };
+    let chars: Vec<(usize, char)> = s.char_indices().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        let (at, c) = chars[i];
+        let next = chars.get(i + 1).map(|x| x.1);
+        // Two-character spellings of one letter or vowel sign.
+        let pair = match (c, next) {
+            ('য', Some(NUKTA)) => Some('\u{09DF}'),
+            ('ড', Some(NUKTA)) | ('ঢ', Some(NUKTA)) => Some('র'),
+            ('ে', Some('া')) => Some('ো'),
+            ('ে', Some('\u{09D7}')) => Some('ৌ'),
+            _ => None,
+        };
+        if let Some(p) = pair {
+            push(p, at, &mut out);
+            i += 2;
+            continue;
         }
+        if ('\u{0980}'..='\u{09FF}').contains(&c) || c == '\u{200C}' || c == '\u{200D}' {
+            if let Some(f) = fold_one(c) {
+                push(f, at, &mut out);
+            }
+        } else {
+            for lc in c.to_lowercase() {
+                push(lc, at, &mut out);
+            }
+        }
+        i += 1;
     }
     map.push(s.len());
-    (lower, map)
+    (out, map)
+}
+
+/// `s` as search compares it: lower-case, Bangla spellings folded.
+pub fn fold(s: &str) -> String {
+    fold_with_map(s).0
 }
 
 /// Byte ranges in `line` where any of `words` (already lower-case) occur,
 /// merged and in order.
 fn find_all(line: &str, words: &[&str]) -> Vec<(usize, usize)> {
-    let (lower, map) = lower_with_map(line);
+    let (lower, map) = fold_with_map(line);
     let mut ranges: Vec<(usize, usize)> = Vec::new();
     for w in words {
         let mut from = 0;
@@ -574,5 +642,29 @@ mod tests {
         assert!(s.text.len() < 400);
         assert_eq!(marked(s), vec!["needle"]);
         assert_eq!(s.ch, 500);
+    }
+
+    #[test]
+    fn bangla_spellings_match() {
+        let (_d, mut e) = engine(&[
+            ("a.md", "আমি বাংলাদেশে থাকি। সূর্য উঠেছে।\nসাল ২০২৬"),
+            ("b.md", "ভবিষ্যৎ নিয়ে ভাবনা"),
+            ("c.md", "nothing here"),
+        ]);
+        // ূ/ু, য/জ
+        assert_eq!(paths(&e.search("সুর্জ", 10)), vec!["a.md"]);
+        // ৎ/ত, ষ/শ/স, য় written as য + nukta
+        assert_eq!(paths(&e.search("ভবিশ্যত", 10)), vec!["b.md"]);
+        assert_eq!(paths(&e.search("নি\u{09AF}\u{09BC}ে", 10)), vec!["b.md"]);
+        // ং/ঙ and digits both ways
+        assert_eq!(paths(&e.search("বাঙলাদেশ", 10)), vec!["a.md"]);
+        assert_eq!(paths(&e.search("2026", 10)), vec!["a.md"]);
+        let r = e.search("সূর্য", 10);
+        assert_eq!(marked(&r.hits[0].snippets[0]), vec!["সূর্য"]);
+        let r = e.search("২০২৬", 10);
+        assert_eq!(marked(&r.hits[0].snippets[0]), vec!["২০২৬"]);
+        // Ordinary text is unaffected.
+        assert_eq!(paths(&e.search("NOTHING", 10)), vec!["c.md"]);
+        assert_eq!(fold("Ünïcode"), "ünïcode");
     }
 }

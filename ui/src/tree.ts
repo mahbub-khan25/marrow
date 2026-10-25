@@ -27,6 +27,7 @@ export interface TreeApp {
   toggleStar(path: string): void;
   /** Earlier versions of a note. */
   history(path: string): void;
+  timeMachine(path: string | null): void;
   /** Import from Notion, Evernote, OneNote… */
   importNotes(): void;
   /** Lock a note or folder with a password, or remove its lock. */
@@ -286,6 +287,7 @@ export class Tree {
           { label: "Print…", icon: "printer", run: () => this.app.exportNote(n.path, "print") },
           "-",
           { label: "Version history…", icon: "clock-counter-clockwise", run: () => this.app.history(n.path) },
+          { label: "Time machine…", icon: "clock-clockwise", run: () => this.app.timeMachine(n.path) },
           isLockedNote(n.path)
             ? { label: "Remove lock…", icon: "lock-simple-open", run: () => this.app.unlockRemove(n.path, false) }
             : { label: "Lock with password…", icon: "lock-simple", run: () => this.app.lock(n.path, false) },

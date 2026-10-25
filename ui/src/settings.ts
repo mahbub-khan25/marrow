@@ -195,6 +195,22 @@ function render() {
           ]),
         ),
         row(
+          "Bring back old notes",
+          "On the start screen: a note you haven't opened in a long time, the same day in earlier years, and a weekly review from Friday to Sunday.",
+          prefSeg("resurface", [
+            [true, "On"],
+            [false, "Off"],
+          ]),
+        ),
+        row(
+          "Bangla typing",
+          "Type Bangla with an English keyboard, Avro Phonetic style: ami → আমি. F12 or the অ button in the status bar switches it on and off.",
+          prefSeg("banglaKeys", [
+            [true, "Show the button"],
+            [false, "Off"],
+          ]),
+        ),
+        row(
           "Vim keys",
           "Edit in Source with Vim's normal, insert and visual modes (Esc, hjkl, dd, :w …). Off by default.",
           prefSeg("vim", [
@@ -238,6 +254,14 @@ function render() {
       h(
         "div.set-rows",
         null,
+        row(
+          "Interface language",
+          "Menus, buttons and messages. Your notes are never changed.",
+          prefSeg("language", [
+            ["en", "English"],
+            ["bn", "বাংলা"],
+          ]),
+        ),
         row(
           "Theme",
           "Follow the system, or keep it light or dark.",

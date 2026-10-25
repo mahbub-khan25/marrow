@@ -1,5 +1,6 @@
 // App-wide preferences (not tied to a vault), kept in local storage.
 
+import { defaultLang, type Lang } from "./i18n";
 import { storage, store } from "./util";
 
 export type Mode = "preview" | "source";
@@ -26,6 +27,12 @@ export interface Prefs {
   spellcheck: boolean;
   /** Vim keys in Source. */
   vim: boolean;
+  /** Old notes, "on this day" and the weekly review on the start screen. */
+  resurface: boolean;
+  /** The interface language. */
+  language: Lang;
+  /** The Bangla typing button in the status bar (and F12). */
+  banglaKeys: boolean;
 }
 
 const DEFAULTS: Prefs = {
@@ -42,6 +49,9 @@ const DEFAULTS: Prefs = {
   lockAfter: 15,
   spellcheck: true,
   vim: false,
+  resurface: true,
+  language: defaultLang(),
+  banglaKeys: defaultLang() === "bn",
 };
 
 export const prefs: Prefs = { ...DEFAULTS, ...storage<Partial<Prefs>>("marrow.prefs", {}) };

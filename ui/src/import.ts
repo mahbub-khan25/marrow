@@ -10,6 +10,8 @@ import { h, icon } from "./util";
 export interface ImportApp {
   /** After an import: show the new folder. */
   done(folder: string): void;
+  /** The guided switch from Notion or Evernote. */
+  guided?(from: "notion" | "evernote"): void;
 }
 
 interface Source {
@@ -86,6 +88,17 @@ export function openImport(app: ImportApp) {
   const choose = () => {
     body.replaceChildren(
       h("p.dlg-lede", null, "Your notes are converted to Markdown in a new folder of this vault. The files you pick are only read, never changed."),
+      app.guided
+        ? h(
+            "div.imp-guided",
+            null,
+            icon("signpost"),
+            h("span", null, "Moving over for good? "),
+            h("button.linkish", { onclick: () => (close(), app.guided!("notion")) }, "Step-by-step from Notion"),
+            h("span", null, " · "),
+            h("button.linkish", { onclick: () => (close(), app.guided!("evernote")) }, "from Evernote"),
+          )
+        : h("span"),
       h(
         "div.imp-sources",
         null,

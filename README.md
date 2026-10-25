@@ -105,6 +105,16 @@ All of these are plain Markdown, so the notes still open in Obsidian.
   OpenAI or Groq key in Settings → AI, voice notes are also written out as
   text. On phones and tablets, tap the round **+** button. Change or turn
   off the shortcut in Settings → Editor.
+* **Time machine**: right-click a note → *Time machine…*, or *Time
+  machine* in the command palette for the whole vault. Drag back to any
+  date to see notes as they were, what changed since, and bring back
+  deleted notes.
+* **Notes come back to you**: the start screen shows a forgotten note and
+  the same day in earlier years, and a weekly review from Friday to Sunday.
+* **Bangla**: a Bangla interface (Settings → Appearance), Avro Phonetic
+  typing anywhere (F12), and search that forgives Bangla spelling.
+* **Move from Notion or Evernote**: *Move from Notion (step by step)* in the
+  command palette, or on the start screen of a new vault.
 * **Version history**: right-click a note → *Version history…* (or the
   palette). While you edit, Marrow keeps a copy every few minutes in
   `.marrow/history`; older copies thin out to one an hour, then one a day,

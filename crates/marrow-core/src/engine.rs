@@ -31,7 +31,7 @@ pub use graph::{GraphData, GraphEdge, GraphNode, GraphNodeKind, GraphOptions};
 pub use rename::RenameReport;
 pub use mentions::Mention;
 pub use tasks::TaskItem;
-pub use search::{Query, SearchHit, SearchResults, Snippet};
+pub use search::{fold as fold_for_search, Query, SearchHit, SearchResults, Snippet};
 
 /// What the UI needs to hear about after any change.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -582,19 +582,19 @@ impl Engine {
     /// Notes and files whose name contains `query` (case-insensitive),
     /// best matches first. A starting point for the quick switcher.
     pub fn find_files(&self, query: &str, limit: usize) -> Vec<VaultPath> {
-        let q = query.to_lowercase();
+        let q = search::fold(query);
         let mut hits: Vec<(u8, usize, &VaultPath)> = self
             .vault
             .files()
             .filter_map(|p| {
-                let name = p.stem().to_lowercase();
+                let name = search::fold(p.stem());
                 let rank = if name == q {
                     0
                 } else if name.starts_with(&q) {
                     1
                 } else if name.contains(&q) {
                     2
-                } else if p.as_str().to_lowercase().contains(&q) {
+                } else if search::fold(p.as_str()).contains(&q) {
                     3
                 } else {
                     return None;

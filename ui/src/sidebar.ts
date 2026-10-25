@@ -311,7 +311,7 @@ export class TagsView {
         h(
           "button.note-row",
           { onclick: (e: MouseEvent) => this.app.openNote(hit.path, undefined, e.ctrlKey || e.metaKey) },
-          h("span.t", null, displayName(hit.path)),
+          h("span.t", { translate: "no" }, displayName(hit.path)),
           h("span.f", null, parentOf(hit.path) || "Vault"),
         ),
       ),

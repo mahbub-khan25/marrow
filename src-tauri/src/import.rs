@@ -81,6 +81,68 @@ fn merge(into: &mut Output, from: Output) {
     into.files.extend(from.files);
 }
 
+/// An export file found in Downloads, ready to import.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FoundExport {
+    pub path: String,
+    pub name: String,
+    pub size: u64,
+    pub modified_ms: i64,
+}
+
+/// Is `name` an export from `kind` ("notion": Export-….zip, "evernote": .enex)?
+pub fn looks_like_export(kind: &str, name: &str) -> bool {
+    let lower = name.to_lowercase();
+    match kind {
+        "notion" => lower.ends_with(".zip") && (lower.starts_with("export-") || lower.contains("notion")),
+        "evernote" => lower.ends_with(".enex"),
+        _ => false,
+    }
+}
+
+/// Recent exports from Notion or Evernote in the Downloads folder, newest first.
+#[tauri::command(async)]
+pub fn find_exports(app: AppHandle, kind: String) -> CmdResult<Vec<FoundExport>> {
+    use tauri::Manager;
+    let Ok(dir) = app.path().download_dir() else { return Ok(Vec::new()) };
+    let Ok(rd) = std::fs::read_dir(&dir) else { return Ok(Vec::new()) };
+    let month_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(45 * 86_400);
+    let mut out: Vec<FoundExport> = rd
+        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            if !looks_like_export(&kind, &name) {
+                return None;
+            }
+            let meta = e.metadata().ok()?;
+            let modified = meta.modified().ok()?;
+            if !meta.is_file() || modified < month_ago {
+                return None;
+            }
+            let modified_ms = modified.duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as i64;
+            Some(FoundExport { path: e.path().to_string_lossy().to_string(), name, size: meta.len(), modified_ms })
+        })
+        .collect();
+    out.sort_by_key(|f| std::cmp::Reverse(f.modified_ms));
+    out.truncate(6);
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::looks_like_export;
+
+    #[test]
+    fn recognises_exports() {
+        assert!(looks_like_export("notion", "Export-8f2a1c3e-9b7d-4e1a-b2c3-d4e5f6a7b8c9.zip"));
+        assert!(looks_like_export("notion", "My Notion backup.zip"));
+        assert!(!looks_like_export("notion", "photos.zip"));
+        assert!(looks_like_export("evernote", "Recipes.enex"));
+        assert!(!looks_like_export("evernote", "Recipes.zip"));
+    }
+}
+
 /// Imports `paths` into a new folder named like `folder` ("Notion", "Notion 2"…).
 #[tauri::command]
 pub async fn import_files(app: AppHandle, state: State<'_, AppState>, locks: State<'_, crate::locks::Locks>, kind: String, paths: Vec<String>, folder: String) -> CmdResult<ImportReport> {

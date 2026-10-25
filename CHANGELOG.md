@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+- **Time machine:** drag a slider to see a note, or the whole vault, as it
+  was on any past date. See what changed since, restore an old version, or
+  bring back a note that was deleted. Built on the versions Marrow already
+  keeps while you write.
+- **Notes come back to you:** the start screen shows a note you haven't
+  opened in a long time and the same day in earlier years. From Friday to
+  Sunday it offers a five-minute weekly review: what you wrote, what's
+  still open, loose ends, and a few questions, saved as a note if you like.
+  Turn it off in Settings → Editor.
+- **Move from Notion or Evernote, step by step:** exactly how to export,
+  the export found in Downloads automatically (or dropped on the window),
+  then everything brought in with its links, pictures and databases.
+- **Bangla:**
+  - The whole interface in Bangla (Settings → Appearance → Interface
+    language). Your notes are never changed.
+  - Bangla typing with an English keyboard, Avro Phonetic style
+    (ami → আমি), in notes and every text box. F12 or the অ button in the
+    status bar switches it on and off.
+  - Search that understands Bangla spelling: ি/ী, ু/ূ, ন/ণ, শ/ষ/স, জ/য,
+    ং/ঙ, ড়/র and ৎ/ত match each other, and Bangla digits match 0-9.
+  - A Bengali font that matches Marrow's type, in notes and in PDF exports.
+
 - **Sync with your own server:** Nextcloud, ownCloud, Synology, pCloud, Koofr
   and other WebDAV servers, on any device. Same safe two-way sync as cloud
   folders: notes edited in two places are merged, deletions go to the trash,

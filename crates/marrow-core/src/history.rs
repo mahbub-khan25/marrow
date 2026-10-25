@@ -163,6 +163,129 @@ impl History {
     }
 }
 
+// ------------------------------------------------------------ time machine
+
+/// A note as it was at some moment, for the time machine.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Then {
+    pub path: String,
+    pub state: ThenState,
+    /// The kept version holding the note as it was (read it with
+    /// [`History::read`]); `None` means the note on disk now, or, for a
+    /// changed note, that no copy from that moment was kept.
+    pub version: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ThenState {
+    /// The note hasn't changed since.
+    Same,
+    /// The note has changed since.
+    Changed,
+    /// The note was deleted (or renamed outside Marrow) since.
+    Gone,
+}
+
+/// A note in the vault now: its path, and when it was created and last changed.
+pub struct NoteNow<'a> {
+    pub path: &'a str,
+    pub created_ms: i64,
+    pub modified_ms: i64,
+}
+
+impl History {
+    /// Every note with kept versions, including notes deleted since.
+    pub fn paths(&self) -> Vec<String> {
+        fn walk(dir: &Path, rel: &str, out: &mut Vec<String>) {
+            let Ok(rd) = fs::read_dir(dir) else { return };
+            let mut has_versions = false;
+            for e in rd.filter_map(|e| e.ok()) {
+                let name = e.file_name().to_string_lossy().to_string();
+                let is_dir = e.file_type().is_ok_and(|t| t.is_dir());
+                if is_dir {
+                    let child = if rel.is_empty() { name } else { format!("{rel}/{name}") };
+                    walk(&e.path(), &child, out);
+                } else if name.strip_suffix(".md").is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())) {
+                    has_versions = true;
+                }
+            }
+            if has_versions && !rel.is_empty() {
+                out.push(rel.to_string());
+            }
+        }
+        let mut out = Vec::new();
+        walk(&self.dir, "", &mut out);
+        out.sort();
+        out
+    }
+
+    /// The vault as it was at `t`: which notes existed then, and where to
+    /// find each one's text. Only what's known is shown: a note counts as
+    /// existing at `t` if it was created by then or a version from before
+    /// `t` was kept.
+    pub fn vault_at(&self, now: &[NoteNow], t: i64) -> Vec<Then> {
+        let mut out = Vec::new();
+        let mut live = std::collections::HashSet::new();
+        for n in now {
+            live.insert(n.path.to_lowercase());
+            let versions = self.list(n.path);
+            let existed = n.created_ms <= t || versions.iter().any(|v| v.time_ms <= t);
+            if !existed {
+                continue;
+            }
+            if n.modified_ms <= t {
+                out.push(Then { path: n.path.to_string(), state: ThenState::Same, version: None });
+            } else {
+                // A version is the text a save replaced, so the first one
+                // kept after `t` is the note as it was at `t`.
+                let version = versions.iter().rev().find(|v| v.time_ms > t).map(|v| v.time_ms);
+                out.push(Then { path: n.path.to_string(), state: ThenState::Changed, version });
+            }
+        }
+        let trash = self.dir.parent().map(|d| d.join("trash"));
+        for path in self.paths() {
+            if live.contains(&path.to_lowercase()) {
+                continue;
+            }
+            let versions = self.list(&path);
+            let (Some(newest), Some(oldest)) = (versions.first(), versions.last()) else { continue };
+            // It existed until at least its newest version, and from at
+            // least its oldest one (or when its copy in the trash was made).
+            let mut from = oldest.time_ms;
+            if let Some(tr) = &trash {
+                let mut f = tr.clone();
+                for part in path.split('/') {
+                    f.push(part);
+                }
+                if let Some(c) = fs::metadata(&f).ok().and_then(|m| m.created().ok()).and_then(|c| c.duration_since(UNIX_EPOCH).ok()) {
+                    from = from.min(c.as_millis() as i64);
+                }
+            }
+            if t >= newest.time_ms || t < from {
+                continue;
+            }
+            let version = versions.iter().rev().find(|v| v.time_ms > t).map(|v| v.time_ms);
+            out.push(Then { path, state: ThenState::Gone, version });
+        }
+        out.sort_by_key(|a| a.path.to_lowercase());
+        out
+    }
+
+    /// How much was kept on each day (days since 1970, versions), for the
+    /// time machine's timeline.
+    pub fn activity(&self) -> Vec<(i64, u32)> {
+        let mut days = std::collections::BTreeMap::new();
+        for p in self.paths() {
+            for v in self.list(&p) {
+                *days.entry(v.time_ms.div_euclid(DAY)).or_insert(0u32) += 1;
+            }
+        }
+        days.into_iter().collect()
+    }
+}
+
 fn merge_dirs(a: &Path, b: &Path) -> io::Result<()> {
     for e in fs::read_dir(a)? {
         let e = e?;
@@ -230,5 +353,42 @@ mod tests {
         // Two and a half days at one per hour (instead of six).
         assert!((59..=61).contains(&older), "one per hour after a day, got {older}");
         assert!(!v.iter().any(|x| now - x.time_ms > 365 * DAY));
+    }
+
+    #[test]
+    fn vault_as_it_was() {
+        let dir = tempfile::tempdir().unwrap();
+        let h = History::for_vault(dir.path());
+        // "a.md": edited at 300 and 500 (the text before each was kept).
+        h.snapshot("a.md", "a v1", 300).unwrap();
+        h.snapshot("a.md", "a v2", 500).unwrap();
+        // "gone.md": edited at 200, deleted after 400.
+        h.snapshot("gone.md", "g v1", 200).unwrap();
+        h.snapshot("gone.md", "g v2", 400).unwrap();
+        assert_eq!(h.paths(), vec!["a.md", "gone.md"]);
+        let now = [
+            NoteNow { path: "a.md", created_ms: 100, modified_ms: 500 },
+            NoteNow { path: "b.md", created_ms: 100, modified_ms: 150 },
+            NoteNow { path: "new.md", created_ms: 450, modified_ms: 460 },
+        ];
+        let at = |t| h.vault_at(&now, t);
+        let v = at(250);
+        assert_eq!(v.iter().map(|x| (x.path.as_str(), x.state, x.version)).collect::<Vec<_>>(), vec![
+            ("a.md", ThenState::Changed, Some(300)),
+            ("b.md", ThenState::Same, None),
+            ("gone.md", ThenState::Gone, Some(400)),
+        ]);
+        assert_eq!(h.read("a.md", 300).unwrap(), "a v1");
+        let v = at(420);
+        assert_eq!(v.iter().map(|x| (x.path.as_str(), x.state, x.version)).collect::<Vec<_>>(), vec![
+            ("a.md", ThenState::Changed, Some(500)),
+            ("b.md", ThenState::Same, None),
+        ]);
+        let v = at(600);
+        assert!(v.iter().any(|x| x.path == "new.md" && x.state == ThenState::Same));
+        assert!(v.iter().all(|x| x.state == ThenState::Same));
+        // Before anything existed.
+        assert!(at(50).is_empty());
+        assert_eq!(h.activity(), vec![(0, 4)]);
     }
 }

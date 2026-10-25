@@ -943,6 +943,39 @@ pub fn history_read(state: State<AppState>, locks: State<crate::locks::Locks>, p
     crate::locks::reveal(&locks, text)
 }
 
+/// The vault as it was at `time_ms` (the time machine).
+#[tauri::command(async)]
+pub fn history_vault_at(state: State<AppState>, time_ms: i64) -> CmdResult<Vec<marrow_core::history::Then>> {
+    with_engine(&state, |e| {
+        let v = e.vault();
+        let stats: Vec<(String, marrow_core::vault::FileStat)> = v.markdown_files().filter_map(|p| Some((p.as_str().to_string(), v.stat(p)?))).collect();
+        let now: Vec<marrow_core::history::NoteNow> = stats
+            .iter()
+            .map(|(p, s)| marrow_core::history::NoteNow { path: p, created_ms: s.ctime_ms, modified_ms: s.mtime_ms })
+            .collect();
+        Ok(marrow_core::history::History::for_vault(v.root()).vault_at(&now, time_ms))
+    })
+}
+
+/// Days with kept versions, and the oldest note, for the time machine's timeline.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Timeline {
+    /// (days since 1970, versions kept that day)
+    pub days: Vec<(i64, u32)>,
+    /// When the oldest note was created.
+    pub first_ms: Option<i64>,
+}
+
+#[tauri::command(async)]
+pub fn history_timeline(state: State<AppState>) -> CmdResult<Timeline> {
+    with_engine(&state, |e| {
+        let v = e.vault();
+        let first_ms = v.markdown_files().filter_map(|p| v.stat(p)).map(|s| s.ctime_ms.min(s.mtime_ms)).min();
+        Ok(Timeline { days: marrow_core::history::History::for_vault(v.root()).activity(), first_ms })
+    })
+}
+
 /// Keeps the note's current text as a version now (before a restore, say).
 #[tauri::command(async)]
 pub fn history_snapshot(state: State<AppState>, locks: State<crate::locks::Locks>, path: String, text: String) -> CmdResult<()> {
