@@ -13,9 +13,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use marrow_core::cloud::{self, CloudLocation};
 use marrow_core::conflicts::{self, ConflictCopy};
-use marrow_core::mirror::{self, Mirror, SyncReport, SyncStop};
+use marrow_core::mirror::{self, Mirror, Remote, SyncReport, SyncStop};
 use marrow_core::merge2;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
 use crate::commands::{emit_events, err, load_settings, save_settings, vp, with_engine, AppState, CmdResult};
@@ -66,31 +66,91 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// Starts syncing `local` with `remote` (stopping any earlier sync).
+/// A cloud service a vault syncs with directly.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum CloudTarget {
+    /// Nextcloud, ownCloud, Synology, pCloud, Koofr and other WebDAV servers.
+    #[serde(rename_all = "camelCase")]
+    Webdav { url: String, user: String },
+}
+
+impl CloudTarget {
+    /// Where its password lives in the credential store.
+    fn secret_id(&self) -> String {
+        match self {
+            CloudTarget::Webdav { url, user } => format!("sync:webdav:{user}@{url}"),
+        }
+    }
+
+    fn connect(&self, app: &AppHandle) -> Result<Box<dyn Remote>, String> {
+        match self {
+            CloudTarget::Webdav { url, user } => {
+                let password = crate::ai::keys::get(app, &self.secret_id()).unwrap_or_default();
+                Ok(Box::new(crate::webdav::WebDav::new(url, user, &password)?))
+            }
+        }
+    }
+}
+
+/// Starts syncing `local` with the folder `remote` (stopping any earlier sync).
 pub fn start_mirror(app: &AppHandle, state: &State<AppState>, local: &Path, remote: PathBuf) {
-    stop_mirror(state);
-    let (tx, rx) = channel::<Msg>();
     let label = remote
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| remote.to_string_lossy().into_owned());
-    let status = Arc::new(Mutex::new(MirrorStatus {
-        remote: remote.to_string_lossy().into_owned(),
-        label,
-        ..Default::default()
-    }));
-    let worker_status = status.clone();
-    let app = app.clone();
-    let local = local.to_path_buf();
-    std::thread::spawn(move || {
+    let status = MirrorStatus { remote: remote.to_string_lossy().into_owned(), label, ..Default::default() };
+    start_worker(app, state, local, status, move |status| {
         // Name the provider (looking for cloud folders can be slow, so it's done here).
         if let Some(l) = cloud::provider_of(&remote, &cloud::detect()) {
-            if let Ok(mut s) = worker_status.lock() {
+            if let Ok(mut s) = status.lock() {
                 s.label = l.label.clone();
                 s.provider = Some(l.provider.clone());
             }
         }
-        let m = Mirror::new(&local, &remote);
+        Ok(Box::new(mirror::FolderRemote::new(remote)))
+    });
+}
+
+/// Starts syncing `local` with a cloud service (stopping any earlier sync).
+pub fn start_cloud(app: &AppHandle, state: &State<AppState>, local: &Path, target: CloudTarget) {
+    let (remote, label, provider) = match &target {
+        CloudTarget::Webdav { url, .. } => {
+            let host = reqwest::Url::parse(url).ok().and_then(|u| u.host_str().map(str::to_string)).unwrap_or_else(|| url.clone());
+            (url.clone(), host, "webdav")
+        }
+    };
+    let status = MirrorStatus { remote, label, provider: Some(provider.into()), ..Default::default() };
+    let app2 = app.clone();
+    start_worker(app, state, local, status, move |_| target.connect(&app2));
+}
+
+fn start_worker(
+    app: &AppHandle,
+    state: &State<AppState>,
+    local: &Path,
+    status: MirrorStatus,
+    make: impl FnOnce(&Arc<Mutex<MirrorStatus>>) -> Result<Box<dyn Remote>, String> + Send + 'static,
+) {
+    stop_mirror(state);
+    let (tx, rx) = channel::<Msg>();
+    let status = Arc::new(Mutex::new(status));
+    let worker_status = status.clone();
+    let app = app.clone();
+    let local = local.to_path_buf();
+    std::thread::spawn(move || {
+        let m = match make(&worker_status) {
+            Ok(remote) => Mirror::with_remote(&local, remote),
+            Err(e) => {
+                if let Ok(mut s) = worker_status.lock() {
+                    let stop = SyncStop::Io { message: e };
+                    s.message = Some(stop.to_string());
+                    s.stop = Some(stop);
+                    let _ = app.emit("mirror-changed", MirrorEvent { status: s.clone(), report: None });
+                }
+                return;
+            }
+        };
         let emit = |report: Option<SyncReport>| {
             if let Ok(s) = worker_status.lock() {
                 let _ = app.emit(
@@ -224,6 +284,46 @@ pub async fn mirror_preview(remote: String) -> usize {
     mirror::count_files(Path::new(&remote))
 }
 
+/// Talks to a WebDAV server off the async threads (its client blocks).
+async fn on_blocking_thread<T: Send + 'static>(f: impl FnOnce() -> CmdResult<T> + Send + 'static) -> CmdResult<T> {
+    tauri::async_runtime::spawn_blocking(f).await.map_err(err)?
+}
+
+/// Checks a WebDAV server before syncing with it: signs in, makes the sync
+/// folder if needed, and says how many files are already there.
+#[tauri::command]
+pub async fn webdav_check(url: String, user: String, password: String) -> CmdResult<usize> {
+    on_blocking_thread(move || {
+        let dav = crate::webdav::WebDav::new(&url, &user, &password)?;
+        dav.check().map_err(|e| e.to_string())?;
+        dav.list().map(|l| l.len()).map_err(err)
+    })
+    .await
+}
+
+/// Turns on sync with a WebDAV server (turning off any other sync for this vault).
+#[tauri::command]
+pub async fn set_cloud_sync(app: AppHandle, state: State<'_, AppState>, url: String, user: String, password: String) -> CmdResult<()> {
+    let root = vault_root(&state)?;
+    let key = root.to_string_lossy().into_owned();
+    let (u, n, p) = (url.clone(), user.clone(), password.clone());
+    on_blocking_thread(move || {
+        let dav = crate::webdav::WebDav::new(&u, &n, &p)?;
+        dav.check().map_err(|e| e.to_string())
+    })
+    .await?;
+    let target = CloudTarget::Webdav { url: url.trim().to_string(), user: user.trim().to_string() };
+    crate::ai::keys::set(&app, &target.secret_id(), Some(&password))?;
+    let mut settings = load_settings(&app);
+    if let Some(old) = settings.mirrors.remove(&key) {
+        Mirror::new(&root, old).reset();
+    }
+    settings.clouds.insert(key, target.clone());
+    save_settings(&app, &settings)?;
+    start_cloud(&app, &state, &root, target);
+    Ok(())
+}
+
 /// Turns sync on with `remote`, or off with `None`.
 #[tauri::command(async)]
 pub fn set_mirror(app: AppHandle, state: State<AppState>, remote: Option<String>) -> CmdResult<()> {
@@ -239,7 +339,11 @@ pub fn set_mirror(app: AppHandle, state: State<AppState>, remote: Option<String>
             if r.starts_with(&l) || l.starts_with(&r) {
                 return Err("Pick a folder outside this vault (and not one that contains it).".into());
             }
-            settings.mirrors.insert(key, r.to_string_lossy().into_owned());
+            settings.mirrors.insert(key.clone(), r.to_string_lossy().into_owned());
+            if let Some(old) = settings.clouds.remove(&key) {
+                let _ = crate::ai::keys::set(&app, &old.secret_id(), None);
+                Mirror::new(&root, "").reset();
+            }
             save_settings(&app, &settings)?;
             start_mirror(&app, &state, &root, r);
         }
@@ -247,6 +351,10 @@ pub fn set_mirror(app: AppHandle, state: State<AppState>, remote: Option<String>
             stop_mirror(&state);
             if let Some(old) = settings.mirrors.remove(&key) {
                 Mirror::new(&root, old).reset();
+            }
+            if let Some(old) = settings.clouds.remove(&key) {
+                let _ = crate::ai::keys::set(&app, &old.secret_id(), None);
+                Mirror::new(&root, "").reset();
             }
             save_settings(&app, &settings)?;
         }

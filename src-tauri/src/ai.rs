@@ -95,7 +95,8 @@ pub(crate) fn save(app: &AppHandle, cfg: &AiConfig) -> CmdResult<()> {
 
 // ----------------------------------------------------------------- keys
 
-mod keys {
+/// Secrets (API keys, sync passwords) in the system's credential store.
+pub(crate) mod keys {
     use super::*;
 
     #[cfg(any(windows, target_os = "macos"))]

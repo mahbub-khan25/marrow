@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Sync with your own server:** Nextcloud, ownCloud, Synology, pCloud, Koofr
+  and other WebDAV servers, on any device. Same safe two-way sync as cloud
+  folders: notes edited in two places are merged, deletions go to the trash,
+  and sync pauses rather than empty a vault. Being offline is fine; sync
+  resumes by itself.
+- **Mobile groundwork:** Marrow builds for Android and iOS, with layouts for
+  phones and tablets.
+
 ## 1.1.0
 
 - **Calendar:** a new view in the sidebar. See a month of daily notes and the

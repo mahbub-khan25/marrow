@@ -1325,6 +1325,12 @@ mark { background: var(--color-accent-100); color: var(--color-accent-900); padd
 .dlg-hint:empty { display: none; }
 .dlg-error { font-size: 14px; color: var(--color-accent-2-700); }
 .dlg-foot { display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
+.dlg-server { display: flex; flex-direction: column; gap: 12px; }
+.dlg-server[hidden] { display: none; }
+.dlg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.dlg-field { display: flex; flex-direction: column; gap: 5px; font-size: 14px; color: var(--ink-78); min-width: 0; }
+.dlg-field .input { width: 100%; box-sizing: border-box; }
+@media (max-width: 699px) { .dlg-row { grid-template-columns: 1fr; } .dlg { width: calc(100vw - 24px); max-height: 92vh; overflow: auto; } }
 
 .where { display: flex; flex-direction: column; gap: 6px; }
 .where-opt {

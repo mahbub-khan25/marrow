@@ -11,6 +11,7 @@ mod portable;
 mod publish;
 mod recall;
 mod sync;
+mod webdav;
 
 use std::sync::Mutex;
 
@@ -148,6 +149,8 @@ pub fn run() {
             sync::mirror_status,
             sync::mirror_preview,
             sync::set_mirror,
+            sync::webdav_check,
+            sync::set_cloud_sync,
             sync::sync_now,
             sync::conflict_copies,
             sync::resolve_conflict,

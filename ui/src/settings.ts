@@ -350,7 +350,7 @@ function syncRow(): HTMLElement {
       ),
     );
   } else {
-    desc.textContent = "Keep this vault the same as a folder in Dropbox, OneDrive or Google Drive, both ways.";
+    desc.textContent = "Keep this vault the same on all your devices, both ways: through Dropbox, OneDrive, Google Drive or iCloud, or your own Nextcloud or WebDAV server.";
     control.append(
       h(
         "button.btn.btn-secondary",

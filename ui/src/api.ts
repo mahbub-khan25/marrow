@@ -320,6 +320,10 @@ export const api = {
   mirrorPreview: (remote: string) => invoke<number>("mirror_preview", { remote }),
   /** Keeps the vault in two-way sync with `remote`, or stops with null. */
   setMirror: (remote: string | null) => invoke<void>("set_mirror", { remote }),
+  /** Signs in to a WebDAV server and says how many files its sync folder has. */
+  webdavCheck: (url: string, user: string, password: string) => invoke<number>("webdav_check", { url, user, password }),
+  /** Syncs this vault with a WebDAV server from now on. */
+  setCloudSync: (url: string, user: string, password: string) => invoke<void>("set_cloud_sync", { url, user, password }),
   syncNow: (force = false) => invoke<void>("sync_now", { force }),
   conflictCopies: () => invoke<ConflictCopy[]>("conflict_copies"),
   /** Merges a conflict copy into its original; returns places where both versions were kept. */
@@ -400,6 +404,8 @@ export interface CloudLocation {
 
 export type SyncStop =
   | { kind: "missing" }
+  | { kind: "offline"; message: string }
+  | { kind: "signIn"; message: string }
   | { kind: "looksEmpty"; side: "local" | "remote" }
   | { kind: "manyDeletes"; side: "local" | "remote"; count: number }
   | { kind: "io"; message: string };
@@ -407,7 +413,7 @@ export type SyncStop =
 export interface MirrorStatus {
   remote: string;
   label: string;
-  provider: CloudLocation["provider"] | null;
+  provider: CloudLocation["provider"] | "webdav" | null;
   lastSync: number | null;
   syncing: boolean;
   stop: SyncStop | null;

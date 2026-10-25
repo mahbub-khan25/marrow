@@ -1,6 +1,6 @@
-//! Two-way sync between the vault and another folder, usually one inside
-//! Dropbox, OneDrive or Google Drive. The cloud app then carries that folder
-//! to other computers; Marrow only keeps the two folders the same.
+//! Two-way sync between the vault and another place: a folder (usually one
+//! inside Dropbox, OneDrive or Google Drive, whose app carries it to other
+//! computers) or a cloud service Marrow talks to directly ([`Remote`]).
 //!
 //! Each run compares both folders with what they looked like after the last
 //! run (kept in `.marrow/mirror/state.json`):
@@ -40,11 +40,94 @@ struct Stamp {
     s: u64,
 }
 
+/// A file's version on the other side: it changes whenever the file does.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Version {
+    /// Modified time (ms) and size, for folders.
+    Stamp { m: u64, s: u64 },
+    /// A server's tag for the content (an ETag or revision).
+    Tag(String),
+}
+
+impl From<Stamp> for Version {
+    fn from(s: Stamp) -> Self {
+        Version::Stamp { m: s.m, s: s.s }
+    }
+}
+
+/// A file on the other side.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteFile {
+    pub version: Version,
+    /// When it last changed (ms since 1970), to pick the newer of two versions.
+    pub modified_ms: u64,
+}
+
+/// The other side of a sync: a folder, or a cloud service. Paths are
+/// relative, with `/`. Hidden files and folders are left out of `list`.
+pub trait Remote: Send {
+    /// Identifies this place; a different one starts a fresh sync.
+    fn id(&self) -> String;
+    /// Ok when it can be reached; otherwise why not.
+    fn check(&self) -> Result<(), SyncStop>;
+    fn list(&self) -> io::Result<BTreeMap<String, RemoteFile>>;
+    fn read(&self, key: &str) -> io::Result<Vec<u8>>;
+    /// Writes a whole file (making folders as needed) and returns its new version.
+    fn write(&self, key: &str, bytes: &[u8]) -> io::Result<Version>;
+    fn delete(&self, key: &str) -> io::Result<()>;
+}
+
+/// Another folder on this computer.
+pub struct FolderRemote {
+    root: PathBuf,
+}
+
+impl FolderRemote {
+    pub fn new(root: impl Into<PathBuf>) -> Self {
+        FolderRemote { root: root.into() }
+    }
+}
+
+impl Remote for FolderRemote {
+    fn id(&self) -> String {
+        self.root.to_string_lossy().into_owned()
+    }
+    fn check(&self) -> Result<(), SyncStop> {
+        if self.root.is_dir() {
+            Ok(())
+        } else {
+            Err(SyncStop::Missing)
+        }
+    }
+    fn list(&self) -> io::Result<BTreeMap<String, RemoteFile>> {
+        Ok(scan(&self.root)?
+            .into_iter()
+            .map(|(k, s)| (k, RemoteFile { version: s.into(), modified_ms: s.m }))
+            .collect())
+    }
+    fn read(&self, key: &str) -> io::Result<Vec<u8>> {
+        fs::read(self.root.join(key))
+    }
+    fn write(&self, key: &str, bytes: &[u8]) -> io::Result<Version> {
+        let p = self.root.join(key);
+        write_atomic(&p, bytes)?;
+        Ok(stamp(&p)?.into())
+    }
+    fn delete(&self, key: &str) -> io::Result<()> {
+        // The cloud app keeps deleted files in its own trash.
+        let p = self.root.join(key);
+        fs::remove_file(&p)?;
+        remove_empty_parents(&p, &self.root);
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Seen {
     hash: String,
     l: Stamp,
-    r: Stamp,
+    r: Version,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -90,6 +173,10 @@ impl SyncReport {
 pub enum SyncStop {
     /// The other folder doesn't exist (drive not mounted, app not running).
     Missing,
+    /// A cloud service can't be reached (offline, server down).
+    Offline { message: String },
+    /// The cloud service turned down the sign-in; sign in again.
+    SignIn { message: String },
     /// One side is empty while the other isn't, after they were synced before.
     LooksEmpty { side: Side },
     /// The run would delete many files; pass `force` to go ahead.
@@ -109,6 +196,8 @@ impl std::fmt::Display for SyncStop {
         let where_ = |s: &Side| if *s == Side::Local { "this vault" } else { "the sync folder" };
         match self {
             SyncStop::Missing => write!(f, "The sync folder can't be found. Is the cloud app running?"),
+            SyncStop::Offline { message } => write!(f, "Can't reach the cloud right now ({message}). Marrow tries again soon."),
+            SyncStop::SignIn { message } => write!(f, "The cloud didn't accept the sign-in ({message}). Sign in again in Settings → Vault → Sync."),
             SyncStop::LooksEmpty { side } => write!(f, "Sync paused: {} is suddenly empty.", where_(side)),
             SyncStop::ManyDeletes { side, count } => {
                 write!(f, "Sync paused: it would delete {count} files from {}.", where_(side))
@@ -129,19 +218,18 @@ const MAX_BASE: u64 = 4 * 1024 * 1024;
 
 pub struct Mirror {
     local: PathBuf,
-    remote: PathBuf,
+    remote: Box<dyn Remote>,
 }
 
 impl Mirror {
+    /// Syncs `local` with another folder.
     pub fn new(local: impl Into<PathBuf>, remote: impl Into<PathBuf>) -> Self {
-        Mirror {
-            local: local.into(),
-            remote: remote.into(),
-        }
+        Self::with_remote(local, Box::new(FolderRemote::new(remote)))
     }
 
-    pub fn remote(&self) -> &Path {
-        &self.remote
+    /// Syncs `local` with any [`Remote`], such as a cloud service.
+    pub fn with_remote(local: impl Into<PathBuf>, remote: Box<dyn Remote>) -> Self {
+        Mirror { local: local.into(), remote }
     }
 
     fn meta_dir(&self) -> PathBuf {
@@ -149,7 +237,7 @@ impl Mirror {
     }
 
     fn load_state(&self) -> State {
-        let remote = self.remote.to_string_lossy().into_owned();
+        let remote = self.remote.id();
         fs::read(self.meta_dir().join("state.json"))
             .ok()
             .and_then(|b| serde_json::from_slice::<State>(&b).ok())
@@ -174,9 +262,7 @@ impl Mirror {
 
     /// Runs one sync. `force` goes ahead with a large delete that was paused.
     pub fn sync(&self, force: bool) -> Result<SyncReport, SyncStop> {
-        if !self.remote.is_dir() {
-            return Err(SyncStop::Missing);
-        }
+        self.remote.check()?;
         if !self.local.is_dir() {
             return Err(SyncStop::Io {
                 message: "the vault folder is missing".into(),
@@ -184,7 +270,7 @@ impl Mirror {
         }
         let mut state = self.load_state();
         let lmap = scan(&self.local).map_err(io_stop)?;
-        let rmap = scan(&self.remote).map_err(io_stop)?;
+        let rmap = self.remote.list().map_err(io_stop)?;
 
         // A small vault can legitimately end up empty; a larger one going empty at once is suspicious.
         if state.files.len() > 5 && !force {
@@ -207,7 +293,7 @@ impl Mirror {
         let mut plan: Vec<(String, Action)> = Vec::new();
         for k in keys {
             let l = lmap.get(&k).copied();
-            let r = rmap.get(&k).copied();
+            let r = rmap.get(&k);
             let seen = state.files.get(&k).cloned();
             let action = self.decide(&k, l, r, seen.as_ref());
             plan.push((k, action));
@@ -228,8 +314,8 @@ impl Mirror {
         let mut report = SyncReport::default();
         for (k, action) in plan {
             let l = lmap.get(&k).copied();
-            let r = rmap.get(&k).copied();
-            match self.apply(&k, action, l, r, &mut state, &mut report) {
+            let r = rmap.get(&k);
+            match self.apply(&k, action, l, r, &rmap, &mut state, &mut report) {
                 Ok(()) => {}
                 Err(e) => report.errors.push(format!("{k}: {e}")),
             }
@@ -239,15 +325,15 @@ impl Mirror {
         Ok(report)
     }
 
-    fn decide(&self, key: &str, l: Option<Stamp>, r: Option<Stamp>, seen: Option<&Seen>) -> Action {
+    fn decide(&self, key: &str, l: Option<Stamp>, r: Option<&RemoteFile>, seen: Option<&Seen>) -> Action {
         let mut lc = changed(l, seen.map(|s| s.l));
-        let mut rc = changed(r, seen.map(|s| s.r));
+        let mut rc = changed(r.map(|f| &f.version), seen.map(|s| &s.r));
         // A new time with the same content isn't a change.
         if let Some(s) = seen {
             if lc && l.is_some() && hash_file(&self.local.join(key)).as_deref() == Some(s.hash.as_str()) {
                 lc = false;
             }
-            if rc && r.is_some() && hash_file(&self.remote.join(key)).as_deref() == Some(s.hash.as_str()) {
+            if rc && r.is_some() && self.remote.read(key).ok().map(|b| hash_bytes(&b)).as_deref() == Some(s.hash.as_str()) {
                 rc = false;
             }
         }
@@ -268,85 +354,76 @@ impl Mirror {
         }
     }
 
-    fn side_root(&self, side: Side) -> &Path {
-        match side {
-            Side::Local => &self.local,
-            Side::Remote => &self.remote,
-        }
-    }
-
+    #[allow(clippy::too_many_arguments)]
     fn apply(
         &self,
         key: &str,
         action: Action,
         l: Option<Stamp>,
-        r: Option<Stamp>,
+        r: Option<&RemoteFile>,
+        rmap: &BTreeMap<String, RemoteFile>,
         state: &mut State,
         report: &mut SyncReport,
     ) -> io::Result<()> {
         let lp = self.local.join(key);
-        let rp = self.remote.join(key);
         match action {
             Action::Forget => {
                 state.files.remove(key);
             }
             Action::Refresh => {
-                // Same content; just remember the new times.
+                // Same content; just remember the new versions.
                 if let (Some(s), Some(l), Some(r)) = (state.files.get_mut(key), l, r) {
                     s.l = l;
-                    s.r = r;
+                    s.r = r.version.clone();
                 }
             }
-            Action::Copy(to) => {
-                let (src, dst, src_stamp) = match to {
-                    Side::Remote => (&lp, &rp, l),
-                    Side::Local => (&rp, &lp, r),
-                };
-                let bytes = fs::read(src)?;
-                write_atomic(dst, &bytes)?;
-                let dst_stamp = stamp(dst)?;
+            Action::Copy(Side::Remote) => {
+                let bytes = fs::read(&lp)?;
+                let rv = self.remote.write(key, &bytes)?;
                 let hash = hash_bytes(&bytes);
                 self.keep_base(key, &hash, &bytes);
-                let (ls, rs) = match to {
-                    Side::Remote => (src_stamp.unwrap_or(dst_stamp), dst_stamp),
-                    Side::Local => (dst_stamp, src_stamp.unwrap_or(dst_stamp)),
+                let ls = match l {
+                    Some(l) => l,
+                    None => stamp(&lp)?,
                 };
-                state.files.insert(key.to_string(), Seen { hash, l: ls, r: rs });
-                match to {
-                    Side::Remote => report.to_remote.push(key.to_string()),
-                    Side::Local => report.to_local.push(key.to_string()),
-                }
+                state.files.insert(key.to_string(), Seen { hash, l: ls, r: rv });
+                report.to_remote.push(key.to_string());
             }
-            Action::Delete(side) => {
-                let path = self.side_root(side).join(key);
-                match side {
-                    Side::Local => self.to_trash(key)?,
-                    Side::Remote => {
-                        // The cloud app keeps deleted files in its own trash.
-                        fs::remove_file(&path)?;
-                    }
-                }
-                remove_empty_parents(&path, self.side_root(side));
+            Action::Copy(Side::Local) => {
+                let bytes = self.remote.read(key)?;
+                write_atomic(&lp, &bytes)?;
+                let hash = hash_bytes(&bytes);
+                self.keep_base(key, &hash, &bytes);
+                let rv = match r {
+                    Some(r) => r.version.clone(),
+                    None => self.remote.list()?.remove(key).map(|f| f.version).ok_or_else(|| io::Error::other("vanished"))?,
+                };
+                state.files.insert(key.to_string(), Seen { hash, l: stamp(&lp)?, r: rv });
+                report.to_local.push(key.to_string());
+            }
+            Action::Delete(Side::Local) => {
+                self.to_trash(key)?;
+                remove_empty_parents(&lp, &self.local);
                 state.files.remove(key);
-                match side {
-                    Side::Local => report.deleted_local.push(key.to_string()),
-                    Side::Remote => report.deleted_remote.push(key.to_string()),
-                }
+                report.deleted_local.push(key.to_string());
+            }
+            Action::Delete(Side::Remote) => {
+                self.remote.delete(key)?;
+                state.files.remove(key);
+                report.deleted_remote.push(key.to_string());
             }
             Action::Reconcile => {
                 let lb = fs::read(&lp)?;
-                let rb = fs::read(&rp)?;
+                let rb = self.remote.read(key)?;
                 let (lh, rh) = (hash_bytes(&lb), hash_bytes(&rb));
                 if lh == rh {
                     self.keep_base(key, &lh, &lb);
-                    state.files.insert(
-                        key.to_string(),
-                        Seen {
-                            hash: lh,
-                            l: l.unwrap_or(stamp(&lp)?),
-                            r: r.unwrap_or(stamp(&rp)?),
-                        },
-                    );
+                    let ls = match l {
+                        Some(l) => l,
+                        None => stamp(&lp)?,
+                    };
+                    let rv = r.map(|r| r.version.clone()).ok_or_else(|| io::Error::other("vanished"))?;
+                    state.files.insert(key.to_string(), Seen { hash: lh, l: ls, r: rv });
                     return Ok(());
                 }
                 let texts = (is_note(key))
@@ -362,37 +439,21 @@ impl Mirror {
                     };
                     let bytes = merged.into_bytes();
                     write_atomic(&lp, &bytes)?;
-                    write_atomic(&rp, &bytes)?;
+                    let rv = self.remote.write(key, &bytes)?;
                     let hash = hash_bytes(&bytes);
                     self.keep_base(key, &hash, &bytes);
-                    state.files.insert(
-                        key.to_string(),
-                        Seen {
-                            hash,
-                            l: stamp(&lp)?,
-                            r: stamp(&rp)?,
-                        },
-                    );
+                    state.files.insert(key.to_string(), Seen { hash, l: stamp(&lp)?, r: rv });
                     report.merged.push(key.to_string());
                 } else {
                     // Keep the newer file; save the older one beside it on both sides.
-                    let local_newer = l.map(|s| s.m).unwrap_or(0) >= r.map(|s| s.m).unwrap_or(0);
+                    let local_newer = l.map(|s| s.m).unwrap_or(0) >= r.map(|f| f.modified_ms).unwrap_or(0);
                     let (winner, loser) = if local_newer { (&lb, &rb) } else { (&rb, &lb) };
-                    let copy = conflict_name(key, |c| self.local.join(c).exists() || self.remote.join(c).exists());
-                    write_atomic(&self.local.join(&copy), loser)?;
-                    write_atomic(&self.remote.join(&copy), loser)?;
-                    write_atomic(&lp, winner)?;
-                    write_atomic(&rp, winner)?;
-                    for (k, bytes) in [(key.to_string(), winner), (copy.clone(), loser)] {
-                        let (a, b) = (self.local.join(&k), self.remote.join(&k));
-                        state.files.insert(
-                            k,
-                            Seen {
-                                hash: hash_bytes(bytes),
-                                l: stamp(&a)?,
-                                r: stamp(&b)?,
-                            },
-                        );
+                    let copy = conflict_name(key, |c| self.local.join(c).exists() || rmap.contains_key(c) || state.files.contains_key(c));
+                    for (k, bytes) in [(copy.clone(), loser), (key.to_string(), winner)] {
+                        let p = self.local.join(&k);
+                        write_atomic(&p, bytes)?;
+                        let rv = self.remote.write(&k, bytes)?;
+                        state.files.insert(k, Seen { hash: hash_bytes(bytes), l: stamp(&p)?, r: rv });
                     }
                     report.conflict_copies.push(copy);
                 }
@@ -470,7 +531,7 @@ enum Action {
     Reconcile,
 }
 
-fn changed(now: Option<Stamp>, before: Option<Stamp>) -> bool {
+fn changed<T: PartialEq>(now: Option<T>, before: Option<T>) -> bool {
     match (now, before) {
         (None, None) => false,
         (Some(a), Some(b)) => a != b,
@@ -528,7 +589,8 @@ fn today() -> String {
     format!("{y:04}-{m:02}-{d:02}")
 }
 
-fn skip_name(name: &str) -> bool {
+/// Names sync leaves alone: hidden files, Office lock files, system and partial files.
+pub fn skip_name(name: &str) -> bool {
     name.starts_with('.')
         || name.starts_with("~$")
         || name.eq_ignore_ascii_case("desktop.ini")
@@ -783,5 +845,130 @@ mod tests {
         let c = conflict_name("x/pic.png", |_| false);
         assert!(c.starts_with("x/pic (Marrow conflicted copy 20") && c.ends_with(").png"), "{c}");
         assert_eq!(today().len(), 10);
+    }
+
+    /// A cloud service kept in memory: versions are tags, like ETags.
+    #[derive(Default)]
+    struct Cloud {
+        files: std::sync::Mutex<BTreeMap<String, (Vec<u8>, u64)>>,
+        next: std::sync::atomic::AtomicU64,
+        offline: std::sync::atomic::AtomicBool,
+    }
+
+    impl Cloud {
+        fn put(&self, key: &str, text: &str) {
+            let n = self.next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.files.lock().unwrap().insert(key.into(), (text.as_bytes().to_vec(), n));
+        }
+        fn get(&self, key: &str) -> Option<String> {
+            self.files.lock().unwrap().get(key).map(|(b, _)| String::from_utf8(b.clone()).unwrap())
+        }
+    }
+
+    impl Remote for std::sync::Arc<Cloud> {
+        fn id(&self) -> String {
+            "memory".into()
+        }
+        fn check(&self) -> Result<(), SyncStop> {
+            if self.offline.load(std::sync::atomic::Ordering::SeqCst) {
+                Err(SyncStop::Offline { message: "no network".into() })
+            } else {
+                Ok(())
+            }
+        }
+        fn list(&self) -> io::Result<BTreeMap<String, RemoteFile>> {
+            Ok(self
+                .files
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(k, (_, n))| (k.clone(), RemoteFile { version: Version::Tag(format!("v{n}")), modified_ms: *n }))
+                .collect())
+        }
+        fn read(&self, key: &str) -> io::Result<Vec<u8>> {
+            self.files.lock().unwrap().get(key).map(|(b, _)| b.clone()).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
+        }
+        fn write(&self, key: &str, bytes: &[u8]) -> io::Result<Version> {
+            let n = self.next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.files.lock().unwrap().insert(key.into(), (bytes.to_vec(), n));
+            Ok(Version::Tag(format!("v{n}")))
+        }
+        fn delete(&self, key: &str) -> io::Result<()> {
+            self.files.lock().unwrap().remove(key);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn syncs_with_a_cloud_service() {
+        let t = tempfile::tempdir().unwrap();
+        let l = t.path().join("vault");
+        fs::create_dir_all(&l).unwrap();
+        let cloud = std::sync::Arc::new(Cloud::default());
+        let m = Mirror::with_remote(&l, Box::new(cloud.clone()));
+        write(&l.join("A.md"), "a\n");
+        write(&l.join("N.md"), "title\n\none\n\ntwo\n");
+        cloud.put("from phone/B.md", "b\n");
+        let rep = m.sync(false).unwrap();
+        assert_eq!(rep.to_remote, vec!["A.md", "N.md"]);
+        assert_eq!(rep.to_local, vec!["from phone/B.md"]);
+        assert_eq!(read(&l.join("from phone/B.md")), "b\n");
+        assert!(!m.sync(false).unwrap().changed());
+
+        // Edited in both places: merged, and both sides get the result.
+        tick();
+        write(&l.join("N.md"), "title\n\none, on the computer\n\ntwo\n");
+        cloud.put("N.md", "title\n\none\n\ntwo, on the phone\n");
+        let rep = m.sync(false).unwrap();
+        assert_eq!(rep.merged, vec!["N.md"]);
+        let want = "title\n\none, on the computer\n\ntwo, on the phone\n";
+        assert_eq!(read(&l.join("N.md")), want);
+        assert_eq!(cloud.get("N.md").unwrap(), want);
+
+        // Deleted on the phone: moved to Marrow's trash here.
+        cloud.files.lock().unwrap().remove("A.md");
+        let rep = m.sync(false).unwrap();
+        assert_eq!(rep.deleted_local, vec!["A.md"]);
+        assert_eq!(read(&l.join(".marrow/trash/A.md")), "a\n");
+
+        // Offline: nothing happens and nothing is lost.
+        cloud.offline.store(true, std::sync::atomic::Ordering::SeqCst);
+        assert!(matches!(m.sync(false), Err(SyncStop::Offline { .. })));
+        cloud.offline.store(false, std::sync::atomic::Ordering::SeqCst);
+        assert!(!m.sync(false).unwrap().changed());
+    }
+
+    #[test]
+    fn binary_files_changed_on_both_sides_keep_both() {
+        let t = tempfile::tempdir().unwrap();
+        let l = t.path().join("vault");
+        fs::create_dir_all(&l).unwrap();
+        let cloud = std::sync::Arc::new(Cloud::default());
+        let m = Mirror::with_remote(&l, Box::new(cloud.clone()));
+        write(&l.join("pic.png"), "one");
+        m.sync(false).unwrap();
+        tick();
+        write(&l.join("pic.png"), "local");
+        cloud.put("pic.png", "remote");
+        let rep = m.sync(false).unwrap();
+        assert_eq!(rep.conflict_copies.len(), 1);
+        let copy = &rep.conflict_copies[0];
+        assert_eq!(read(&l.join(copy)), cloud.get(copy).unwrap());
+        assert_eq!(read(&l.join("pic.png")), cloud.get("pic.png").unwrap());
+        let mut both = vec![read(&l.join("pic.png")), read(&l.join(copy))];
+        both.sort();
+        assert_eq!(both, vec!["local", "remote"]);
+    }
+
+    #[test]
+    fn state_saved_by_older_versions_still_loads() {
+        let (_t, l, r, m) = setup();
+        write(&l.join("A.md"), "a\n");
+        m.sync(false).unwrap();
+        // Before cloud services, the other side's version was always {m, s}.
+        let raw = fs::read_to_string(l.join(".marrow/mirror/state.json")).unwrap();
+        assert!(raw.contains("\"r\":{\"m\":"), "{raw}");
+        assert!(!m.sync(false).unwrap().changed());
+        drop(r);
     }
 }

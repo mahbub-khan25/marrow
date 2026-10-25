@@ -1,6 +1,6 @@
 // Cloud drives: creating a vault in Dropbox / OneDrive / Google Drive, and
-// setting up two-way sync between a vault and a cloud folder. Marrow never
-// talks to the cloud itself; it uses the folders those apps keep on disk.
+// setting up two-way sync between a vault and a cloud folder (kept on disk by
+// that cloud's app) or a cloud service Marrow talks to directly (WebDAV).
 
 import { documentDir, homeDir } from "@tauri-apps/api/path";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -15,8 +15,8 @@ const PROVIDER_ICON: Record<CloudLocation["provider"], [string, string]> = {
   icloud: ["apple-logo", "var(--ink-78)"],
 };
 
-export function providerIcon(provider: CloudLocation["provider"] | null | undefined): HTMLElement {
-  const [name, color] = provider ? PROVIDER_ICON[provider] : ["folder-simple", "var(--ink-70)"];
+export function providerIcon(provider: CloudLocation["provider"] | "webdav" | null | undefined): HTMLElement {
+  const [name, color] = provider === "webdav" ? ["hard-drives", "var(--color-accent)"] : provider ? PROVIDER_ICON[provider] : ["folder-simple", "var(--ink-70)"];
   const el = icon(name);
   el.style.color = color;
   return el;
@@ -48,7 +48,7 @@ interface Place {
   key: string;
   label: string;
   path: string;
-  provider?: CloudLocation["provider"];
+  provider?: CloudLocation["provider"] | "webdav";
   icon?: string;
   /** Opens a folder picker instead of using `path`. */
   pick?: boolean;
@@ -152,19 +152,43 @@ export async function createVaultDialog(onCreated: (path: string) => void | Prom
   name.select();
 }
 
-/** "Sync with a cloud folder": pick a cloud drive (or any folder). */
-export async function setupSyncDialog(vaultName: string, onDone: () => void) {
-  const clouds = await api.cloudLocations().catch(() => []);
+/** Sync setup: a cloud folder on this computer, or a server Marrow talks to directly. */
+export async function setupSyncDialog(vaultName: string, onDone: () => void, mobile = false) {
+  // Phones and tablets can't use another app's folder, only services Marrow talks to.
+  const clouds = mobile ? [] : await api.cloudLocations().catch(() => []);
   const note = h("div.dlg-hint");
   const error = h("div.dlg-error", { role: "alert", hidden: true });
+  const field = (label: string, input: HTMLInputElement) => h("label.dlg-field", null, h("span", null, label), input);
+  const url = h("input.input", { type: "url", placeholder: "https://cloud.example.com/remote.php/dav/files/you/Marrow", autocomplete: "off", spellcheck: false }) as HTMLInputElement;
+  const user = h("input.input", { type: "text", autocomplete: "username", spellcheck: false, autocapitalize: "off" }) as HTMLInputElement;
+  const pass = h("input.input", { type: "password", autocomplete: "current-password" }) as HTMLInputElement;
+  const server = h(
+    "div.dlg-server",
+    { hidden: true },
+    field("Server and folder", url),
+    h("div.dlg-row", null, field("User name", user), field("Password", pass)),
+    h(
+      "div.dlg-hint",
+      null,
+      "Nextcloud: create an app password in Settings › Security, and use the WebDAV address from Files › Settings with a folder name added, such as …/Marrow. Synology, pCloud and Koofr show their WebDAV address in their settings.",
+    ),
+  );
   const places: Place[] = [
     ...clouds.map((c, i) => ({ key: `cloud${i}`, label: c.label, path: join(c.path, vaultName), provider: c.provider })),
-    { key: "pick", label: "Choose a folder…", path: "", icon: "folder-open", pick: true },
+    { key: "webdav", label: "Nextcloud, Synology or another WebDAV server", path: "", provider: "webdav" as const },
+    ...(mobile ? [] : [{ key: "pick", label: "Choose a folder…", path: "", icon: "folder-open", pick: true }]),
   ];
   let target = "";
   const where = placeList(places, async (p) => {
     target = p.path;
     note.textContent = "";
+    error.hidden = true;
+    server.hidden = p.key !== "webdav";
+    if (p.key === "webdav") {
+      note.textContent = "Notes stay plain Markdown files in that folder on your server. Marrow checks the sign-in before it starts.";
+      window.setTimeout(() => url.focus(), 0);
+      return;
+    }
     if (!target) return;
     const n = await api.mirrorPreview(target).catch(() => 0);
     if (where.selected()?.path !== target) return;
@@ -173,36 +197,57 @@ export async function setupSyncDialog(vaultName: string, onDone: () => void) {
         ? `That folder already has ${n} ${n === 1 ? "file" : "files"}. They'll be combined with this vault — nothing is deleted, and notes that differ are merged.`
         : "Everything in this vault will be copied there, and kept in sync both ways from then on.";
   });
-  const start = h("button.btn.btn-primary", null, icon("arrows-clockwise"), "Start syncing");
+  const label = h("span", null, "Start syncing");
+  const start = h("button.btn.btn-primary", null, icon("arrows-clockwise"), label) as HTMLButtonElement;
   const close = dialog(
-    "Sync with a cloud folder",
+    "Sync this vault",
     [
       h(
         "p.dlg-lede",
         null,
-        "Marrow keeps this vault and a folder in your cloud drive the same, both ways. Your cloud app carries it to your other devices.",
+        mobile
+          ? "Keep this vault the same on all your devices, through your own server."
+          : "Keep this vault the same everywhere: through a folder your cloud app syncs (Dropbox, OneDrive, Google Drive, iCloud), or your own server.",
       ),
-      clouds.length ? null : h("div.dlg-hint", null, "No Dropbox, OneDrive or Google Drive folder was found on this computer. Install its desktop app, or choose any folder."),
+      clouds.length || mobile ? null : h("div.dlg-hint", null, "No Dropbox, OneDrive or Google Drive folder was found on this computer. Install its desktop app, or choose any folder."),
       where.el,
+      server,
       note,
       error,
     ],
     [h("button.btn.btn-secondary", { onclick: () => close() }, "Cancel"), start],
   );
-  if (clouds.length) where.select("cloud0");
+  where.select(clouds.length ? "cloud0" : "webdav");
+  const fail = (msg: string) => {
+    error.hidden = false;
+    error.textContent = msg;
+  };
   start.addEventListener("click", async () => {
-    if (!target) {
-      error.hidden = false;
-      error.textContent = "Pick a folder to sync with.";
+    error.hidden = true;
+    if (where.selected()?.key === "webdav") {
+      if (!url.value.trim() || !user.value.trim() || !pass.value) return fail("Fill in the server address, user name and password.");
+      start.disabled = true;
+      label.textContent = "Checking…";
+      try {
+        await api.webdavCheck(url.value.trim(), user.value.trim(), pass.value);
+        await api.setCloudSync(url.value.trim(), user.value.trim(), pass.value);
+        close();
+        onDone();
+      } catch (e) {
+        fail(String(e));
+      } finally {
+        start.disabled = false;
+        label.textContent = "Start syncing";
+      }
       return;
     }
+    if (!target) return fail("Pick a folder to sync with.");
     try {
       await api.setMirror(target);
       close();
       onDone();
     } catch (e) {
-      error.hidden = false;
-      error.textContent = String(e);
+      fail(String(e));
     }
   });
 }

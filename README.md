@@ -313,8 +313,9 @@ your notes), and only when you ask.
 
 ## Cloud drives
 
-Marrow doesn't upload anything itself. It uses the folders that the Dropbox,
-OneDrive, Google Drive and iCloud apps keep on your computer.
+On a computer, Marrow can use the folders that the Dropbox, OneDrive, Google
+Drive and iCloud apps keep on your disk. On any device, including phones and
+tablets, it can also sync directly with your own server.
 
 * **Create a vault in the cloud**: *Create a vault* (on the start screen, in
   Settings → Vault, or in the command palette) lists the cloud folders it
@@ -330,6 +331,14 @@ OneDrive, Google Drive and iCloud apps keep on your computer.
   * If the cloud folder goes missing or suddenly empty, or a sync would
     delete many files at once, sync pauses and asks first.
   * Hidden files and folders (`.marrow`, `.obsidian`, `.git`) aren't synced.
+* **Sync with your own server (WebDAV)**: Settings → Vault → Sync →
+  *Set up…* → *Nextcloud, Synology or another WebDAV server*. Enter the
+  folder's WebDAV address, your user name and password (for Nextcloud, an app
+  password from Settings › Security). Marrow checks the sign-in first. Notes
+  stay plain Markdown files in that folder; the password is kept in the
+  system's credential store. Works with Nextcloud, ownCloud, Synology, pCloud,
+  Koofr and other WebDAV servers, the same way as the cloud folders above.
+  Direct Google Drive, OneDrive, Dropbox and iCloud sync are coming next.
 * **Conflict copies**: when a cloud app keeps two versions of a note (for
   example `Note (Khan's conflicted copy …).md`), Marrow offers to merge them
   back into one.

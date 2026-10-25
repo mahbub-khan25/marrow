@@ -1481,7 +1481,7 @@ function commands(): Command[] {
     cmd("Export this note to PDF…", "file-pdf", () => void exportNote("pdf")),
     cmd("Export this note to HTML…", "file-html", () => void exportNote("html")),
     cmd("Print this note…", "printer", () => void exportNote("print")),
-    mirror ? cmd("Sync now", "arrows-clockwise", () => void api.syncNow()) : cmd("Sync with a cloud folder", "cloud", () => startSyncSetup()),
+    mirror ? cmd("Sync now", "arrows-clockwise", () => void api.syncNow()) : cmd("Sync this vault (cloud folder or server)", "cloud", () => startSyncSetup()),
     cmd("Customize: CSS snippets and plugins", "paint-brush", () => openSettings("customize")),
     ...fromPlugins,
   ];
@@ -1619,6 +1619,11 @@ function showSyncProblem(s: MirrorStatus) {
   if (!st) return;
   if (st.kind === "missing") {
     showBanner(`Can't find the ${s.label} folder. Is ${s.label} running? Sync starts again by itself when it's back.`, "warn");
+  } else if (st.kind === "offline") {
+    // Being offline is normal on a phone: the status shows it, and sync resumes by itself.
+    return;
+  } else if (st.kind === "signIn") {
+    showBanner(s.message ?? "Sign in to sync again.", "warn", [{ label: "Sync settings", run: () => openSettings("vault") }]);
   } else if (st.kind === "looksEmpty" || st.kind === "manyDeletes") {
     const where = st.side === "remote" ? `your ${s.label} folder` : "this vault";
     showBanner(`${s.message} Have a look at ${where}; if that's what you meant, sync anyway.`, "warn", [
@@ -1641,10 +1646,14 @@ async function refreshMirror() {
 }
 
 function startSyncSetup() {
-  void setupSyncDialog(vaultName, () => {
-    toast("Sync is on. Changes go both ways from now on.");
-    void refreshMirror();
-  });
+  void setupSyncDialog(
+    vaultName,
+    () => {
+      toast("Sync is on. Changes go both ways from now on.");
+      void refreshMirror();
+    },
+    platform.mobile,
+  );
 }
 
 async function stopSync() {

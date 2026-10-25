@@ -65,6 +65,9 @@ pub(crate) struct Settings {
     /// Vault folder → the folder it's kept in sync with. Per computer, since
     /// the cloud folder's location differs from one computer to the next.
     pub mirrors: std::collections::BTreeMap<String, String>,
+    /// Vault folder → the cloud service it syncs with directly (no password here;
+    /// that's in the system's credential store).
+    pub clouds: std::collections::BTreeMap<String, crate::sync::CloudTarget>,
 }
 
 fn settings_path(app: &AppHandle) -> CmdResult<PathBuf> {
@@ -205,9 +208,12 @@ pub fn open_vault(app: AppHandle, state: State<AppState>, path: String) -> CmdRe
     let mut settings = load_settings(&app);
     settings.last_vault = Some(crate::portable::to_stored(&info.root));
     let mirror = settings.mirrors.get(&info.root).cloned();
+    let cloud = settings.clouds.get(&info.root).cloned();
     save_settings(&app, &settings)?;
     if let Some(remote) = mirror {
         crate::sync::start_mirror(&app, &state, Path::new(&info.root), PathBuf::from(remote));
+    } else if let Some(target) = cloud {
+        crate::sync::start_cloud(&app, &state, Path::new(&info.root), target);
     }
     Ok(info)
 }
@@ -888,7 +894,7 @@ pub fn save_clipboard_image(app: AppHandle, state: State<AppState>, name: String
     store_attachment(&app, &state, &name, &folder, &png_bytes).map(Some)
 }
 
-fn percent_decode(s: &str) -> String {
+pub(crate) fn percent_decode(s: &str) -> String {
     let b = s.as_bytes();
     let mut out = Vec::with_capacity(b.len());
     let mut i = 0;
