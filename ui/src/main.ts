@@ -32,7 +32,7 @@ import { exportHtml, printNote } from "./export";
 import { openHistory } from "./history";
 import { openTimeMachine } from "./timemachine";
 import { openSwitch, type SwitchFrom } from "./switch";
-import { banglaTyping, installBanglaInputs, onBanglaTyping, setBanglaTyping } from "./bangla";
+import { banglaTyping, installBanglaInputs, loadEngine, onBanglaTyping, setBanglaTyping } from "./bangla";
 import { setLanguage } from "./i18n";
 import { markSeen, openWeeklyReview, renderResurface, seenMoved, type ResurfaceApp } from "./resurface";
 import { openCapture } from "./capture";
@@ -1549,7 +1549,7 @@ function commands(): Command[] {
         tree.reveal(p);
       }
     }),
-    cmd("Bangla typing on / off (F12)", "keyboard", () => toggleBangla(), "F12"),
+    cmd("Bangla typing on / off (F12)", "keyboard", () => void toggleBangla(), "F12"),
     cmd("Toggle dark mode", "moon", () => setPref("theme", document.documentElement.dataset.theme === "dark" || (prefs.theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches) ? "light" : "dark")),
     cmd("Import from Notion, Evernote, OneNote…", "tray-arrow-down", () => importNotes()),
     cmd("Move from Notion (step by step)…", "notion-logo", () => moveFrom("notion")),
@@ -1881,10 +1881,15 @@ function showWelcome(error?: string) {
 
 // ---------------------------------------------------------------- Bangla
 
-function toggleBangla() {
+async function toggleBangla() {
   if (!prefs.banglaKeys) setPref("banglaKeys", true);
   setBanglaTyping(!banglaTyping());
-  toast(banglaTyping() ? "বাংলা টাইপিং চালু: ami → আমি. F12 to switch back to English." : "English typing. F12 for Bangla.");
+  if (!banglaTyping()) return toast("English typing. F12 for Bangla.");
+  if (!(await loadEngine())) {
+    setBanglaTyping(false);
+    return toast("Ekushe Next couldn't start, so Bangla typing is off.", "error");
+  }
+  toast("বাংলা টাইপিং চালু (একুশে নেক্সট): ami → আমি. Tab for other words, F12 for English.");
 }
 
 function showBanglaButton() {
@@ -1903,9 +1908,9 @@ function bindKeys() {
       e.preventDefault();
       toggleFocus();
     } else if (e.key === "F12" && !e.ctrlKey && !e.altKey && !e.metaKey) {
-      // Avro's own key for switching between Bangla and English.
+      // Switches between Bangla (Ekushe Next) and English typing.
       e.preventDefault();
-      toggleBangla();
+      void toggleBangla();
     }
   });
   // A file dropped where nothing takes it mustn't replace the app with the file.
@@ -2077,7 +2082,7 @@ async function boot() {
   setLanguage(prefs.language);
   installBanglaInputs();
   onBanglaTyping(() => showBanglaButton());
-  $("bangla-toggle").addEventListener("click", () => toggleBangla());
+  $("bangla-toggle").addEventListener("click", () => void toggleBangla());
   showBanglaButton();
   pluginHooks();
   onVimWrite(() => {

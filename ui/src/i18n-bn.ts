@@ -579,8 +579,8 @@ export const BN: Record<string, string> = {
   "Interface language": "ইন্টারফেসের ভাষা",
   "Menus, buttons and messages. Your notes are never changed.": "মেনু, বাটন ও বার্তা। আপনার নোট কখনো বদলায় না।",
   "Bangla typing": "বাংলা টাইপিং",
-  "Type Bangla with an English keyboard, Avro Phonetic style: ami → আমি. F12 or the অ button in the status bar switches it on and off.":
-    "ইংরেজি কীবোর্ডে বাংলা লিখুন, অভ্র ফোনেটিক পদ্ধতিতে: ami → আমি। F12 বা স্ট্যাটাস বারের অ বাটনে চালু ও বন্ধ করুন।",
+  "Type Bangla with an English keyboard, powered by Ekushe Next: ami → আমি, with suggestions as you type (Tab for the next one). F12 or the অ button in the status bar switches it on and off.":
+    "ইংরেজি কীবোর্ডে বাংলা লিখুন, একুশে নেক্সট দিয়ে: ami → আমি, লেখার সাথে সাথে শব্দের প্রস্তাবসহ (পরেরটির জন্য Tab)। F12 বা স্ট্যাটাস বারের অ বাটনে চালু ও বন্ধ করুন।",
   "Show the button": "বাটন দেখান",
   "Bangla typing (F12)": "বাংলা টাইপিং (F12)",
 

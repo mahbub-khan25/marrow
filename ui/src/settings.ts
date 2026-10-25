@@ -204,7 +204,7 @@ function render() {
         ),
         row(
           "Bangla typing",
-          "Type Bangla with an English keyboard, Avro Phonetic style: ami → আমি. F12 or the অ button in the status bar switches it on and off.",
+          "Type Bangla with an English keyboard, powered by Ekushe Next: ami → আমি, with suggestions as you type (Tab for the next one). F12 or the অ button in the status bar switches it on and off.",
           prefSeg("banglaKeys", [
             [true, "Show the button"],
             [false, "Off"],

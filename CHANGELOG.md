@@ -17,9 +17,12 @@
 - **Bangla:**
   - The whole interface in Bangla (Settings → Appearance → Interface
     language). Your notes are never changed.
-  - Bangla typing with an English keyboard, Avro Phonetic style
-    (ami → আমি), in notes and every text box. F12 or the অ button in the
-    status bar switches it on and off.
+  - Bangla typing with an English keyboard, powered by Ekushe Next's own
+    engine (ami banglay gan gai → আমি বাংলায় গান গাই): suggestions as you
+    type (Tab or ↓ for the next one), forgiving spellings, যুক্তবর্ণ, and
+    Backspace right after a word to get the English back. In notes and
+    every text box. F12 or the অ button in the status bar switches it on
+    and off.
   - Search that understands Bangla spelling: ি/ী, ু/ূ, ন/ণ, শ/ষ/স, জ/য,
     ং/ঙ, ড়/র and ৎ/ত match each other, and Bangla digits match 0-9.
   - A Bengali font that matches Marrow's type, in notes and in PDF exports.

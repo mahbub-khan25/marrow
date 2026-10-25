@@ -111,8 +111,9 @@ All of these are plain Markdown, so the notes still open in Obsidian.
   deleted notes.
 * **Notes come back to you**: the start screen shows a forgotten note and
   the same day in earlier years, and a weekly review from Friday to Sunday.
-* **Bangla**: a Bangla interface (Settings → Appearance), Avro Phonetic
-  typing anywhere (F12), and search that forgives Bangla spelling.
+* **Bangla**: a Bangla interface (Settings → Appearance), Bangla typing
+  anywhere with [Ekushe Next](https://github.com/mahbub-khan25/ekushenext)
+  (F12), and search that forgives Bangla spelling.
 * **Move from Notion or Evernote**: *Move from Notion (step by step)* in the
   command palette, or on the start screen of a new vault.
 * **Version history**: right-click a note → *Version history…* (or the
