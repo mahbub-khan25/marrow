@@ -38,7 +38,7 @@ jobs:
       - name: Build the app (debug APK for testing)
         run: |
           export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
-          npx tauri android build --debug --apk --ci
+          npx tauri android build --debug --apk --target aarch64 --ci
       - uses: actions/upload-artifact@v4
         with:
           name: marrow-android-debug

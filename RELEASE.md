@@ -63,6 +63,22 @@ AppImage doesn't run on RHEL 9 either (it needs a newer C library). The way
 to support Red Hat is a **Flatpak** (Flathub), which brings its own web engine
 and runs on RHEL 9 and 10 as well as every other distribution.
 
+## Mobile apps (in progress)
+
+The same app builds for Android and iOS (phones and tablets). The "Mobile"
+workflow builds both on every change:
+
+- **Android:** a debug APK for 64-bit ARM phones and tablets, under
+  Actions → Mobile → the latest run → Artifacts. Install it on a device with
+  "Install unknown apps" allowed. Store releases need an upload key (later).
+- **iOS:** built for the Simulator. To run it on your own iPad or iPhone, on
+  the Mac: `npm install`, then `npx tauri ios init` and `npx tauri ios dev`,
+  and pick your Apple ID team in Xcode. App Store releases need the Apple
+  Developer Program.
+
+On phones and tablets there's no folder picker: notes live in the app's own
+"Marrow" folder (on iOS it shows in the Files app under On My iPhone/iPad).
+
 ## Steps only you can do
 
 These need accounts, money or decisions, so they're left to you.
