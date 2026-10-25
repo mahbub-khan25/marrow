@@ -1,10 +1,15 @@
 [package]
 name = "marrow-app"
-description = "Marrow desktop app (Tauri shell around marrow-core)"
+description = "Marrow app for desktop and mobile (Tauri shell around marrow-core)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
+
+[lib]
+# Shared by the desktop app (main.rs) and the iOS and Android apps.
+name = "marrow_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -14,8 +19,6 @@ marrow-core = { path = "../crates/marrow-core" }
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
-tauri-plugin-global-shortcut = "2"
-tauri-plugin-single-instance = "2"
 tauri-plugin-log = "2"
 log = "0.4"
 dunce = { workspace = true }
@@ -24,9 +27,14 @@ serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "http2"] }
 futures-util = "0.3"
 tokio = { version = "1", features = ["time"] }
-# Pasting screenshots where the webview doesn't pass images through.
-arboard = { version = "3", default-features = false, features = ["image-data"] }
 png = "0.17"
+
+# Desktop only: quick capture from any app, one copy at a time, and pasting
+# screenshots where the webview doesn't pass images through.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-single-instance = "2"
+arboard = { version = "3", default-features = false, features = ["image-data"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }

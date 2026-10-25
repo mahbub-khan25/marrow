@@ -234,6 +234,10 @@ export const api = {
   siteFinish: (out: string, files: string[]) => invoke<number>("site_finish", { out, files }),
   siteOpen: (out: string) => invoke<void>("site_open", { out }),
   lastVault: () => invoke<string | null>("last_vault"),
+  /** Which kind of device this is ("ios", "android", "windows"…). */
+  appPlatform: () => invoke<{ os: string; mobile: boolean }>("app_platform"),
+  /** Phones and tablets: the app's own "Marrow" notes folder, made if needed. */
+  defaultVault: () => invoke<string>("default_vault"),
   openVault: (path: string) => invoke<VaultInfo>("open_vault", { path }),
   tree: () => invoke<TreeNode>("tree"),
   readNote: (path: string) => invoke<string>("read_note", { path }),

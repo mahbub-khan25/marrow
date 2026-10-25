@@ -135,6 +135,8 @@ let splitPane: NotePane;
 let tree: Tree;
 let searchView: SearchView;
 let tagsView: TagsView;
+/** The device: phones and tablets get touch-sized controls and no desktop-only actions. */
+let platform: { os: string; mobile: boolean } = { os: "", mobile: false };
 let calendarView: CalendarView;
 let tasksView: TasksView;
 let inspector: Inspector;
@@ -271,9 +273,11 @@ function showStage() {
   $("pane-split").hidden = !showSplit;
   $("panes").classList.toggle("is-split", showSplit);
   $("split-btn").setAttribute("aria-pressed", String(showSplit));
-  const insp = prefs.inspector && view === "note";
+  // Where the inspector would cover the note (phones, tablets held upright), it opens only when asked.
+  const inspOn = inspectorCovers() ? inspectorOnPhone : prefs.inspector;
+  const insp = inspOn && view === "note";
   $("app").classList.toggle("no-inspector", !insp);
-  $("inspector-btn").setAttribute("aria-pressed", String(prefs.inspector));
+  $("inspector-btn").setAttribute("aria-pressed", String(inspOn));
   $("inspector").classList.toggle("floating", innerWidth < 1200);
   // Rail
   const daily = t?.kind === "note" && dailyNav(t.doc.path) !== null && displayName(t.doc.path) === isoDay();
@@ -286,7 +290,7 @@ function showStage() {
   $("rail-canvas").setAttribute("aria-pressed", String(view === "canvas"));
   if (view === "start") void renderStart();
   const title = t?.kind === "note" ? t.doc.name : t?.kind === "canvas" ? displayName(t.path) : t?.kind === "graph" ? "Graph" : "";
-  void getCurrentWindow().setTitle(title ? `${title} — Marrow` : vaultName ? `${vaultName} — Marrow` : "Marrow");
+  if (!platform.mobile) void getCurrentWindow().setTitle(title ? `${title} — Marrow` : vaultName ? `${vaultName} — Marrow` : "Marrow").catch(() => {});
   tree?.markActive();
   updateStatus();
   updateSaveState();
@@ -501,7 +505,25 @@ async function openPath(path: string, how: OpenHow = "replace", at?: At): Promis
  * Opens a note. If a tab already shows it, switches there. `replace` swaps
  * the active note tab (or opens a tab if the active one isn't a note).
  */
+let inspectorOnPhone = false;
+/** Phones, and tablets too narrow for the inspector beside the note. */
+const inspectorCovers = () => isPhone() || (platform.mobile && innerWidth < 1200);
+function toggleInspector() {
+  if (inspectorCovers()) {
+    inspectorOnPhone = !inspectorOnPhone;
+    showStage();
+  } else setPref("inspector", !prefs.inspector);
+}
+
+/** On a phone the sidebar covers the screen, so it steps aside once something opens. */
+const isPhone = () => matchMedia("(max-width: 699px)").matches;
+function sideAsideOnPhone() {
+  if (isPhone() && sideOpen) setSide(side, false);
+  inspectorOnPhone = false;
+}
+
 async function openNote(path: string, how: OpenHow = "replace", at?: At, opts: { mode?: Mode; focusTitle?: boolean } = {}): Promise<void> {
+  sideAsideOnPhone();
   if (how === "split") return openInSplit(path, at);
   const existing = tabs.findIndex((t) => t.kind === "note" && t.doc.path === path);
   if (existing >= 0) {
@@ -660,6 +682,7 @@ async function toggleSplit() {
 }
 
 async function openCanvas(path: string, how: "replace" | "tab" = "tab") {
+  sideAsideOnPhone();
   const existing = tabs.findIndex((t) => t.kind === "canvas" && t.path === path);
   if (existing >= 0) return activateTab(existing);
   stashActive();
@@ -869,7 +892,7 @@ function quickCapture(wasHidden = false) {
       if (side === "tasks" && sideOpen) void tasksView.refresh();
     },
     done: () => {
-      if (wasHidden) void getCurrentWindow().minimize();
+      if (wasHidden && !platform.mobile) void getCurrentWindow().minimize();
     },
   });
 }
@@ -1399,7 +1422,7 @@ function commands(): Command[] {
     cmd("Open canvas", "squares-four", () => void openSomeCanvas()),
     cmd("Toggle split pane", "columns", () => void toggleSplit(), kbd("\\")),
     cmd("Toggle preview / source", "code", () => toggleMode(), kbd("E")),
-    cmd("Toggle inspector", "sidebar-simple", () => setPref("inspector", !prefs.inspector)),
+    cmd("Toggle inspector", "sidebar-simple", () => toggleInspector()),
     cmd("Focus mode", "arrows-out", () => toggleFocus(), "F11"),
     cmd("Quick capture", "lightning", () => quickCapture(), prefs.captureKey ? prefs.captureKey.replace("CommandOrControl", isMac ? "⌘" : "Ctrl") : ""),
     cmd("Show all tasks", "check-square", () => setSide("tasks")),
@@ -1680,6 +1703,10 @@ async function mergeConflicts(list: ConflictCopy[]) {
 // ------------------------------------------------------------------ vault
 
 async function chooseVault() {
+  if (platform.mobile) {
+    toast(platform.os === "ios" ? "Your notes are in the Marrow folder: open the Files app › On My iPhone/iPad › Marrow." : "Your notes are kept in Marrow's own folder on this device.");
+    return;
+  }
   const picked = await openDialog({ directory: true, multiple: false, title: "Open a folder of notes" });
   if (typeof picked === "string") await openVault(picked);
 }
@@ -1826,7 +1853,7 @@ function bindChrome() {
   window.setInterval(renderSync, 30_000);
   $("jump").addEventListener("click", () => openPalette());
   $("split-btn").addEventListener("click", () => void toggleSplit());
-  $("inspector-btn").addEventListener("click", () => setPref("inspector", !prefs.inspector));
+  $("inspector-btn").addEventListener("click", () => toggleInspector());
   $("start-new").addEventListener("click", () => void newNote());
   $("start-today").addEventListener("click", () => void openToday());
   $("start-search").addEventListener("click", () => openPalette());
@@ -1909,6 +1936,9 @@ function pluginHooks() {
 }
 
 async function boot() {
+  platform = await api.appPlatform().catch(() => platform);
+  document.documentElement.dataset.os = platform.os;
+  document.documentElement.toggleAttribute("data-mobile", platform.mobile);
   applyPrefs();
   pluginHooks();
   onVimWrite(() => {
@@ -2126,6 +2156,8 @@ async function boot() {
 
   const last = await api.lastVault();
   if (last) await openVault(last);
+  // Phones and tablets have no folder picker: notes live in Marrow's own folder.
+  else if (platform.mobile) await openVault(await api.defaultVault());
   else showWelcome();
 }
 

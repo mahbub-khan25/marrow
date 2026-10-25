@@ -118,6 +118,29 @@ pub fn last_vault(app: AppHandle) -> Option<String> {
         })
 }
 
+/// Which kind of device Marrow runs on, so the window can fit it.
+#[derive(Serialize)]
+pub struct AppPlatform {
+    /// "windows", "macos", "linux", "ios" or "android".
+    pub os: &'static str,
+    pub mobile: bool,
+}
+
+#[tauri::command]
+pub fn app_platform() -> AppPlatform {
+    AppPlatform { os: std::env::consts::OS, mobile: cfg!(mobile) }
+}
+
+/// On phones and tablets: the "Marrow" folder in the app's documents, made if
+/// needed. (iOS shows it in the Files app under On My iPhone/iPad › Marrow.)
+#[tauri::command(async)]
+pub fn default_vault(app: AppHandle) -> CmdResult<String> {
+    let base = app.path().document_dir().or_else(|_| app.path().app_data_dir()).map_err(err)?;
+    let dir = base.join("Marrow");
+    std::fs::create_dir_all(&dir).map_err(err)?;
+    Ok(dir.to_string_lossy().into_owned())
+}
+
 /// A file in the app's cache folder for this vault ("<key>.<ext>"). In
 /// portable mode the key ignores the drive letter, so the cache is reused.
 pub(crate) fn vault_cache_file(app: &AppHandle, root: &Path, ext: &str) -> CmdResult<PathBuf> {
@@ -843,6 +866,14 @@ fn store_attachment(app: &AppHandle, state: &State<AppState>, name: &str, folder
 /// Saves the image on the system clipboard as a PNG, for when the webview
 /// doesn't hand pasted images to the page (WebKitGTK). None if there's no image.
 #[tauri::command(async)]
+#[cfg(mobile)]
+pub fn save_clipboard_image(_app: AppHandle, _state: State<AppState>, _name: String, _folder: String) -> CmdResult<Option<String>> {
+    // Pasted images reach the page directly on phones and tablets.
+    Ok(None)
+}
+
+#[tauri::command(async)]
+#[cfg(desktop)]
 pub fn save_clipboard_image(app: AppHandle, state: State<AppState>, name: String, folder: String) -> CmdResult<Option<String>> {
     let Ok(mut cb) = arboard::Clipboard::new() else { return Ok(None) };
     let Ok(img) = cb.get_image() else { return Ok(None) };

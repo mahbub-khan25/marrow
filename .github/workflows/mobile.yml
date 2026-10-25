@@ -1,0 +1,68 @@
+# Builds Marrow for Android and iOS on every change, to keep the mobile apps
+# working. The Android build is a debug APK you can install on a phone or
+# tablet to try it (Actions → this run → Artifacts). The iOS build is for the
+# Simulator until Apple signing is set up.
+name: Mobile
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "promo/**", "docs/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: android
+      - run: npm ci
+      - name: Android project
+        run: |
+          export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          npx tauri android init --ci
+      - name: Build the app (debug APK for testing)
+        run: |
+          export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          npx tauri android build --debug --apk --ci
+      - uses: actions/upload-artifact@v4
+        with:
+          name: marrow-android-debug
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ios
+      - run: npm ci
+      - name: Xcode project tools
+        run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+      - name: iOS project
+        run: npx tauri ios init --ci
+      - name: Build for the iOS Simulator
+        run: npx tauri ios build --debug --target aarch64-sim --ci

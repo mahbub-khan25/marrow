@@ -1,11 +1,15 @@
 //! Quick capture: a system-wide shortcut that brings Marrow forward with a
 //! small box for jotting something down, from any app.
 
-use tauri::{AppHandle, Emitter, Manager, Runtime};
+#[cfg(desktop)]
+use tauri::{Emitter, Manager, Runtime};
+use tauri::AppHandle;
+#[cfg(desktop)]
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 use crate::commands::CmdResult;
 
+#[cfg(desktop)]
 pub fn plugin<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
     tauri_plugin_global_shortcut::Builder::new()
         .with_handler(|app, _shortcut, event| {
@@ -27,6 +31,15 @@ pub fn plugin<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
 
 /// Sets the quick-capture shortcut ("Ctrl+Alt+N" style), or turns it off.
 #[tauri::command(async)]
+#[cfg(mobile)]
+pub fn set_capture_shortcut(_app: AppHandle, _shortcut: Option<String>) -> CmdResult<()> {
+    // Phones and tablets have no system-wide shortcuts.
+    Ok(())
+}
+
+/// Sets the quick-capture shortcut ("Ctrl+Alt+N" style), or turns it off.
+#[tauri::command(async)]
+#[cfg(desktop)]
 pub fn set_capture_shortcut(app: AppHandle, shortcut: Option<String>) -> CmdResult<()> {
     let gs = app.global_shortcut();
     gs.unregister_all().map_err(|e| e.to_string())?;
