@@ -1,7 +1,6 @@
 // CodeMirror 6 setup: Markdown, wikilink highlighting, Ctrl-click to follow,
 // and `[[` autocomplete.
 
-import { banglaEditor } from "./bangla";
 import {
   autocompletion,
   closeBrackets,
@@ -245,7 +244,6 @@ function foldMarker(open: boolean): HTMLElement {
 
 export function editorExtensions(hooks: EditorHooks): Extension[] {
   return [
-    banglaEditor(),
     writingOptions(),
     history(),
     drawSelection(),

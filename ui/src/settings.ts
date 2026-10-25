@@ -203,14 +203,6 @@ function render() {
           ]),
         ),
         row(
-          "Bangla typing",
-          "Type Bangla with an English keyboard, powered by Ekushe Next: ami → আমি, with suggestions as you type (Tab for the next one). F12 or the অ button in the status bar switches it on and off.",
-          prefSeg("banglaKeys", [
-            [true, "Show the button"],
-            [false, "Off"],
-          ]),
-        ),
-        row(
           "Vim keys",
           "Edit in Source with Vim's normal, insert and visual modes (Esc, hjkl, dd, :w …). Off by default.",
           prefSeg("vim", [
@@ -256,7 +248,7 @@ function render() {
         null,
         row(
           "Interface language",
-          "Menus, buttons and messages. Your notes are never changed.",
+          "Menus, buttons and messages. Your notes are never changed. To type in Bangla, use a Bangla keyboard such as Ekushe Next.",
           prefSeg("language", [
             ["en", "English"],
             ["bn", "বাংলা"],

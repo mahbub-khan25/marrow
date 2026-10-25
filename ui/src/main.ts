@@ -32,7 +32,6 @@ import { exportHtml, printNote } from "./export";
 import { openHistory } from "./history";
 import { openTimeMachine } from "./timemachine";
 import { openSwitch, type SwitchFrom } from "./switch";
-import { banglaTyping, installBanglaInputs, loadEngine, onBanglaTyping, setBanglaTyping } from "./bangla";
 import { setLanguage } from "./i18n";
 import { markSeen, openWeeklyReview, renderResurface, seenMoved, type ResurfaceApp } from "./resurface";
 import { openCapture } from "./capture";
@@ -1549,7 +1548,6 @@ function commands(): Command[] {
         tree.reveal(p);
       }
     }),
-    cmd("Bangla typing on / off (F12)", "keyboard", () => void toggleBangla(), "F12"),
     cmd("Toggle dark mode", "moon", () => setPref("theme", document.documentElement.dataset.theme === "dark" || (prefs.theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches) ? "light" : "dark")),
     cmd("Import from Notion, Evernote, OneNote…", "tray-arrow-down", () => importNotes()),
     cmd("Move from Notion (step by step)…", "notion-logo", () => moveFrom("notion")),
@@ -1879,27 +1877,6 @@ function showWelcome(error?: string) {
   if (error) el.textContent = error;
 }
 
-// ---------------------------------------------------------------- Bangla
-
-async function toggleBangla() {
-  if (!prefs.banglaKeys) setPref("banglaKeys", true);
-  setBanglaTyping(!banglaTyping());
-  if (!banglaTyping()) return toast("English typing. F12 for Bangla.");
-  if (!(await loadEngine())) {
-    setBanglaTyping(false);
-    return toast("Ekushe Next couldn't start, so Bangla typing is off.", "error");
-  }
-  toast("বাংলা টাইপিং চালু (একুশে নেক্সট): ami → আমি. Tab for other words, F12 for English.");
-}
-
-function showBanglaButton() {
-  const b = $("bangla-toggle");
-  b.hidden = !prefs.banglaKeys;
-  b.setAttribute("aria-pressed", String(banglaTyping()));
-  b.textContent = banglaTyping() ? "অ" : "A";
-  if (!prefs.banglaKeys && banglaTyping()) setBanglaTyping(false);
-}
-
 // ------------------------------------------------------------------- boot
 
 function bindKeys() {
@@ -1907,10 +1884,6 @@ function bindKeys() {
     if (e.key === "F11" && !$("app").hidden) {
       e.preventDefault();
       toggleFocus();
-    } else if (e.key === "F12" && !e.ctrlKey && !e.altKey && !e.metaKey) {
-      // Switches between Bangla (Ekushe Next) and English typing.
-      e.preventDefault();
-      void toggleBangla();
     }
   });
   // A file dropped where nothing takes it mustn't replace the app with the file.
@@ -2080,10 +2053,6 @@ async function boot() {
   document.documentElement.toggleAttribute("data-mobile", platform.mobile);
   applyPrefs();
   setLanguage(prefs.language);
-  installBanglaInputs();
-  onBanglaTyping(() => showBanglaButton());
-  $("bangla-toggle").addEventListener("click", () => void toggleBangla());
-  showBanglaButton();
   pluginHooks();
   onVimWrite(() => {
     const d = focusedPane().doc;
@@ -2264,7 +2233,6 @@ async function boot() {
   onPrefs(() => {
     applyCaptureKey();
     if (prefs.language !== lang) setLanguage((lang = prefs.language));
-    showBanglaButton();
     for (const p of [primary, splitPane]) {
       setLivePreview(p.view, prefs.livePreview);
       applyWriting(p.view);

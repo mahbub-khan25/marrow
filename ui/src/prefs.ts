@@ -31,8 +31,6 @@ export interface Prefs {
   resurface: boolean;
   /** The interface language. */
   language: Lang;
-  /** The Bangla typing button in the status bar (and F12). */
-  banglaKeys: boolean;
 }
 
 const DEFAULTS: Prefs = {
@@ -51,7 +49,6 @@ const DEFAULTS: Prefs = {
   vim: false,
   resurface: true,
   language: defaultLang(),
-  banglaKeys: defaultLang() === "bn",
 };
 
 export const prefs: Prefs = { ...DEFAULTS, ...storage<Partial<Prefs>>("marrow.prefs", {}) };
