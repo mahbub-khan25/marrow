@@ -1,6 +1,6 @@
 # Releasing Marrow
 
-## Where things stand (1.2.0)
+## Where things stand (1.3.0)
 
 Every blocker from the readiness reviews is fixed and covered by tests:
 
