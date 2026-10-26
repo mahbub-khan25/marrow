@@ -1062,6 +1062,9 @@ export class NotePane {
     }
     this.blocks.hide();
     this.preview.innerHTML = renderMarkdown(doc.text, this.unresolved);
+    // A first "# Heading" that repeats the title shows once, as the title.
+    const first = this.preview.firstElementChild;
+    if (first?.tagName === "H1" && first.textContent?.trim().toLowerCase() === doc.name.trim().toLowerCase()) first.classList.add("is-title");
     this.decoratePreview();
     this.tables.decorate();
     for (const w of this.preview.querySelectorAll<HTMLElement>(":scope > .mermaid-wrap[data-line]")) {

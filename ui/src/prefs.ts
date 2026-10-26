@@ -29,6 +29,8 @@ export interface Prefs {
   vim: boolean;
   /** Old notes, "on this day" and the weekly review on the start screen. */
   resurface: boolean;
+  /** The typeface of note text: book (Literata), sans (Atkinson) or classic (EB Garamond). */
+  readFont: "book" | "sans" | "classic";
   /** The interface language. */
   language: Lang;
 }
@@ -48,6 +50,7 @@ const DEFAULTS: Prefs = {
   spellcheck: true,
   vim: false,
   resurface: true,
+  readFont: "book",
   language: defaultLang(),
 };
 
@@ -71,7 +74,9 @@ export function applyPrefs() {
   if (prefs.theme === "system") delete root.dataset.theme;
   else root.dataset.theme = prefs.theme;
   root.style.setProperty("--note-size", `${prefs.size}px`);
-  root.style.setProperty("--note-width", { narrow: "680px", normal: "820px", wide: "1080px" }[prefs.width]);
+  root.style.setProperty("--note-width", { narrow: "600px", normal: "700px", wide: "960px" }[prefs.width]);
+  if (prefs.readFont === "book") delete root.dataset.readFont;
+  else root.dataset.readFont = prefs.readFont;
   document.body.classList.toggle("link-tint", prefs.linkStyle === "tint");
   root.dataset.toolbar = prefs.toolbar ? "on" : "off";
 }

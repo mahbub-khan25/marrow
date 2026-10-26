@@ -220,25 +220,6 @@ function render() {
             [0, "When closed"],
           ]),
         ),
-        row(
-          "Readable line length",
-          "Holds the writing column near a comfortable measure.",
-          prefSeg("width", [
-            ["narrow", "Narrow"],
-            ["normal", "Normal"],
-            ["wide", "Wide"],
-          ]),
-        ),
-        row(
-          "Text size",
-          "Body size for reading and writing.",
-          prefSeg("size", [
-            [16, "16"],
-            [18, "18"],
-            [20, "20"],
-            [22, "22"],
-          ]),
-        ),
       ),
     );
   } else if (tab === "appearance") {
@@ -252,6 +233,34 @@ function render() {
           prefSeg("language", [
             ["en", "English"],
             ["bn", "বাংলা"],
+          ]),
+        ),
+        row(
+          "Note text",
+          "The typeface of your notes. Book is made for long reading; Clean is plain and very easy to read; Classic is the old-style Garamond.",
+          prefSeg("readFont", [
+            ["book", "Book"],
+            ["sans", "Clean"],
+            ["classic", "Classic"],
+          ]),
+        ),
+        row(
+          "Text size",
+          "How big note text is, for reading and writing.",
+          prefSeg("size", [
+            [16, "Small"],
+            [18, "Medium"],
+            [20, "Large"],
+            [22, "Larger"],
+          ]),
+        ),
+        row(
+          "Note width",
+          "How wide the column of text is. Narrower lines are easier to read.",
+          prefSeg("width", [
+            ["narrow", "Narrow"],
+            ["normal", "Normal"],
+            ["wide", "Wide"],
           ]),
         ),
         row(

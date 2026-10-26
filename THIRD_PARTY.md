@@ -11,6 +11,6 @@ license texts ship with the packages (see `Cargo.lock` and
 | DOMPurify | MPL-2.0 or Apache-2.0 |
 | d3-force, yaml | ISC |
 | Phosphor Icons | MIT |
-| EB Garamond and Noto Serif Bengali fonts (via Fontsource) | SIL Open Font License 1.1 |
+| Atkinson Hyperlegible Next, Literata, EB Garamond, Noto Sans Bengali and Noto Serif Bengali fonts (via Fontsource); the zero of Public Sans (`ui/src/assets/fonts/`) | SIL Open Font License 1.1 |
 
 Marrow is not affiliated with Obsidian and contains none of its code.

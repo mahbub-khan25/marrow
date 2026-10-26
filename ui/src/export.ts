@@ -139,8 +139,12 @@ export async function usedFonts(fonts: CSSFontFaceRule[], content: HTMLElement):
   for (const f of fonts) {
     const family = f.style.getPropertyValue("font-family").replace(/["']/g, "");
     const range = f.style.getPropertyValue("unicode-range");
+    // Text faces: the note's typeface (Literata, Atkinson or Garamond, as
+    // chosen), Atkinson for callouts and tags, and the plain zero.
+    const latin = !range || covers(range, 0x41) || covers(range, 0x101);
+    const textFace = /literata|atkinson|garamond/i.test(family) && latin;
     const want =
-      (/garamond/i.test(family) && (!range || covers(range, 0x41) || covers(range, 0x101))) || (hasMath && /^KaTeX/i.test(family)) || (hasIcons && /phosphor/i.test(family) && /duotone/i.test(family)) || (hasBangla && /noto serif bengali/i.test(family) && !!range && covers(range, 0x985));
+      textFace || /^Marrow Zero$/i.test(family) || (hasMath && /^KaTeX/i.test(family)) || (hasIcons && /phosphor/i.test(family) && /duotone/i.test(family)) || (hasBangla && /noto (serif|sans) bengali/i.test(family) && !!range && covers(range, 0x985));
     if (!want) continue;
     const src = f.style.getPropertyValue("src");
     // The first url() of a woff2 (or the first one at all).

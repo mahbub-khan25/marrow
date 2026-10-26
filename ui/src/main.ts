@@ -31,8 +31,9 @@ import { CanvasView } from "./canvas";
 import { exportHtml, printNote } from "./export";
 import { openHistory } from "./history";
 import { openTimeMachine } from "./timemachine";
+import { openHelp } from "./help";
 import { openSwitch, type SwitchFrom } from "./switch";
-import { setLanguage } from "./i18n";
+import { setLanguage, uiLocale } from "./i18n";
 import { markSeen, openWeeklyReview, renderResurface, seenMoved, type ResurfaceApp } from "./resurface";
 import { openCapture } from "./capture";
 import { usePropertyTypes } from "./properties";
@@ -218,7 +219,8 @@ async function refreshStats() {
   stats = await api.vaultStats().catch(() => stats);
   const line = `${stats.notes} ${stats.notes === 1 ? "note" : "notes"} · ${stats.links} ${stats.links === 1 ? "link" : "links"}`;
   $("vault-meta").textContent = line;
-  $("start-kicker").textContent = `${vaultName} · ${line}`;
+  $("start-kicker").textContent = `${line} in ${vaultName}`;
+  $("start-guide").hidden = stats.notes >= 15;
   updateStatus();
 }
 
@@ -311,7 +313,15 @@ const resurfaceApp: ResurfaceApp = {
   toast: (t, k) => toast(t, k),
 };
 
+function startHeading() {
+  const now = new Date();
+  const hr = now.getHours();
+  $("start-greeting").textContent = hr < 5 ? "Good evening" : hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening";
+  $("start-date").textContent = now.toLocaleDateString(uiLocale(), { weekday: "long", day: "numeric", month: "long" });
+}
+
 async function renderStart() {
+  startHeading();
   // A new, nearly empty vault: offer to bring notes over.
   const sw = $("switch-from");
   const stats = await api.vaultStats().catch(() => null);
@@ -548,7 +558,7 @@ async function openPath(path: string, how: OpenHow = "replace", at?: At): Promis
  */
 let inspectorOnPhone = false;
 /** Phones, and tablets too narrow for the inspector beside the note. */
-const inspectorCovers = () => isPhone() || (platform.mobile && innerWidth < 1200);
+const inspectorCovers = () => isPhone() || innerWidth < 1200;
 function toggleInspector() {
   if (inspectorCovers()) {
     inspectorOnPhone = !inspectorOnPhone;
@@ -1505,6 +1515,7 @@ function commands(): Command[] {
     }),
     cmd("Search all notes", "magnifying-glass", () => (setSide("search"), searchView.focus()), kbd("F", true)),
     cmd("Open settings", "gear-six", () => openSettings(), kbd(",")),
+    cmd("Help: how Marrow works", "question", () => openHelp()),
     cmd("New canvas", "squares-four", () => void newCanvas()),
     cmd("New folder", "folder-simple-plus", () => void newFolder(newNoteFolder())),
     cmd("Rename this note", "pencil-simple", () => primary.doc && primary.focusTitle()),
@@ -1949,6 +1960,7 @@ function bindChrome() {
   $("rail-canvas").addEventListener("click", () => void openSomeCanvas());
   $("rail-palette").addEventListener("click", () => openPalette());
   $("rail-settings").addEventListener("click", () => openSettings());
+  $("rail-help").addEventListener("click", () => openHelp());
   $("new-note").addEventListener("click", () => void newNote());
   $("vault-name").addEventListener("click", () => void chooseVault());
   $("open-vault").addEventListener("click", () => void chooseVault());
@@ -1977,14 +1989,23 @@ function bindChrome() {
     ["rail-today", `Today's note (${kbd("D")})`],
     ["rail-ask", `Ask your notes (${kbd("J", true)})`],
     ["rail-graph", `Graph view (${kbd("G")})`],
-    ["rail-palette", `Command palette (${kbd("K")})`],
+    ["rail-palette", `Search and commands (${kbd("K")})`],
     ["rail-settings", `Settings (${kbd(",")})`],
     ["new-note", `New note (${kbd("N")})`],
     ["split-btn", `Split pane (${kbd("\\")})`],
   ];
   for (const [id, t] of tips) $(id).title = t;
 
-  window.addEventListener("resize", () => $("inspector").classList.toggle("floating", innerWidth < 1200));
+  // Narrow windows: the inspector opens over the note only when asked.
+  let wasNarrow = innerWidth < 1200;
+  window.addEventListener("resize", () => {
+    const narrow = innerWidth < 1200;
+    if (narrow !== wasNarrow) {
+      wasNarrow = narrow;
+      inspectorOnPhone = false;
+      showStage();
+    } else $("inspector").classList.toggle("floating", narrow);
+  });
   // A crowded tab bar scrolls sideways with the wheel.
   $("tabs").addEventListener(
     "wheel",

@@ -114,7 +114,7 @@ export class GraphView {
       accent: v("--color-accent"),
       tag: v("--color-accent-2"),
       tagText: v("--color-accent-2-700"),
-      serif: v("--font-body"),
+      serif: v("--font-ui"),
       dark: isDark(v("--color-bg")),
     };
   }

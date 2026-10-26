@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+A new look that is easier to read and to find your way around.
+
+- **New type:** the interface uses Atkinson Hyperlegible Next, made by the
+  Braille Institute so letters like I, l and 1 can't be mistaken for each
+  other. Notes use Literata, made for long reading on screens. Choose
+  Book, Clean or Classic (the old Garamond) in Settings → Appearance →
+  Note text.
+- **Every place has a name:** the side bar shows a name under each icon
+  (on phones too). Today's note has its own sun icon, so it no longer looks
+  like the calendar.
+- **Help:** a new Help button explains every part of Marrow in one plain
+  sentence each, with the keys worth knowing.
+- **Start page:** opens with today's date, your notes and what to do next,
+  with a short "Getting started" while a vault is new.
+- **Nothing overlaps any more:** the note header on phones, the side panel
+  on smaller laptop screens (it now opens over the note only when asked),
+  tab names on phones, and settings whose choices are wide.
+- **Calmer, clearer screens:** softer colours with the note as the
+  brightest thing, rounded controls, plain sentence-case labels, a title
+  that no longer repeats the note's first heading, and settings in plain
+  words (Small, Medium, Large instead of pixel sizes).
+
 ## 1.2.0
 
 - **Time machine:** drag a slider to see a note, or the whole vault, as it
