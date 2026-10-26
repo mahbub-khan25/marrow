@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0
 
 - **Time machine:** drag a slider to see a note, or the whole vault, as it
   was on any past date. See what changed since, restore an old version, or
