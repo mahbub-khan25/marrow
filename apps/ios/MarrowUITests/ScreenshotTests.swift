@@ -42,6 +42,10 @@ final class ScreenshotTests: XCTestCase {
             let app = XCUIApplication()
             app.launchArguments = ["-demoVault", vault, "-screen", screen] + (theme.map { ["-theme", $0] } ?? [])
             app.launch()
+            guard app.wait(for: .runningForeground, timeout: 20) else {
+                XCTFail("Marrow didn't start for \(name)")
+                continue
+            }
             // Let the engine load the vault and the screen settle.
             sleep(4)
             let shot = XCUIScreen.main.screenshot()
