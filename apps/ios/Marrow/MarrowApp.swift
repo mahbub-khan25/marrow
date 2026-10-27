@@ -24,12 +24,12 @@ struct MarrowApp: App {
     var body: some Scene {
         WindowGroup {
             Root()
+                .toasts()
                 .environment(store)
                 .environment(router)
                 .environment(\.reading, Reading(prefs: store.prefs))
                 .preferredColorScheme(store.prefs.colorScheme)
                 .tint(.accent)
-                .toasts()
                 .task { await start() }
                 .onReceive(NotificationCenter.default.publisher(for: QuickActions.notice)) { _ in handleQuickAction() }
         }
