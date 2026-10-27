@@ -56,7 +56,7 @@ struct MarrowApp: App {
     @MainActor
     private func start() async {
         if let demo {
-            if let t = demo.theme { store.prefs.theme = t }
+            store.prefs.theme = demo.theme ?? "light"
             if demo.screen != "welcome" {
                 _ = try? await store.open(demo.vault.path)
             }

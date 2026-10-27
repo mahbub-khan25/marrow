@@ -248,7 +248,7 @@ impl Marrow {
                 let mut refs: Vec<LineRef> = b
                     .refs
                     .iter()
-                    .map(|r| LineRef { line: r.pos.start.line, text: lines.get(r.pos.start.line as usize).copied().unwrap_or("").trim().chars().take(240).collect() })
+                    .map(|r| LineRef { line: r.pos.start.line, text: tidy_line(lines.get(r.pos.start.line as usize).copied().unwrap_or("").trim(), &[]).0.chars().take(240).collect() })
                     .collect();
                 refs.dedup_by_key(|r| r.line);
                 backlinks.push(Backlink { title: display_name(b.source.as_str()), source: b.source.to_string(), lines: refs });
@@ -357,7 +357,11 @@ impl Marrow {
                         lines: h
                             .snippets
                             .into_iter()
-                            .map(|s| SearchLine { line: s.line, text: s.text, ranges: s.ranges.into_iter().flat_map(|(a, b)| [a, b]).collect() })
+                            .map(|s| {
+                                let raw: Vec<u32> = s.ranges.into_iter().flat_map(|(a, b)| [a, b]).collect();
+                                let (text, ranges) = tidy_line(&s.text, &raw);
+                                SearchLine { line: s.line, text, ranges }
+                            })
                             .collect(),
                     })
                     .collect(),
@@ -445,7 +449,7 @@ mod tests {
         let m = crate::tests::vault(dir.path(), &[("Apple.md", "# Apple\nSee [[B]] and #work\n- [ ] call Sam\n"), ("B.md", "B mentions apple here.\n")]);
         let d = m.note_details("B.md".into()).unwrap();
         assert_eq!(d.backlinks.len(), 1);
-        assert_eq!(d.backlinks[0].lines[0].text, "See [[B]] and #work");
+        assert_eq!(d.backlinks[0].lines[0].text, "See B and #work");
         let a = m.note_details("Apple.md".into()).unwrap();
         assert_eq!(a.tags, ["#work"]);
         assert_eq!(a.outline[0].text, "Apple");
@@ -462,5 +466,122 @@ mod tests {
         assert_eq!(m.tags().unwrap().len(), 0);
         assert_eq!(m.follow_link("C".into(), "Apple.md".into()).unwrap(), "C.md");
         assert_eq!(m.find_files("c".into(), None, 5).unwrap()[0].path, "C.md");
+    }
+}
+
+/// A search line without Markdown marks (`[[`, `]]`, link targets behind an
+/// alias, list and task bullets, heading `#`s, `**` and backticks), with the
+/// highlight ranges (UTF-16 code units) moved to match.
+pub(crate) fn tidy_line(text: &str, ranges: &[u32]) -> (String, Vec<u32>) {
+    let chars: Vec<char> = text.chars().collect();
+    let mut keep = vec![true; chars.len()];
+    let n = chars.len();
+    let at = |i: usize, s: &str| s.chars().enumerate().all(|(k, c)| chars.get(i + k) == Some(&c));
+    // Leading bullet, task box or heading marks.
+    let mut i = 0;
+    while i < n && chars[i] == ' ' {
+        i += 1;
+    }
+    let lead = i;
+    for m in ["- [ ] ", "- [x] ", "- [X] ", "* [ ] ", "* [x] ", "- ", "* ", "+ ", "> "] {
+        if at(lead, m) {
+            keep[..lead + m.chars().count()].iter_mut().for_each(|k| *k = false);
+            break;
+        }
+    }
+    if chars.get(lead) == Some(&'#') {
+        let mut j = lead;
+        while j < n && chars[j] == '#' {
+            j += 1;
+        }
+        if j < n && chars[j] == ' ' {
+            keep[..=j].iter_mut().for_each(|k| *k = false);
+        }
+    }
+    // Text inside `code` stays as it is.
+    let mut code = vec![false; n];
+    let mut inside = false;
+    for (j, c) in chars.iter().enumerate() {
+        if *c == '`' {
+            inside = !inside;
+        } else {
+            code[j] = inside;
+        }
+    }
+    // Wikilinks: keep the alias, or else the target.
+    let mut i = 0;
+    while i + 1 < n {
+        if code[i] || chars[i] == '`' {
+            i += 1;
+            continue;
+        }
+        if at(i, "[[") {
+            if let Some(close) = (i + 2..n.saturating_sub(1)).take_while(|&j| !code[j] && chars[j] != '`').find(|&j| at(j, "]]")) {
+                if i > 0 && chars[i - 1] == '!' {
+                    keep[i - 1] = false;
+                }
+                keep[i] = false;
+                keep[i + 1] = false;
+                keep[close] = false;
+                keep[close + 1] = false;
+                if let Some(bar) = (i + 2..close).find(|&j| chars[j] == '|') {
+                    keep[i + 2..=bar].iter_mut().for_each(|k| *k = false);
+                }
+                i = close + 2;
+                continue;
+            }
+        }
+        if at(i, "**") || at(i, "__") {
+            keep[i] = false;
+            keep[i + 1] = false;
+            i += 2;
+            continue;
+        }
+        i += 1;
+    }
+    for (j, c) in chars.iter().enumerate() {
+        if *c == '`' {
+            keep[j] = false;
+        }
+    }
+    // Map old UTF-16 positions to new ones.
+    let mut map = Vec::with_capacity(text.len() + 1);
+    let mut out = String::with_capacity(text.len());
+    let mut new16 = 0u32;
+    for (j, c) in chars.iter().enumerate() {
+        for _ in 0..c.len_utf16() {
+            map.push(new16);
+        }
+        if keep[j] {
+            out.push(*c);
+            new16 += c.len_utf16() as u32;
+        }
+    }
+    map.push(new16);
+    let moved: Vec<u32> = ranges.iter().map(|&r| map.get(r as usize).copied().unwrap_or(new16)).collect();
+    // Drop highlights that vanished with the marks.
+    let mut kept = Vec::new();
+    for p in moved.chunks(2) {
+        if p.len() == 2 && p[1] > p[0] {
+            kept.extend_from_slice(p);
+        }
+    }
+    (out.trim_end().to_string(), kept)
+}
+
+#[cfg(test)]
+mod tidy_tests {
+    use super::tidy_line;
+
+    #[test]
+    fn marks_go_and_highlights_follow() {
+        let t = "- [ ] Link notes by typing `[[`, like [[Garden plan]]";
+        // "Garden" in UTF-16 units
+        let s = t.find("Garden").unwrap() as u32;
+        let (out, r) = tidy_line(t, &[s, s + 6]);
+        assert_eq!(out, "Link notes by typing [[, like Garden plan");
+        assert_eq!(&out[r[0] as usize..r[1] as usize], "Garden");
+        let (out, _) = tidy_line("## See [[Daily/2026-10-24|the weekend]] and **this**", &[]);
+        assert_eq!(out, "See the weekend and this");
     }
 }

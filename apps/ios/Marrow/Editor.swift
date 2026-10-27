@@ -34,13 +34,12 @@ struct MarkdownEditor: UIViewRepresentable {
         let bar = EditorBarHost(coordinator: context.coordinator)
         v.inputAccessoryView = bar
         context.coordinator.bar = bar
-        if startLine >= 0 {
-            let offset = lineOffset(text, startLine)
-            v.selectedRange = NSRange(location: offset, length: 0)
-        }
+        // Start where asked, or at the top (not the end, which a long note
+        // would scroll to).
+        v.selectedRange = NSRange(location: startLine >= 0 ? lineOffset(text, startLine) : 0, length: 0)
         DispatchQueue.main.async {
             v.becomeFirstResponder()
-            if startLine >= 0 { v.scrollRangeToVisible(v.selectedRange) }
+            if startLine >= 0 { v.scrollRangeToVisible(v.selectedRange) } else { v.setContentOffset(.zero, animated: false) }
         }
         return v
     }

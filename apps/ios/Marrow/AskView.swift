@@ -236,6 +236,7 @@ struct CalendarView: View {
             }
         }
         .navigationTitle(Text("Calendar"))
+        .navigationBarTitleDisplayMode(.inline)
         .task(id: "\(month)-\(store.tick)") { await load() }
     }
 
@@ -279,6 +280,8 @@ struct GraphView: View {
     @State private var pan: CGSize = .zero
     @State private var lastPan: CGSize = .zero
     @State private var fitted = false
+    /// Goes up each time the graph is loaded, so it's fitted to the screen.
+    @State private var loads = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -330,7 +333,8 @@ struct GraphView: View {
                     )
                     .onTapGesture { loc in tap(loc, size: size, g: g) }
                     .onAppear { fit(g, size) }
-                    .onChange(of: g.nodes.count) { _, _ in fit(g, size) }
+                    .onChange(of: size) { _, now in fit(g, now) }
+                    .onChange(of: loads) { _, _ in fit(g, size) }
                 }
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -341,13 +345,16 @@ struct GraphView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: "\(tags)-\(missing)-\(twoSteps)-\(store.tick)") {
             let (t, m, a, d) = (tags, missing, around, twoSteps)
-            graph = try? await store.run { try $0.graph(showTags: t, showMissing: m, showAttachments: false, around: a.isEmpty ? nil : a, depth: d ? 2 : 1) }
-            fitted = false
+            let g = try? await store.run { try $0.graph(showTags: t, showMissing: m, showAttachments: false, around: a.isEmpty ? nil : a, depth: d ? 2 : 1) }
+            // Fit again only when the set of notes shown changes, not on every save.
+            if g?.nodes.count != graph?.nodes.count { fitted = false }
+            graph = g
+            loads += 1
         }
     }
 
     private func fit(_ g: Graph, _ size: CGSize) {
-        guard !g.nodes.isEmpty, size.width > 0, !fitted else { return }
+        guard !g.nodes.isEmpty, size.width > 10, size.height > 10, !fitted else { return }
         let xs = g.nodes.map { CGFloat($0.x) }, ys = g.nodes.map { CGFloat($0.y) }
         let w = max(1, (xs.max() ?? 0) - (xs.min() ?? 0)), h = max(1, (ys.max() ?? 0) - (ys.min() ?? 0))
         let s = min(3, max(0.15, min((size.width - 96) / w, (size.height - 96) / h)))
