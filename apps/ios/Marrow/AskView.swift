@@ -309,12 +309,12 @@ struct GraphView: View {
                         ctx.stroke(edges, with: .color(Color.faint.opacity(0.5)), lineWidth: 1.5)
                         let few = g.nodes.count <= 80
                         for (i, n) in g.nodes.enumerated() {
-                            let r = min(14, 4 + sqrt(CGFloat(n.degree)) * 2.2) * min(1.4, max(0.7, sqrt(scale)))
+                            let r = min(16, 6 + sqrt(CGFloat(n.degree)) * 2.4) * min(1.4, max(0.7, sqrt(scale)))
                             let p = at(i)
                             let color: Color = n.id == around ? .orange : n.kind == .tag ? .inkSoft : n.kind == .missing ? .faint : .accent
                             ctx.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)), with: .color(color))
                             if few || scale > 1.2 || n.degree >= 6 || n.id == around {
-                                ctx.draw(Text(verbatim: n.name).font(.caption2).foregroundColor(Color.ink), at: CGPoint(x: p.x, y: p.y + r + 9))
+                                ctx.draw(Text(verbatim: n.name).font(.caption).foregroundColor(Color.ink), at: CGPoint(x: p.x, y: p.y + r + 10))
                             }
                         }
                     }
@@ -371,7 +371,7 @@ private struct View2D {
     init(_ g: Graph, _ size: CGSize, _ zoom: CGFloat, _ pan: CGSize) {
         let xs = g.nodes.map { CGFloat($0.x) }, ys = g.nodes.map { CGFloat($0.y) }
         let (x0, x1, y0, y1) = (xs.min() ?? 0, xs.max() ?? 0, ys.min() ?? 0, ys.max() ?? 0)
-        let fit = min(3, (size.width - 96) / max(1, x1 - x0), (size.height - 96) / max(1, y1 - y0))
+        let fit = min(3, (size.width - 150) / max(1, x1 - x0), (size.height - 120) / max(1, y1 - y0))
         k = max(0.05, fit) * zoom
         mid = CGPoint(x: (x0 + x1) / 2, y: (y0 + y1) / 2)
         c = CGPoint(x: size.width / 2 + pan.width, y: size.height / 2 + pan.height)
