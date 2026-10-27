@@ -279,9 +279,6 @@ struct GraphView: View {
     @State private var lastScale: CGFloat = 1
     @State private var pan: CGSize = .zero
     @State private var lastPan: CGSize = .zero
-    @State private var fitted = false
-    /// Goes up each time the graph is loaded, so it's fitted to the screen.
-    @State private var loads = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -301,8 +298,9 @@ struct GraphView: View {
                 GeometryReader { geo in
                     let size = geo.size
                     Canvas { ctx, _ in
-                        let c = CGPoint(x: size.width / 2 + pan.width, y: size.height / 2 + pan.height)
-                        func at(_ i: Int) -> CGPoint { CGPoint(x: c.x + CGFloat(g.nodes[i].x) * scale, y: c.y + CGFloat(g.nodes[i].y) * scale) }
+                        let v = View2D(g, size, scale, pan)
+                        let scale = v.k
+                        func at(_ i: Int) -> CGPoint { v.at(g.nodes[i]) }
                         var edges = Path()
                         for e in g.edges {
                             edges.move(to: at(Int(e.from)))
@@ -324,7 +322,7 @@ struct GraphView: View {
                     .gesture(
                         SimultaneousGesture(
                             MagnificationGesture()
-                                .onChanged { v in scale = min(6, max(0.15, lastScale * v)) }
+                                .onChanged { v in scale = min(8, max(0.3, lastScale * v)) }
                                 .onEnded { _ in lastScale = scale },
                             DragGesture()
                                 .onChanged { v in pan = CGSize(width: lastPan.width + v.translation.width, height: lastPan.height + v.translation.height) }
@@ -332,9 +330,6 @@ struct GraphView: View {
                         )
                     )
                     .onTapGesture { loc in tap(loc, size: size, g: g) }
-                    .onAppear { fit(g, size) }
-                    .onChange(of: size) { _, now in fit(g, now) }
-                    .onChange(of: loads) { _, _ in fit(g, size) }
                 }
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -346,33 +341,44 @@ struct GraphView: View {
         .task(id: "\(tags)-\(missing)-\(twoSteps)-\(store.tick)") {
             let (t, m, a, d) = (tags, missing, around, twoSteps)
             let g = try? await store.run { try $0.graph(showTags: t, showMissing: m, showAttachments: false, around: a.isEmpty ? nil : a, depth: d ? 2 : 1) }
-            // Fit again only when the set of notes shown changes, not on every save.
-            if g?.nodes.count != graph?.nodes.count { fitted = false }
+            // Back to the whole graph only when the set of notes shown changes,
+            // not on every save.
+            if g?.nodes.count != graph?.nodes.count {
+                scale = 1; lastScale = 1; pan = .zero; lastPan = .zero
+            }
             graph = g
-            loads += 1
         }
-    }
-
-    private func fit(_ g: Graph, _ size: CGSize) {
-        guard !g.nodes.isEmpty, size.width > 10, size.height > 10, !fitted else { return }
-        let xs = g.nodes.map { CGFloat($0.x) }, ys = g.nodes.map { CGFloat($0.y) }
-        let w = max(1, (xs.max() ?? 0) - (xs.min() ?? 0)), h = max(1, (ys.max() ?? 0) - (ys.min() ?? 0))
-        let s = min(3, max(0.15, min((size.width - 96) / w, (size.height - 96) / h)))
-        scale = s
-        lastScale = s
-        pan = CGSize(width: -((xs.min() ?? 0) + (xs.max() ?? 0)) / 2 * s, height: -((ys.min() ?? 0) + (ys.max() ?? 0)) / 2 * s)
-        lastPan = pan
-        fitted = true
     }
 
     private func tap(_ loc: CGPoint, size: CGSize, g: Graph) {
-        let c = CGPoint(x: size.width / 2 + pan.width, y: size.height / 2 + pan.height)
-        let hit = g.nodes.min { a, b in
-            hypot(c.x + CGFloat(a.x) * scale - loc.x, c.y + CGFloat(a.y) * scale - loc.y) < hypot(c.x + CGFloat(b.x) * scale - loc.x, c.y + CGFloat(b.y) * scale - loc.y)
-        }
-        if let hit, hit.kind == .note, hypot(c.x + CGFloat(hit.x) * scale - loc.x, c.y + CGFloat(hit.y) * scale - loc.y) < 32 {
+        let v = View2D(g, size, scale, pan)
+        func d(_ n: GraphNode) -> CGFloat { let p = v.at(n); return hypot(p.x - loc.x, p.y - loc.y) }
+        let hit = g.nodes.min { d($0) < d($1) }
+        if let hit, hit.kind == .note, d(hit) < 32 {
             router.open(path: hit.id)
         }
+    }
+}
+
+/// Where the graph's nodes go on screen: the whole graph fitted to the view,
+/// then the person's zoom and pan.
+private struct View2D {
+    let mid: CGPoint
+    let c: CGPoint
+    /// Points per layout unit.
+    let k: CGFloat
+
+    init(_ g: Graph, _ size: CGSize, _ zoom: CGFloat, _ pan: CGSize) {
+        let xs = g.nodes.map { CGFloat($0.x) }, ys = g.nodes.map { CGFloat($0.y) }
+        let (x0, x1, y0, y1) = (xs.min() ?? 0, xs.max() ?? 0, ys.min() ?? 0, ys.max() ?? 0)
+        let fit = min(3, (size.width - 96) / max(1, x1 - x0), (size.height - 96) / max(1, y1 - y0))
+        k = max(0.05, fit) * zoom
+        mid = CGPoint(x: (x0 + x1) / 2, y: (y0 + y1) / 2)
+        c = CGPoint(x: size.width / 2 + pan.width, y: size.height / 2 + pan.height)
+    }
+
+    func at(_ n: GraphNode) -> CGPoint {
+        CGPoint(x: c.x + (CGFloat(n.x) - mid.x) * k, y: c.y + (CGFloat(n.y) - mid.y) * k)
     }
 }
 
