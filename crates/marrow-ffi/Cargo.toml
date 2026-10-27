@@ -1,0 +1,35 @@
+[package]
+name = "marrow-ffi"
+description = "Marrow's engine for the native iOS (SwiftUI) and Android (Jetpack Compose) apps"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "marrow_ffi"
+# staticlib: linked into the iOS app; cdylib: loaded by the Android app.
+crate-type = ["staticlib", "cdylib", "lib"]
+
+[[bin]]
+# Writes the Swift and Kotlin bindings: see apps/README.md.
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+bindgen = ["uniffi/cli"]
+
+[dependencies]
+marrow-core = { path = "../marrow-core" }
+marrow-webdav = { path = "../marrow-webdav" }
+uniffi = "0.29"
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+pulldown-cmark = { workspace = true, features = [] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "http2", "blocking", "json"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }

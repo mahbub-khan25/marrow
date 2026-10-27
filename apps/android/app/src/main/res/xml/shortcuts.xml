@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="capture"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/quick_note"
+        android:shortcutLongLabel="@string/quick_note">
+        <intent
+            android:action="app.marrow.CAPTURE"
+            android:targetPackage="app.marrow.notes"
+            android:targetClass="app.marrow.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="today"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/todays_note"
+        android:shortcutLongLabel="@string/todays_note">
+        <intent
+            android:action="app.marrow.TODAY"
+            android:targetPackage="app.marrow.notes"
+            android:targetClass="app.marrow.MainActivity" />
+    </shortcut>
+</shortcuts>

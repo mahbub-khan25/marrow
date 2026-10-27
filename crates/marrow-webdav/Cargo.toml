@@ -1,0 +1,15 @@
+[package]
+name = "marrow-webdav"
+description = "WebDAV sync target for Marrow (Nextcloud, ownCloud, Synology…)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+marrow-core = { path = "../marrow-core" }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "http2", "blocking"] }
+quick-xml = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

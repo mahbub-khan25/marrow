@@ -23,6 +23,7 @@
 //! | `import`  | Notion, Evernote, Word/OneNote and web pages into notes      |
 //! | `vectors` | embeddings of note chunks, for search by meaning             |
 //! | `lock`    | password-locked notes (Argon2id + XChaCha20-Poly1305)        |
+//! | `vault_locks` | which notes and folders are locked; keys for this session |
 
 pub mod atomic;
 pub mod backup;
@@ -42,6 +43,7 @@ pub mod path;
 pub mod sealed;
 pub mod service;
 pub mod vault;
+pub mod vault_locks;
 pub mod vectors;
 
 pub use backup::{Backup, BackupStore};

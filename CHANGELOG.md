@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Marrow on iPhone, iPad and Android:** native apps made with SwiftUI and
+  Jetpack Compose, with Today and daily notes, the calendar, tasks, search,
+  quick capture (with a photo or by speaking), sync with end-to-end
+  encryption, locked notes, the graph, canvases, version history, the time
+  machine, Ask your notes, import and English or Bangla. Both share the same
+  engine as the desktop app. See [apps/README.md](apps/README.md).
+- The lock and WebDAV code moved into the engine crates so the phone apps
+  use the same code as the desktop app.
+
 ## 1.3.0
 
 A new look that is easier to read and to find your way around.

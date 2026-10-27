@@ -1,0 +1,69 @@
+# The iOS app (SwiftUI): builds the engine for iPhone, iPad and the
+# Simulator, the app, takes a picture of every screen on an iPhone and an
+# iPad Simulator, and builds it for real devices (unsigned until Apple
+# signing is set up).
+name: iOS
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/ios/**", "apps/demo-vault/**", "apps/i18n/**", "crates/**", "Cargo.*", ".github/workflows/ios.yml"]
+  pull_request:
+    paths: ["apps/ios/**", "apps/i18n/**", "crates/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    name: Build and draw the screens on a Simulator
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ios-native
+      - name: Engine for iOS
+        run: apps/ios/build-rust.sh
+      - name: Xcode project
+        working-directory: apps/ios
+        run: |
+          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+          xcodegen
+      - name: Screens on an iPhone and an iPad
+        working-directory: apps/ios
+        run: |
+          pick() {
+            xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k in sorted(d, reverse=True) if 'iOS' in k for x in d[k] if x['name'].startswith('$1')))"
+          }
+          for dev in iPhone iPad; do
+            id=$(pick "$dev")
+            echo "$dev simulator: $id"
+            xcodebuild test -project Marrow.xcodeproj -scheme Marrow -destination "id=$id" \
+              CODE_SIGNING_ALLOWED=NO -resultBundlePath "$RUNNER_TEMP/$dev.xcresult" > "$RUNNER_TEMP/$dev.log" 2>&1 \
+              || { grep -E "error:|failed|XCTAssert|Fatal" "$RUNNER_TEMP/$dev.log" | head -80; tail -40 "$RUNNER_TEMP/$dev.log"; exit 1; }
+            grep -E "Test Case .*(passed|failed)|Executed" "$RUNNER_TEMP/$dev.log" | tail -5
+          done
+          ls shots
+      - name: Build for iPhone and iPad (unsigned)
+        working-directory: apps/ios
+        run: |
+          xcodebuild build -project Marrow.xcodeproj -scheme Marrow -configuration Release \
+            -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO > "$RUNNER_TEMP/build.log" 2>&1 \
+            || { grep -E "error:" "$RUNNER_TEMP/build.log" | head -60; tail -30 "$RUNNER_TEMP/build.log"; exit 1; }
+          grep -cE "warning:" "$RUNNER_TEMP/build.log" || true
+          echo "BUILD OK"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-screens
+          path: apps/ios/shots
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ios-logs
+          path: ${{ runner.temp }}/*.log

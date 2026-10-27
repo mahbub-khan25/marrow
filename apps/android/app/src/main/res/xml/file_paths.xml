@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Photos taken for a note are written here first, then saved into the vault. -->
+<paths>
+    <cache-path name="captures" path="captures/" />
+    <cache-path name="shared" path="shared/" />
+</paths>

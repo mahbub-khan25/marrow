@@ -1,0 +1,12 @@
+{
+  "nodes": [
+    {"id": "a1", "type": "group", "x": -40, "y": -60, "width": 620, "height": 300, "label": "Garden"},
+    {"id": "b1", "type": "text", "text": "## Spring\nTomatoes, basil, peas", "x": 0, "y": 0, "width": 240, "height": 140, "color": "4"},
+    {"id": "c1", "type": "file", "file": "Projects/Garden plan.md", "x": 300, "y": 0, "width": 240, "height": 200},
+    {"id": "d1", "type": "text", "text": "Ask Mina about **seed swap**", "x": 120, "y": 320, "width": 260, "height": 90, "color": "5"}
+  ],
+  "edges": [
+    {"id": "e1", "fromNode": "b1", "toNode": "c1"},
+    {"id": "e2", "fromNode": "d1", "toNode": "b1", "fromSide": "top", "toSide": "bottom"}
+  ]
+}

@@ -4,7 +4,8 @@ A local-first Markdown notes app in Rust. Your notes are plain `.md` files in
 a folder; Marrow indexes them, resolves `[[wikilinks]]` and shows backlinks.
 
 **[Download the latest beta](https://github.com/mahbub-khan25/marrow/releases)**
-for Windows, macOS and Linux. Marrow is free and open source under the
+for Windows, macOS and Linux. Native apps for iPhone, iPad and Android are
+in [apps/](apps/README.md). Marrow is free and open source under the
 [MIT license](LICENSE). Bug reports and pull requests are welcome; see
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -494,7 +495,10 @@ of that).
 ## Layout
 
 ```
-Cargo.toml                 workspace (marrow-core + src-tauri)
+Cargo.toml                 workspace (marrow-core, marrow-webdav, marrow-ffi, src-tauri)
+apps/                      iPhone, iPad and Android apps (see apps/README.md)
+crates/marrow-ffi/         the engine for the phone apps (UniFFI bindings)
+crates/marrow-webdav/      WebDAV client shared by desktop and phones
 package.json, vite.config  frontend build (source in ui/)
 src-tauri/                 Tauri shell: commands.rs bridges the window to the engine
 ui/src/main.ts             app shell: tabs, split, opening, rename/move, live updates

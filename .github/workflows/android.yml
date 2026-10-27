@@ -1,0 +1,84 @@
+# The Android app (Jetpack Compose): builds the engine for phones, the app,
+# draws every screen with the real engine (Roborazzi), and starts the app on
+# an emulator to make sure it runs. The debug APK can be installed to try it
+# (Actions → this run → Artifacts).
+name: Android
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/android/**", "apps/demo-vault/**", "apps/i18n/**", "apps/build-android.sh", "crates/**", "Cargo.*", ".github/workflows/android.yml"]
+  pull_request:
+    paths: ["apps/android/**", "apps/i18n/**", "crates/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build, test and draw the screens
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: android-native
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Engine for Android
+        run: |
+          cargo install cargo-ndk --version 4.1.2 --locked
+          export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          apps/build-android.sh
+      - name: Engine tests
+        run: cargo test -p marrow-ffi
+      - name: App and screenshots
+        working-directory: apps/android
+        run: ./gradlew --no-daemon assembleDebug :app:testDebugUnitTest -Proborazzi.test.record=true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: marrow-android-debug
+          path: apps/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-screens
+          path: apps/android/app/screenshots
+
+  emulator:
+    name: Run on an emulator
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: marrow-android-debug
+          path: apk
+      - name: Allow the emulator to use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: python3 apps/android/test/smoke.py apk/app-debug.apk emulator-screens
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-emulator-screens
+          path: emulator-screens

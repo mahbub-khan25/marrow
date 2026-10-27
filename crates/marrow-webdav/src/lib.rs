@@ -172,7 +172,7 @@ impl Remote for WebDav {
     }
 
     fn list(&self) -> io::Result<BTreeMap<String, RemoteFile>> {
-        let base_path = crate::commands::percent_decode(self.base.path());
+        let base_path = percent_decode(self.base.path());
         let mut out = BTreeMap::new();
         // Folder by folder: many servers turn off "Depth: infinity".
         let mut todo = vec![String::new()];
@@ -315,7 +315,7 @@ fn href_path(href: &str) -> String {
         Ok(u) => u.path().to_string(),
         Err(_) => href.to_string(),
     };
-    crate::commands::percent_decode(&path)
+    percent_decode(&path)
 }
 
 /// "Sat, 24 Oct 2026 22:54:00 GMT" → ms since 1970.
@@ -337,6 +337,25 @@ pub fn http_date_ms(s: &str) -> Option<u64> {
     let days = era * 146_097 + doe - 719_468;
     let secs = days * 86_400 + hh * 3600 + mm * 60 + ss;
     u64::try_from(secs).ok().map(|s| s * 1000)
+}
+
+/// `%20` → space, `%E5%9B%BE` → 图; anything that isn't a valid escape is kept.
+pub fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 #[cfg(test)]

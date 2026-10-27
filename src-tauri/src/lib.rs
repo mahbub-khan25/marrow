@@ -11,7 +11,7 @@ mod portable;
 mod publish;
 mod recall;
 mod sync;
-mod webdav;
+use marrow_webdav as webdav;
 
 use std::sync::Mutex;
 

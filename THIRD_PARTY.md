@@ -12,5 +12,8 @@ license texts ship with the packages (see `Cargo.lock` and
 | d3-force, yaml | ISC |
 | Phosphor Icons | MIT |
 | Atkinson Hyperlegible Next, Literata, EB Garamond, Noto Sans Bengali and Noto Serif Bengali fonts (via Fontsource); the zero of Public Sans (`ui/src/assets/fonts/`) | SIL Open Font License 1.1 |
+| UniFFI (phone app bindings) | MPL-2.0 |
+| Jetpack Compose, AndroidX, Material Components, Material Symbols, Coil (Android app) | Apache-2.0 |
+| JNA (Android app) | Apache-2.0 or LGPL-2.1 |
 
 Marrow is not affiliated with Obsidian and contains none of its code.

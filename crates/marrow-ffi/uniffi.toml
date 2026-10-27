@@ -1,0 +1,9 @@
+# Names of the generated bindings (see apps/README.md).
+[bindings.kotlin]
+package_name = "app.marrow.core"
+cdylib_name = "marrow_ffi"
+
+[bindings.swift]
+module_name = "MarrowCore"
+ffi_module_name = "MarrowCoreFFI"
+ffi_module_filename = "MarrowCoreFFI"

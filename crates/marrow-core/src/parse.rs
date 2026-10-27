@@ -621,7 +621,7 @@ fn find_wikilink_end(text: &str, from: usize) -> Option<usize> {
 /// Length in bytes of a tag body starting right after `#`, or 0 if none.
 /// Tags may contain letters, digits, `_`, `-`, `/` and any non-ASCII
 /// character, and must not be all digits.
-fn tag_len(s: &str) -> usize {
+pub fn tag_len(s: &str) -> usize {
     let mut len = 0;
     let mut has_non_digit = false;
     for c in s.chars() {
