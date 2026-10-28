@@ -41,8 +41,19 @@ def find(text):
     return None
 
 
+def dismiss_system_dialogs():
+    """A slow emulator sometimes shows "… isn't responding" for its own apps."""
+    for button in ("Wait", "Close app"):
+        at = find(button)
+        if at and find("Wait"):
+            adb("shell", "input", "tap", str(at[0]), str(at[1]))
+            time.sleep(2)
+            return
+
+
 def tap(text, wait=3):
     for _ in range(10):
+        dismiss_system_dialogs()
         at = find(text)
         if at:
             adb("shell", "input", "tap", str(at[0]), str(at[1]))
@@ -65,6 +76,7 @@ def main():
     adb("logcat", "-c")
     adb("shell", "am", "start", "-n", f"{APP}/app.marrow.MainActivity", check=True)
     time.sleep(8)
+    dismiss_system_dialogs()
     alive()
     shot(out, "1-welcome")
     tap("Start writing", 6)
