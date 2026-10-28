@@ -63,6 +63,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.marrow.R
+import app.marrow.ui.desk.onSecondaryClick
 import app.marrow.core.FileItem
 import app.marrow.core.FileKind
 import app.marrow.data.Engine
@@ -225,7 +226,10 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, trailing: (@Compos
 fun FileRow(item: FileItem, modifier: Modifier = Modifier, starred: Boolean = false, subtitle: String? = null, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
     val isFolder = item.kind == FileKind.FOLDER
     Row(
-        modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick).padding(horizontal = 20.dp, vertical = 12.dp),
+        modifier.fillMaxWidth()
+            // With a mouse, right-click does what a long press does.
+            .then(if (onLongClick != null) Modifier.onSecondaryClick(onLongClick) else Modifier)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick).padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = if (item.preview.isNotEmpty()) Alignment.Top else Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {

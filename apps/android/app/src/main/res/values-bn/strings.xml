@@ -16,6 +16,8 @@
     <string name="save">সংরক্ষণ</string>
     <string name="done">হয়ে গেছে</string>
     <string name="open">খুলুন</string>
+    <string name="hide_sidebar">সাইডবার লুকান</string>
+    <string name="show_sidebar">সাইডবার দেখান</string>
     <string name="edit">সম্পাদনা</string>
     <string name="delete">মুছুন</string>
     <string name="rename">নাম বদলান</string>

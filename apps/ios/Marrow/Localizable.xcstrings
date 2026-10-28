@@ -1858,6 +1858,23 @@
         }
       }
     },
+    "Hide the sidebar": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide the sidebar"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সাইডবার লুকান"
+          }
+        }
+      }
+    },
     "Hint (optional)": {
       "extractionState": "manual",
       "localizations": {
@@ -4338,6 +4355,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "সব দেখান"
+          }
+        }
+      }
+    },
+    "Show the sidebar": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the sidebar"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সাইডবার দেখান"
           }
         }
       }

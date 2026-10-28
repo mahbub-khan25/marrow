@@ -4,6 +4,37 @@ import android.net.Uri
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.unit.dp
+import app.marrow.data.words
+import app.marrow.ui.common.NameDialog
+import app.marrow.ui.desk.DESK_WIDTH
+import app.marrow.ui.desk.Place
+import app.marrow.ui.desk.Sidebar
+import app.marrow.ui.desk.todayPath
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -122,7 +153,12 @@ private val TABS = listOf(
 )
 
 private class AppNav(private val nav: NavHostController) : Nav {
-    override fun note(path: String, line: Int, edit: Boolean) = nav.navigate(NoteRoute(path, line, edit))
+    /** In the desktop layout a note opened from the sidebar replaces the one showing. */
+    var desk = false
+
+    override fun note(path: String, line: Int, edit: Boolean) = nav.navigate(NoteRoute(path, line, edit)) {
+        if (desk) popUpTo<NoteRoute> { inclusive = true }
+    }
     override fun folder(path: String) = nav.navigate(FolderRoute(path))
     override fun tag(tag: String) = nav.navigate(TagRoute(tag))
     override fun search(query: String) = nav.navigate(SearchRoute(query))
@@ -146,6 +182,22 @@ private class AppNav(private val nav: NavHostController) : Nav {
             else -> nav.navigate(FileRoute(path))
         }
     }
+}
+
+private fun goTab(nav: NavHostController, route: Any) = nav.navigate(route) {
+    popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+    launchSingleTop = true
+    restoreState = true
+}
+
+private fun goPlace(nav: NavHostController, place: Place) = when (place) {
+    Place.Today -> goTab(nav, TodayRoute)
+    Place.Tasks -> goTab(nav, TasksRoute)
+    Place.Ask -> goTab(nav, AskRoute)
+    Place.Search -> goTab(nav, SearchRoute())
+    Place.Calendar -> nav.navigate(CalendarRoute) { launchSingleTop = true }
+    Place.Graph -> nav.navigate(GraphRoute()) { launchSingleTop = true }
+    Place.Settings -> nav.navigate(SettingsRoute) { launchSingleTop = true }
 }
 
 @Composable
@@ -178,6 +230,8 @@ private fun Main(engine: Engine, incoming: Incoming?, onHandled: () -> Unit) {
     val onTab = TABS.any { t -> dest?.hasRoute(t.route::class) == true }
     var capture by remember { mutableStateOf<Incoming.Shared?>(null) }
     var captureOpen by remember { mutableStateOf(false) }
+    var sidebar by rememberSaveable { mutableStateOf(true) }
+    var naming by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val snackbar = LocalSnackbar.current
 
@@ -202,60 +256,124 @@ private fun Main(engine: Engine, incoming: Incoming?, onHandled: () -> Unit) {
     }
 
     CompositionLocalProvider(LocalNav provides appNav) {
-        NavigationSuiteScaffold(
-            navigationSuiteItems = {
-                TABS.forEach { t ->
-                    val selected = dest?.hasRoute(t.route::class) == true
-                    item(
-                        selected = selected,
-                        onClick = {
-                            nav.navigate(t.route) {
-                                popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(if (selected) t.selected else t.icon, contentDescription = null) },
-                        label = { Text(stringResource(t.label)) },
-                    )
+        BoxWithConstraints(
+            Modifier.fillMaxSize().onPreviewKeyEvent { e ->
+                if (e.type != KeyEventType.KeyDown || !(e.isCtrlPressed || e.isMetaPressed)) return@onPreviewKeyEvent false
+                when (e.key) {
+                    Key.K, Key.P -> { goPlace(nav, Place.Search); true }
+                    Key.D -> { scope.launch { engine.todayPath()?.let { appNav.note(it, edit = true) } }; true }
+                    Key.N -> { naming = true; true }
+                    Key.Comma -> { goPlace(nav, Place.Settings); true }
+                    Key.Backslash -> { sidebar = !sidebar; true }
+                    else -> false
                 }
             },
-            layoutType = if (onTab) NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(androidx.compose.material3.adaptive.currentWindowAdaptiveInfo()) else NavigationSuiteType.None,
-            containerColor = MaterialTheme.colorScheme.background,
         ) {
-            Box(Modifier.fillMaxSize()) {
-                NavHost(
-                    nav,
-                    startDestination = TodayRoute,
-                    enterTransition = { fadeIn() },
-                    exitTransition = { fadeOut() },
-                ) {
-                    composable<TodayRoute> { TodayScreen(onCapture = { captureOpen = true }) }
-                    composable<NotesRoute> { BrowserScreen("") }
-                    composable<AskRoute> { AskScreen() }
-                    composable<TasksRoute> { TasksScreen() }
-                    composable<SearchRoute> { SearchScreen(it.toRoute<SearchRoute>().query) }
-                    composable<FolderRoute> { BrowserScreen(it.toRoute<FolderRoute>().path) }
-                    composable<NoteRoute> {
-                        val r = it.toRoute<NoteRoute>()
-                        NoteScreen(r.path, r.line, r.edit)
+            val desk = maxWidth >= DESK_WIDTH
+            appNav.desk = desk
+            val place = when {
+                dest?.hasRoute(TodayRoute::class) == true -> Place.Today
+                dest?.hasRoute(TasksRoute::class) == true -> Place.Tasks
+                dest?.hasRoute(AskRoute::class) == true -> Place.Ask
+                dest?.hasRoute(SearchRoute::class) == true -> Place.Search
+                dest?.hasRoute(CalendarRoute::class) == true -> Place.Calendar
+                dest?.hasRoute(GraphRoute::class) == true -> Place.Graph
+                dest?.hasRoute(SettingsRoute::class) == true -> Place.Settings
+                else -> null
+            }
+            val openPath = when {
+                dest?.hasRoute(NoteRoute::class) == true -> entry?.toRoute<NoteRoute>()?.path
+                dest?.hasRoute(CanvasRoute::class) == true -> entry?.toRoute<CanvasRoute>()?.path
+                dest?.hasRoute(FileRoute::class) == true -> entry?.toRoute<FileRoute>()?.path
+                else -> null
+            }
+            NavigationSuiteScaffold(
+                navigationSuiteItems = {
+                    TABS.forEach { t ->
+                        val selected = dest?.hasRoute(t.route::class) == true
+                        item(
+                            selected = selected,
+                            onClick = { goTab(nav, t.route) },
+                            icon = { Icon(if (selected) t.selected else t.icon, contentDescription = null) },
+                            label = { Text(stringResource(t.label)) },
+                        )
                     }
-                    composable<TagRoute> { TagScreen(it.toRoute<TagRoute>().tag) }
-                    composable<CanvasRoute> { CanvasScreen(it.toRoute<CanvasRoute>().path) }
-                    composable<FileRoute> { FileScreen(it.toRoute<FileRoute>().path) }
-                    composable<CalendarRoute> { CalendarScreen() }
-                    composable<GraphRoute> { GraphScreen(it.toRoute<GraphRoute>().around) }
-                    composable<HistoryRoute> { HistoryScreen(it.toRoute<HistoryRoute>().path) }
-                    composable<TimeMachineRoute> { TimeMachineScreen() }
-                    composable<SettingsRoute> { SettingsScreen() }
-                    composable<SyncRoute> { SyncScreen() }
-                    composable<AiRoute> { AiSettingsScreen() }
-                    composable<AppearanceRoute> { AppearanceScreen() }
-                    composable<VaultRoute> { VaultScreen() }
-                    composable<ImportRoute> { ImportScreen() }
-                    composable<ConflictsRoute> { ConflictsScreen() }
+                },
+                layoutType = when {
+                    // The desktop layout has its own sidebar.
+                    desk -> NavigationSuiteType.None
+                    onTab -> NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(androidx.compose.material3.adaptive.currentWindowAdaptiveInfo())
+                    else -> NavigationSuiteType.None
+                },
+                containerColor = MaterialTheme.colorScheme.background,
+            ) {
+                Row(Modifier.fillMaxSize()) {
+                    if (desk && sidebar) {
+                        Sidebar(
+                            current = place,
+                            currentPath = openPath,
+                            onPlace = { goPlace(nav, it) },
+                            onNewNote = { naming = true },
+                            onHide = { sidebar = false },
+                            modifier = Modifier.width(280.dp),
+                        )
+                        VerticalDivider()
+                    } else if (desk) {
+                        Column(
+                            Modifier.fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerLow).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start + WindowInsetsSides.Vertical)).padding(4.dp),
+                        ) {
+                            IconButton(onClick = { sidebar = true }) { Icon(Icons.Outlined.Menu, stringResource(R.string.show_sidebar)) }
+                            IconButton(onClick = { naming = true }) { Icon(Icons.Outlined.EditNote, stringResource(R.string.new_note)) }
+                            IconButton(onClick = { goPlace(nav, Place.Search) }) { Icon(Icons.Outlined.Search, stringResource(R.string.search)) }
+                        }
+                        VerticalDivider()
+                    }
+                    Box(Modifier.weight(1f).fillMaxHeight()) {
+                    NavHost(
+                        nav,
+                        startDestination = TodayRoute,
+                        enterTransition = { fadeIn() },
+                        exitTransition = { fadeOut() },
+                    ) {
+                        composable<TodayRoute> { TodayScreen(onCapture = { captureOpen = true }) }
+                        composable<NotesRoute> { BrowserScreen("") }
+                        composable<AskRoute> { AskScreen() }
+                        composable<TasksRoute> { TasksScreen() }
+                        composable<SearchRoute> { SearchScreen(it.toRoute<SearchRoute>().query) }
+                        composable<FolderRoute> { BrowserScreen(it.toRoute<FolderRoute>().path) }
+                        composable<NoteRoute> {
+                            val r = it.toRoute<NoteRoute>()
+                            NoteScreen(r.path, r.line, r.edit)
+                        }
+                        composable<TagRoute> { TagScreen(it.toRoute<TagRoute>().tag) }
+                        composable<CanvasRoute> { CanvasScreen(it.toRoute<CanvasRoute>().path) }
+                        composable<FileRoute> { FileScreen(it.toRoute<FileRoute>().path) }
+                        composable<CalendarRoute> { CalendarScreen() }
+                        composable<GraphRoute> { GraphScreen(it.toRoute<GraphRoute>().around) }
+                        composable<HistoryRoute> { HistoryScreen(it.toRoute<HistoryRoute>().path) }
+                        composable<TimeMachineRoute> { TimeMachineScreen() }
+                        composable<SettingsRoute> { SettingsScreen() }
+                        composable<SyncRoute> { SyncScreen() }
+                        composable<AiRoute> { AiSettingsScreen() }
+                        composable<AppearanceRoute> { AppearanceScreen() }
+                        composable<VaultRoute> { VaultScreen() }
+                        composable<ImportRoute> { ImportScreen() }
+                        composable<ConflictsRoute> { ConflictsScreen() }
+                    }
+                        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
+                    }
                 }
-                SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
+            }
+        }
+        if (naming) {
+            NameDialog(stringResource(R.string.new_note), placeholder = stringResource(R.string.untitled), confirm = stringResource(R.string.create), onDismiss = { naming = false }) { name ->
+                naming = false
+                val folder = if (dest?.hasRoute(FolderRoute::class) == true) entry?.toRoute<FolderRoute>()?.path.orEmpty() else ""
+                scope.launch {
+                    runCatching { engine.run { createNote(folder, name, "") } }
+                        .onSuccess { appNav.note(it, edit = true) }
+                        .onFailure { engine.say(it.words()) }
+                }
             }
         }
         if (captureOpen) {

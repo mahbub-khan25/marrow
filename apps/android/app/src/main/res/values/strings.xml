@@ -16,6 +16,8 @@
     <string name="save">Save</string>
     <string name="done">Done</string>
     <string name="open">Open</string>
+    <string name="hide_sidebar">Hide the sidebar</string>
+    <string name="show_sidebar">Show the sidebar</string>
     <string name="edit">Edit</string>
     <string name="delete">Delete</string>
     <string name="rename">Rename</string>

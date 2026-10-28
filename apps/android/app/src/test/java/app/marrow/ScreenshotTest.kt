@@ -7,7 +7,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import app.marrow.ui.App
 import androidx.test.core.app.ApplicationProvider
 import app.marrow.data.Engine
 import app.marrow.data.Look
@@ -87,6 +91,16 @@ class ScreenshotTest {
     fun close() = engine.close()
 
 
+    /** Lets engine calls (off the main thread) finish until [done]. */
+    private fun settle(done: () -> Boolean) {
+        repeat(50) {
+            if (done()) return
+            Thread.sleep(60)
+            compose.mainClock.advanceTimeBy(120)
+            compose.waitForIdle()
+        }
+    }
+
     private fun shot(name: String, look: Look = Look(), content: @Composable () -> Unit) {
         compose.setContent {
             MarrowTheme(look) {
@@ -103,6 +117,22 @@ class ScreenshotTest {
         compose.waitForIdle()
         compose.mainClock.advanceTimeBy(1000)
         compose.onRoot().captureRoboImage(File(out, "$name.png").path)
+    }
+
+    /** The desktop layout: a tablet in desktop mode, or any wide window. */
+    @Config(qualifiers = "w1280dp-h800dp-mdpi")
+    @Test fun desk() {
+        shot("20-desktop") { App(engine, null) {} }
+        compose.onAllNodesWithText("Projects").onFirst().performClick()
+        settle { compose.onAllNodesWithText("Garden plan").fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodesWithText("Garden plan").onFirst().performClick()
+        repeat(12) {
+            Thread.sleep(60)
+            compose.mainClock.advanceTimeBy(120)
+        }
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onRoot().captureRoboImage(File(out, "21-desktop-note.png").path)
     }
 
     @Test fun today() = shot("01-today") { TodayScreen(onCapture = {}) }

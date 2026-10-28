@@ -36,6 +36,8 @@ STRINGS = [
     ("save", "Save", "সংরক্ষণ"),
     ("done", "Done", "হয়ে গেছে"),
     ("open", "Open", "খুলুন"),
+    ("hide_sidebar", "Hide the sidebar", "সাইডবার লুকান"),
+    ("show_sidebar", "Show the sidebar", "সাইডবার দেখান"),
     ("edit", "Edit", "সম্পাদনা"),
     ("delete", "Delete", "মুছুন"),
     ("rename", "Rename", "নাম বদলান"),
