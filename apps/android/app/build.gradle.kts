@@ -38,6 +38,8 @@ android {
         versionName = release
         vectorDrawables.useSupportLibrary = true
         manifestPlaceholders["dropboxScheme"] = "db-$dropboxKey"
+        // Phones and tablets (64- and 32-bit ARM) and the emulator.
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
 
     signingConfigs {
@@ -57,7 +59,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            if (secret("storeFile", "MARROW_KEYSTORE") != null) signingConfig = signingConfigs.getByName("release")
+            // Signed with the release key when it's set up; otherwise with the
+            // debug key, so the APK still installs (for trying it out).
+            signingConfig = signingConfigs.getByName(if (secret("storeFile", "MARROW_KEYSTORE") != null) "release" else "debug")
         }
     }
 
@@ -71,7 +75,8 @@ android {
     sourceSets["main"].java.srcDir("src/generated/kotlin")
 
     packaging {
-        jniLibs.useLegacyPackaging = false
+        // Compressed in the APK: a smaller download (Play Store bundles do their own thing).
+        jniLibs.useLegacyPackaging = true
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
     lint {

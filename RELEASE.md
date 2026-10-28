@@ -63,21 +63,24 @@ AppImage doesn't run on RHEL 9 either (it needs a newer C library). The way
 to support Red Hat is a **Flatpak** (Flathub), which brings its own web engine
 and runs on RHEL 9 and 10 as well as every other distribution.
 
-## Mobile apps (in progress)
+## Mobile apps
 
-The same app builds for Android and iOS (phones and tablets). The "Mobile"
-workflow builds both on every change:
+Native apps in `apps/` (see [apps/README.md](apps/README.md)).
 
-- **Android:** a debug APK for 64-bit ARM phones and tablets, under
-  Actions → Mobile → the latest run → Artifacts. Install it on a device with
-  "Install unknown apps" allowed. Store releases need an upload key (later).
-- **iOS:** built for the Simulator. To run it on your own iPad or iPhone, on
-  the Mac: `npm install`, then `npx tauri ios init` and `npx tauri ios dev`,
-  and pick your Apple ID team in Xcode. App Store releases need the Apple
-  Developer Program.
-
-On phones and tablets there's no folder picker: notes live in the app's own
-"Marrow" folder (on iOS it shows in the Files app under On My iPhone/iPad).
+- **Android:** every release also builds `Marrow_<version>_android.apk`
+  (64- and 32-bit ARM phones and tablets, and x86_64) and adds it to the
+  draft release. Every change to the app builds the same APK under
+  Actions → Android → the latest run → Artifacts → marrow-android, after
+  it has run on an emulator. To install it, open the APK on the phone and
+  allow "Install unknown apps" for the browser or Files app.
+  - **Signing:** with the repository secrets `MARROW_KEYSTORE_BASE64` (the
+    key file as base64), `MARROW_KEYSTORE_PASSWORD`, `MARROW_KEY_ALIAS` and
+    `MARROW_KEY_PASSWORD`, the APK is signed with your release key (see
+    the launch checklist). Until then it's signed with a throwaway debug key:
+    it installs, but each build has a different key, so updating means
+    uninstalling first, and Google Drive sign-in doesn't work.
+- **iOS:** built and tested on Simulators by the iOS workflow. Installing
+  on a device and TestFlight need the Apple Developer Program.
 
 ## Steps only you can do
 

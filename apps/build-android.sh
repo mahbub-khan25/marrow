@@ -17,7 +17,8 @@ rustup target add "${targets[@]}" >/dev/null
 args=()
 for a in "${ABIS[@]}"; do args+=(-t "$a"); done
 cd "$ROOT"
-cargo ndk "${args[@]}" -P 26 -o "$APP/src/main/jniLibs" build --release -p marrow-ffi
+# Without debug symbols: a much smaller app.
+CARGO_PROFILE_RELEASE_STRIP=symbols cargo ndk "${args[@]}" -P 26 -o "$APP/src/main/jniLibs" build --release -p marrow-ffi
 # The bindings come from the engine built for this computer (also used by
 # the screenshot tests, which run on this computer).
 cargo build -p marrow-ffi
