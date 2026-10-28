@@ -123,6 +123,8 @@ pub(crate) fn windows_candidates(
     if let Some(h) = home {
         out.push(loc("gdrive", "Google Drive", h.join("My Drive")));
         out.push(loc("gdrive", "Google Drive", h.join("Google Drive")));
+        // The Marrow app's own iCloud folder (iPhone and iPad), then the rest.
+        out.push(loc("icloud", "iCloud (Marrow on iPhone and iPad)", h.join("iCloudDrive").join("iCloud~app~marrow~notes")));
         out.push(loc("icloud", "iCloud Drive", h.join("iCloudDrive")));
     }
     out
@@ -148,6 +150,8 @@ fn mac_candidates(home: Option<&Path>) -> Vec<CloudLocation> {
         }
     }
     out.push(loc("dropbox", "Dropbox", h.join("Dropbox")));
+    // The Marrow app's own iCloud folder (iPhone and iPad), then the rest.
+    out.push(loc("icloud", "iCloud (Marrow on iPhone and iPad)", h.join("Library/Mobile Documents/iCloud~app~marrow~notes/Documents")));
     out.push(loc("icloud", "iCloud Drive", h.join("Library/Mobile Documents/com~apple~CloudDocs")));
     out
 }

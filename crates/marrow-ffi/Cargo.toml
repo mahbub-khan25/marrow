@@ -24,6 +24,7 @@ bindgen = ["uniffi/cli"]
 [dependencies]
 marrow-core = { path = "../marrow-core" }
 marrow-webdav = { path = "../marrow-webdav" }
+marrow-cloud = { path = "../marrow-cloud" }
 uniffi = "0.29"
 thiserror = { workspace = true }
 serde = { workspace = true }

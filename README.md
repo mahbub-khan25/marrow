@@ -327,9 +327,23 @@ your notes), and only when you ask.
 
 ## Cloud drives
 
-On a computer, Marrow can use the folders that the Dropbox, OneDrive, Google
-Drive and iCloud apps keep on your disk. On any device, including phones and
-tablets, it can also sync directly with your own server.
+Marrow syncs straight with **Google Drive, OneDrive and Dropbox** on every
+device, phones and tablets too: sign in once and your notes stay the same
+everywhere, free with the storage your account already has. On iPhone, iPad
+and Mac it can also use **iCloud**. On a computer it can use the folders the
+cloud apps keep on your disk, and on any device your own WebDAV server.
+
+* **Sign in to Google Drive, OneDrive or Dropbox**: Settings → Vault → Sync
+  → *Set up…* on a computer, or Settings › Sync on a phone. Your browser
+  opens to sign in, then you pick the vault's folder (a new one, or one
+  another device already made). Notes stay plain Markdown files in
+  *My Drive › Marrow* (Google Drive) or *Apps › Marrow* (OneDrive, Dropbox),
+  and Marrow can't see anything else in your account. The sign-in is kept in
+  the system's credential store. (Publishers building their own copy:
+  register the app with each service first; see
+  [docs/cloud-setup.md](docs/cloud-setup.md).)
+* **iCloud** (iPhone and iPad): Settings › Sync › *iCloud* keeps the vault in
+  iCloud Drive › Marrow, which Marrow for Mac lists when you set up sync.
 
 * **Create a vault in the cloud**: *Create a vault* (on the start screen, in
   Settings → Vault, or in the command palette) lists the cloud folders it
@@ -352,7 +366,6 @@ tablets, it can also sync directly with your own server.
   stay plain Markdown files in that folder; the password is kept in the
   system's credential store. Works with Nextcloud, ownCloud, Synology, pCloud,
   Koofr and other WebDAV servers, the same way as the cloud folders above.
-  Direct Google Drive, OneDrive, Dropbox and iCloud sync are coming next.
 * **End-to-end encryption** (optional, in the same setup): tick *Encrypt
   everything before it leaves this device* and choose a sync passphrase.
   Every file and every file name is encrypted on your device (Argon2id and

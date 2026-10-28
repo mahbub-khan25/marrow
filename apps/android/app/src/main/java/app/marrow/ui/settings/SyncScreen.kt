@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -68,7 +70,9 @@ fun SyncScreen() {
                 val s = sync
                 if (s == null) {
                     Explain(stringResource(R.string.sync_explain))
-                    WebDavForm(onDone = { engine.refreshSync() })
+                    CloudChoices(onDone = { engine.refreshSync() })
+                    Spacer(Modifier.height(12.dp))
+                    OwnServer(onDone = { engine.refreshSync() }, open = engine.marrow.cloudServices().none { it.available })
                 } else {
                     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.padding(16.dp).fillMaxWidth()) {
                         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

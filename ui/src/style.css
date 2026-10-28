@@ -2507,3 +2507,7 @@ body.block-dragging, body.block-dragging * { cursor: grabbing !important; user-s
   .help { width: min(760px, 100%); }
   .help-places { display: grid; grid-template-columns: 1fr 1fr; column-gap: 18px; }
 }
+
+/* Sync: the signed-in cloud account. */
+.dlg-account { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; color: var(--ink); }
+.dlg-account i { font-size: 18px; color: var(--color-accent); }

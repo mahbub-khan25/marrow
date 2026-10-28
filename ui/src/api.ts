@@ -352,6 +352,16 @@ export const api = {
   /** Syncs this vault with a WebDAV server from now on. */
   setCloudSync: (url: string, user: string, password: string, passphrase?: string) =>
     invoke<void>("set_cloud_sync", { url, user, password, passphrase: passphrase ?? null }),
+  /** Google Drive, OneDrive and Dropbox: which this copy can sign in to. */
+  driveServices: () => invoke<DriveService[]>("drive_services"),
+  /** Signs in in the browser; resolves once the browser comes back. */
+  driveSignIn: (provider: string) => invoke<DriveAccount>("drive_sign_in", { provider }),
+  driveSignInCancel: () => invoke<void>("drive_sign_in_cancel"),
+  /** Makes the vault folder if needed and says what's in it. */
+  driveCheck: (provider: string, account: string, folder: string) => invoke<{ files: number; encrypted: boolean }>("drive_check", { provider, account, folder }),
+  /** Syncs this vault with a folder in Google Drive, OneDrive or Dropbox from now on. */
+  setDriveSync: (provider: string, account: string, folder: string, passphrase?: string) =>
+    invoke<void>("set_drive_sync", { provider, account, folder, passphrase: passphrase ?? null }),
   syncNow: (force = false) => invoke<void>("sync_now", { force }),
   conflictCopies: () => invoke<ConflictCopy[]>("conflict_copies"),
   /** Merges a conflict copy into its original; returns places where both versions were kept. */
@@ -359,6 +369,23 @@ export const api = {
   getVaultSettings: () => invoke<VaultSettings>("get_vault_settings"),
   setVaultSettings: (settings: VaultSettings) => invoke<void>("set_vault_settings", { settings }),
 };
+
+export interface DriveService {
+  provider: "gdrive" | "onedrive" | "dropbox";
+  name: string;
+  /** Where the vaults go there, e.g. "Apps › Marrow". */
+  place: string;
+  available: boolean;
+}
+
+export interface DriveAccount {
+  provider: DriveService["provider"];
+  account: string;
+  /** Vault folders already there. */
+  folders: string[];
+  /** A folder name for this vault. */
+  suggested: string;
+}
 
 export interface NoteRow {
   path: string;

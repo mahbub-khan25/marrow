@@ -101,13 +101,24 @@ impl Remote for FolderRemote {
         }
     }
     fn list(&self) -> io::Result<BTreeMap<String, RemoteFile>> {
-        Ok(scan(&self.root)?
+        let mut out: BTreeMap<String, RemoteFile> = scan(&self.root)?
             .into_iter()
             .map(|(k, s)| (k, RemoteFile { version: s.into(), modified_ms: s.m }))
-            .collect())
+            .collect();
+        // Files iCloud hasn't downloaded yet are still there (never "deleted").
+        for (k, s) in icloud_placeholders(&self.root) {
+            out.entry(k).or_insert(RemoteFile { version: Version::Tag(format!("icloud-pending-{}", s.m)), modified_ms: s.m });
+        }
+        Ok(out)
     }
     fn read(&self, key: &str) -> io::Result<Vec<u8>> {
-        fs::read(self.root.join(key))
+        let p = self.root.join(key);
+        match fs::read(&p) {
+            Err(e) if e.kind() == io::ErrorKind::NotFound && placeholder_of(&p).is_file() => {
+                Err(io::Error::other("iCloud hasn't downloaded it to this device yet; it syncs once it has"))
+            }
+            r => r,
+        }
     }
     fn write(&self, key: &str, bytes: &[u8]) -> io::Result<Version> {
         let p = self.root.join(key);
@@ -117,7 +128,10 @@ impl Remote for FolderRemote {
     fn delete(&self, key: &str) -> io::Result<()> {
         // The cloud app keeps deleted files in its own trash.
         let p = self.root.join(key);
-        fs::remove_file(&p)?;
+        match fs::remove_file(&p) {
+            Err(e) if e.kind() == io::ErrorKind::NotFound && placeholder_of(&p).is_file() => fs::remove_file(placeholder_of(&p))?,
+            r => r?,
+        }
         remove_empty_parents(&p, &self.root);
         Ok(())
     }
@@ -624,6 +638,35 @@ fn scan(root: &Path) -> io::Result<BTreeMap<String, Stamp>> {
     Ok(out)
 }
 
+/// Where iCloud keeps a stand-in for a file it hasn't downloaded:
+/// `folder/.name.icloud` for `folder/name`.
+fn placeholder_of(p: &Path) -> PathBuf {
+    let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    p.with_file_name(format!(".{name}.icloud"))
+}
+
+/// Files iCloud knows about but hasn't downloaded yet, by the path they'll have.
+fn icloud_placeholders(root: &Path) -> Vec<(String, Stamp)> {
+    let walker = walkdir::WalkDir::new(root)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|e| e.depth() == 0 || e.file_type().is_file() || !skip_name(&e.file_name().to_string_lossy()));
+    let mut out = vec![];
+    for entry in walker.flatten() {
+        let name = entry.file_name().to_string_lossy();
+        let Some(real) = name.strip_prefix('.').and_then(|n| n.strip_suffix(".icloud")) else { continue };
+        if !entry.file_type().is_file() || real.is_empty() || skip_name(real) {
+            continue;
+        }
+        let Ok(rel) = entry.path().with_file_name(real).strip_prefix(root).map(Path::to_path_buf) else { continue };
+        let key = rel.components().map(|c| c.as_os_str().to_string_lossy()).collect::<Vec<_>>().join("/");
+        if let Ok(md) = entry.metadata() {
+            out.push((key, stamp_of(&md)));
+        }
+    }
+    out
+}
+
 fn stamp_of(md: &fs::Metadata) -> Stamp {
     let m = md
         .modified()
@@ -693,6 +736,33 @@ mod tests {
         fs::create_dir_all(&r).unwrap();
         let m = Mirror::new(&l, &r);
         (t, l, r, m)
+    }
+
+    #[test]
+    fn files_icloud_has_not_downloaded_are_never_taken_as_deleted() {
+        let (_t, l, r, m) = setup();
+        write(&l.join("Note.md"), "mine\n");
+        write(&l.join("sub/Two.md"), "two\n");
+        m.sync(false).unwrap();
+        // iCloud swaps the files for stand-ins until they're downloaded again.
+        fs::remove_file(r.join("Note.md")).unwrap();
+        write(&r.join(".Note.md.icloud"), "stub");
+        fs::remove_file(r.join("sub/Two.md")).unwrap();
+        write(&r.join("sub/.Two.md.icloud"), "stub");
+        tick();
+        let rep = m.sync(false).unwrap();
+        assert!(rep.deleted_local.is_empty(), "{rep:?}");
+        assert_eq!(read(&l.join("Note.md")), "mine\n");
+        assert_eq!(read(&l.join("sub/Two.md")), "two\n");
+        assert!(rep.errors.iter().all(|e| e.contains("iCloud")), "{:?}", rep.errors);
+        // Once downloaded, all is well again.
+        fs::remove_file(r.join(".Note.md.icloud")).unwrap();
+        write(&r.join("Note.md"), "mine\n");
+        fs::remove_file(r.join("sub/.Two.md.icloud")).unwrap();
+        write(&r.join("sub/Two.md"), "two\n");
+        let rep = m.sync(false).unwrap();
+        assert!(rep.errors.is_empty(), "{:?}", rep.errors);
+        assert_eq!(read(&l.join("Note.md")), "mine\n");
     }
 
     #[test]

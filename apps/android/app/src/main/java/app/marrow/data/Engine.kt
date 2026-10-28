@@ -54,6 +54,7 @@ class Engine(
     val messages: SharedFlow<String> = _messages.asSharedFlow()
 
     init {
+        marrow.setPlatformTokens(GoogleTokens(context.applicationContext))
         marrow.setListener(object : MarrowListener {
             override fun vaultChanged(paths: List<String>) {
                 _changes.tryEmit(paths)

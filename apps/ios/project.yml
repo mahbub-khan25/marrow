@@ -29,6 +29,15 @@ targets:
       - path: Marrow
         excludes: ["Info.plist"]
       - path: Generated/MarrowCore.swift
+    # iCloud: Marrow's own folder in iCloud Drive, shown there as "Marrow".
+    # Needs a paid Apple developer team (a free one can't use iCloud: delete
+    # these lines to build with one).
+    entitlements:
+      path: Marrow/Marrow.entitlements
+      properties:
+        com.apple.developer.icloud-container-identifiers: [iCloud.app.marrow.notes]
+        com.apple.developer.icloud-services: [CloudDocuments]
+        com.apple.developer.ubiquity-container-identifiers: [iCloud.app.marrow.notes]
     info:
       path: Marrow/Info.plist
       properties:
@@ -50,6 +59,11 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         UIApplicationSupportsIndirectInputEvents: true
+        NSUbiquitousContainers:
+          iCloud.app.marrow.notes:
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            NSUbiquitousContainerName: Marrow
+            NSUbiquitousContainerSupportedFolderLevels: Any
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]

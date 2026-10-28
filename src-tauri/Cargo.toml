@@ -17,6 +17,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 marrow-core = { path = "../crates/marrow-core" }
 marrow-webdav = { path = "../crates/marrow-webdav" }
+marrow-cloud = { path = "../crates/marrow-cloud" }
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"

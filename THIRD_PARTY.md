@@ -15,5 +15,8 @@ license texts ship with the packages (see `Cargo.lock` and
 | UniFFI (phone app bindings) | MPL-2.0 |
 | Jetpack Compose, AndroidX, Material Components, Material Symbols, Coil (Android app) | Apache-2.0 |
 | JNA (Android app) | Apache-2.0 or LGPL-2.1 |
+| AndroidX Browser (Android app) | Apache-2.0 |
+| Google Play services Auth (Android app, Google Drive sign-in) | Android Software Development Kit License |
+| sha2, getrandom (sign-in) | MIT or Apache-2.0 |
 
 Marrow is not affiliated with Obsidian and contains none of its code.

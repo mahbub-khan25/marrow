@@ -661,10 +661,37 @@ export const BN: Record<string, string> = {
   "Delete arrow": "তীর মুছুন",
   "Arrow label": "তীরের লেবেল",
   "No notes to show yet. Link some notes with [[…]] and they’ll appear here.": "দেখানোর মতো নোট এখনও নেই। [[…]] দিয়ে কিছু নোট লিংক করুন, এখানে দেখা যাবে।",
+  "Signed in as": "সাইন ইন করা আছে:",
+  "Use another account": "অন্য অ্যাকাউন্ট ব্যবহার করুন",
+  "Cancel sign-in": "সাইন-ইন বাতিল করুন",
+  "Vault folder": "ভল্টের ফোল্ডার",
+  "Name of the new folder": "নতুন ফোল্ডারের নাম",
+  "A new folder for this vault": "এই ভল্টের জন্য নতুন ফোল্ডার",
+  "Finish signing in in your browser, then come back here.": "ব্রাউজারে সাইন-ইন শেষ করে এখানে ফিরে আসুন।",
+  "Name the folder for this vault.": "এই ভল্টের ফোল্ডারের একটি নাম দিন।",
+  "That folder holds a vault Marrow encrypted. Your notes will be combined with it.": "ওই ফোল্ডারে Marrow-এর এনক্রিপ্ট করা একটি ভল্ট আছে। আপনার নোট তার সঙ্গে মিলিয়ে নেওয়া হবে।",
+  "Everything in this vault will be copied there, and kept in sync both ways from then on.": "এই ভল্টের সবকিছু সেখানে কপি হবে, তারপর থেকে দুই দিকেই সিঙ্কে থাকবে।",
+  "Keep this vault the same on all your devices, phones too: sign in to Google Drive, OneDrive or Dropbox, or use a folder your cloud app syncs, or your own server.":
+    "ফোনসহ আপনার সব ডিভাইসে এই ভল্ট একই রাখুন: Google Drive, OneDrive বা Dropbox-এ সাইন ইন করুন, অথবা ক্লাউড অ্যাপের সিঙ্ক করা কোনো ফোল্ডার বা নিজের সার্ভার ব্যবহার করুন।",
 };
 
 /** Words with numbers: "16 notes", "4 weeks ago"… */
 export const BN_PATTERNS: [RegExp, string][] = [
+  [/^Sign in to (Google Drive|OneDrive|Dropbox)$/, "$1-এ সাইন ইন করুন"],
+  [/^Sign in to (Google Drive|OneDrive|Dropbox) first\.$/, "আগে $1-এ সাইন ইন করুন।"],
+  [/^Sign in · (.+)$/, "সাইন ইন · $1"],
+  [
+    /^Your browser opens so you can sign in to (.+)\. Your notes go in (.+), and Marrow can't see anything else there\. It's free with the storage your account already has\.$/,
+    "$1-এ সাইন ইন করতে ব্রাউজার খুলবে। আপনার নোট থাকবে $2-এ, সেখানে আর কিছুই Marrow দেখতে পায় না। আপনার অ্যাকাউন্টের স্টোরেজেই চলে, আলাদা খরচ নেই।",
+  ],
+  [
+    /^Your notes go in (.+), as plain Markdown files you can open there too\. Marrow can't see anything else in your (.+)\.$/,
+    "আপনার নোট থাকবে $1-এ, সাধারণ Markdown ফাইল হিসেবে, যা সেখানেও খোলা যায়। আপনার $2-এর আর কিছুই Marrow দেখতে পায় না।",
+  ],
+  [
+    /^That folder already has (\d+) files?\. They'll be combined with this vault — nothing is deleted, and notes that differ are merged\.$/,
+    "ওই ফোল্ডারে আগে থেকেই $1টি ফাইল আছে। সেগুলো এই ভল্টের সঙ্গে মিলিয়ে নেওয়া হবে — কিছুই মোছা হবে না, আর আলাদা নোটগুলো একসঙ্গে মেলানো হবে।",
+  ],
   [/^(\d[\d,]*) notes?$/, "$1টি নোট"],
   [/^(\d[\d,]*) links?$/, "$1টি লিংক"],
   [/^(\d[\d,]*) notes? · (\d[\d,]*) links?$/, "$1টি নোট · $2টি লিংক"],

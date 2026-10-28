@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/marrow-core", "crates/marrow-webdav", "crates/marrow-ffi", "src-tauri"]
+members = ["crates/marrow-core", "crates/marrow-webdav", "crates/marrow-cloud", "crates/marrow-ffi", "src-tauri"]
 
 [workspace.package]
 edition = "2021"

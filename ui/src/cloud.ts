@@ -5,7 +5,7 @@
 import { documentDir, homeDir } from "@tauri-apps/api/path";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
-import { api, type CloudLocation, type MirrorStatus } from "./api";
+import { api, type CloudLocation, type DriveAccount, type MirrorStatus } from "./api";
 import { ago, h, icon } from "./util";
 
 const PROVIDER_ICON: Record<CloudLocation["provider"], [string, string]> = {
@@ -28,10 +28,13 @@ function join(dir: string, name: string): string {
 }
 
 /** A small centred dialog. Returns a function that closes it. */
-function dialog(title: string, body: (Node | null)[], foot: Node[]): () => void {
+function dialog(title: string, body: (Node | null)[], foot: Node[], onClose?: () => void): () => void {
   const card = h("div.dlg", { role: "dialog", "aria-label": title }, h("h2", null, title), ...body, h("div.dlg-foot", null, ...foot));
   const wrap = h("div.backdrop.dlg-wrap", null, card);
-  const close = () => wrap.remove();
+  const close = () => {
+    wrap.remove();
+    onClose?.();
+  };
   wrap.addEventListener("mousedown", (e) => e.target === wrap && close());
   wrap.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
@@ -155,10 +158,11 @@ export async function createVaultDialog(onCreated: (path: string) => void | Prom
 /** Sync setup: a cloud folder on this computer, or a server Marrow talks to directly. */
 export async function setupSyncDialog(vaultName: string, onDone: () => void, mobile = false) {
   // Phones and tablets can't use another app's folder, only services Marrow talks to.
-  const clouds = mobile ? [] : await api.cloudLocations().catch(() => []);
+  const [clouds, drives] = await Promise.all([mobile ? [] : api.cloudLocations().catch(() => []), api.driveServices().catch(() => [])]);
+  const services = drives.filter((d) => d.available);
   const note = h("div.dlg-hint");
   const error = h("div.dlg-error", { role: "alert", hidden: true });
-  const field = (label: string, input: HTMLInputElement) => h("label.dlg-field", null, h("span", null, label), input);
+  const field = (label: string, input: HTMLElement) => h("label.dlg-field", null, h("span", null, label), input);
   const url = h("input.input", { type: "url", placeholder: "https://cloud.example.com/remote.php/dav/files/you/Marrow", autocomplete: "off", spellcheck: false }) as HTMLInputElement;
   const user = h("input.input", { type: "text", autocomplete: "username", spellcheck: false, autocapitalize: "off" }) as HTMLInputElement;
   const pass = h("input.input", { type: "password", autocomplete: "current-password" }) as HTMLInputElement;
@@ -173,6 +177,103 @@ export async function setupSyncDialog(vaultName: string, onDone: () => void, mob
       "Nextcloud: create an app password in Settings › Security, and use the WebDAV address from Files › Settings with a folder name added, such as …/Marrow. Synology, pCloud and Koofr show their WebDAV address in their settings.",
     ),
   );
+  // Google Drive, OneDrive, Dropbox: sign in in the browser, then pick the folder.
+  let signedIn: DriveAccount | null = null;
+  let signingIn = false;
+  const driveFolder = h("select.input", { "aria-label": "Vault folder" }) as HTMLSelectElement;
+  const newName = h("input.input", { type: "text", spellcheck: false, "aria-label": "New folder name" }) as HTMLInputElement;
+  const signInLabel = h("span");
+  const signInBtn = h("button.btn.btn-primary", null, icon("sign-in"), signInLabel) as HTMLButtonElement;
+  const cancelBtn = h("button.btn.btn-secondary", { hidden: true }, "Cancel sign-in") as HTMLButtonElement;
+  const driveWho = h("div.dlg-hint");
+  const drivePick = h("div.dlg-drive-pick", { hidden: true }, field("Vault folder", driveFolder), field("Name of the new folder", newName));
+  const drive = h("div.dlg-server", { hidden: true }, h("div.dlg-row", null, signInBtn, cancelBtn), driveWho, drivePick);
+  const driveService = () => {
+    const k = where.selected()?.key ?? "";
+    return k.startsWith("drive:") ? services.find((d) => d.provider === k.slice(6)) ?? null : null;
+  };
+  // Not a possible folder name (Marrow takes * out of names).
+  const NEW_FOLDER = "*new*";
+  const chosenFolder = () => (driveFolder.value === NEW_FOLDER ? newName.value.trim() : driveFolder.value);
+  const showFolders = (acc: DriveAccount) => {
+    const NEW = NEW_FOLDER;
+    driveFolder.replaceChildren(
+      ...acc.folders.map((f) => h("option", { value: f, translate: "no" }, f)),
+      h("option", { value: NEW }, "A new folder for this vault"),
+    );
+    newName.value = acc.suggested;
+    driveFolder.value = acc.folders.includes(acc.suggested) ? acc.suggested : NEW;
+    const sync = () => {
+      (newName.closest("label") as HTMLElement).hidden = driveFolder.value !== NEW;
+      void checkDrive();
+    };
+    driveFolder.onchange = sync;
+    newName.onchange = () => void checkDrive();
+    drivePick.hidden = false;
+    sync();
+  };
+  const checkDrive = async () => {
+    const svc = driveService();
+    const folder = chosenFolder();
+    if (!svc || !signedIn || !folder) return;
+    note.textContent = "Checking…";
+    setEnc("off");
+    try {
+      const info = await api.driveCheck(svc.provider, signedIn.account, folder);
+      if (chosenFolder() !== folder) return;
+      if (info.encrypted) setEnc("join");
+      else if (info.files > 0) setEnc("unavailable");
+      note.textContent = info.encrypted
+        ? "That folder holds a vault Marrow encrypted. Your notes will be combined with it."
+        : info.files > 0
+          ? `That folder already has ${info.files} ${info.files === 1 ? "file" : "files"}. They'll be combined with this vault — nothing is deleted, and notes that differ are merged.`
+          : "Everything in this vault will be copied there, and kept in sync both ways from then on.";
+    } catch (e) {
+      note.textContent = "";
+      fail(String(e));
+    }
+  };
+  const showDrive = () => {
+    const svc = driveService();
+    if (!svc) return;
+    signInLabel.textContent = `Sign in to ${svc.name}`;
+    signInBtn.hidden = signingIn;
+    cancelBtn.hidden = !signingIn;
+    if (signedIn && signedIn.provider === svc.provider) {
+      driveWho.replaceChildren(
+        h("div.dlg-account", null, icon("user-circle"), h("span", null, "Signed in as"), h("b", { translate: "no" }, signedIn.account)),
+        h("div", null, `Your notes go in ${svc.place}, as plain Markdown files you can open there too. Marrow can't see anything else in your ${svc.name}.`),
+      );
+      signInLabel.textContent = "Use another account";
+      signInBtn.className = "btn btn-secondary";
+      showFolders(signedIn);
+    } else {
+      signedIn = null;
+      signInBtn.className = "btn btn-primary";
+      drivePick.hidden = true;
+      driveWho.textContent = signingIn
+        ? "Finish signing in in your browser, then come back here."
+        : `Your browser opens so you can sign in to ${svc.name}. Your notes go in ${svc.place}, and Marrow can't see anything else there. It's free with the storage your account already has.`;
+    }
+  };
+  signInBtn.addEventListener("click", async () => {
+    const svc = driveService();
+    if (!svc) return;
+    error.hidden = true;
+    signingIn = true;
+    signedIn = null;
+    showDrive();
+    try {
+      signedIn = await api.driveSignIn(svc.provider);
+    } catch (e) {
+      if (String(e) !== "Sign-in was cancelled.") fail(String(e));
+    } finally {
+      signingIn = false;
+      if (driveService() === svc) showDrive();
+    }
+  });
+  cancelBtn.addEventListener("click", () => void api.driveSignInCancel());
+
   // End-to-end encryption: on, and (for a place already encrypted) joining it.
   const encOn = h("input", { type: "checkbox" }) as HTMLInputElement;
   const pp1 = h("input.input", { type: "password", autocomplete: "new-password" }) as HTMLInputElement;
@@ -210,6 +311,7 @@ export async function setupSyncDialog(vaultName: string, onDone: () => void, mob
   };
   encOn.addEventListener("change", () => setEnc(encOn.checked ? "new" : "off"));
   const places: Place[] = [
+    ...services.map((d) => ({ key: `drive:${d.provider}`, label: d.name, path: `Sign in · ${d.place}`, provider: d.provider })),
     ...clouds.map((c, i) => ({ key: `cloud${i}`, label: c.label, path: join(c.path, vaultName), provider: c.provider })),
     { key: "webdav", label: "Nextcloud, Synology or another WebDAV server", path: "", provider: "webdav" as const },
     ...(mobile ? [] : [{ key: "pick", label: "Choose a folder…", path: "", icon: "folder-open", pick: true }]),
@@ -220,7 +322,12 @@ export async function setupSyncDialog(vaultName: string, onDone: () => void, mob
     note.textContent = "";
     error.hidden = true;
     server.hidden = p.key !== "webdav";
+    drive.hidden = !p.key.startsWith("drive:");
     setEnc("off");
+    if (p.key.startsWith("drive:")) {
+      showDrive();
+      return;
+    }
     if (p.key === "webdav") {
       note.textContent = "Marrow checks the sign-in before it starts. Without encryption, notes stay plain Markdown files in that folder.";
       window.setTimeout(() => url.focus(), 0);
@@ -247,22 +354,25 @@ export async function setupSyncDialog(vaultName: string, onDone: () => void, mob
         null,
         mobile
           ? "Keep this vault the same on all your devices, through your own server."
-          : "Keep this vault the same everywhere: through a folder your cloud app syncs (Dropbox, OneDrive, Google Drive, iCloud), or your own server.",
+          : "Keep this vault the same on all your devices, phones too: sign in to Google Drive, OneDrive or Dropbox, or use a folder your cloud app syncs, or your own server.",
       ),
-      clouds.length || mobile ? null : h("div.dlg-hint", null, "No Dropbox, OneDrive or Google Drive folder was found on this computer. Install its desktop app, or choose any folder."),
       where.el,
+      drive,
       server,
       encBox,
       note,
       error,
     ],
     [h("button.btn.btn-secondary", { onclick: () => close() }, "Cancel"), start],
+    () => {
+      if (signingIn) void api.driveSignInCancel();
+    },
   );
-  where.select(clouds.length ? "cloud0" : "webdav");
-  const fail = (msg: string) => {
+  function fail(msg: string) {
     error.hidden = false;
     error.textContent = msg;
-  };
+  }
+  where.select(services.length ? `drive:${services[0].provider}` : clouds.length ? "cloud0" : "webdav");
   /** The passphrase to use, or undefined when not encrypting; throws a message when it isn't right yet. */
   const passphrase = (): string | undefined => {
     if (!encOn.checked) return undefined;
@@ -277,6 +387,25 @@ export async function setupSyncDialog(vaultName: string, onDone: () => void, mob
       phrase = passphrase();
     } catch (e) {
       return fail(String(e));
+    }
+    const svc = driveService();
+    if (svc) {
+      const folder = chosenFolder();
+      if (!signedIn) return fail(`Sign in to ${svc.name} first.`);
+      if (!folder) return fail("Name the folder for this vault.");
+      start.disabled = true;
+      label.textContent = phrase ? "Setting up encryption…" : "Checking…";
+      try {
+        await api.setDriveSync(svc.provider, signedIn.account, folder, phrase);
+        close();
+        onDone();
+      } catch (e) {
+        fail(String(e));
+      } finally {
+        start.disabled = false;
+        label.textContent = "Start syncing";
+      }
+      return;
     }
     if (where.selected()?.key === "webdav") {
       if (!url.value.trim() || !user.value.trim() || !pass.value) return fail("Fill in the server address, user name and password.");

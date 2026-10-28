@@ -28,6 +28,8 @@ const SETTLE: Duration = Duration::from_millis(1500);
 pub(crate) enum Target {
     Webdav { url: String, user: String },
     Folder { path: String },
+    /// Google Drive, OneDrive or Dropbox (`provider` is its short name).
+    Cloud { provider: String, account: String, folder: String },
 }
 
 impl Target {
@@ -35,6 +37,7 @@ impl Target {
         match self {
             Target::Webdav { url, user } => Some(format!("sync:webdav:{user}@{url}")),
             Target::Folder { .. } => None,
+            Target::Cloud { provider, account, .. } => Some(crate::cloud::secret_id(provider, account)),
         }
     }
 
@@ -42,11 +45,16 @@ impl Target {
         match self {
             Target::Webdav { url, .. } => reqwest::Url::parse(url).ok().and_then(|u| u.host_str().map(str::to_string)).unwrap_or_else(|| url.clone()),
             Target::Folder { path } => Path::new(path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.clone()),
+            Target::Cloud { provider, .. } => marrow_cloud::Provider::from_id(provider).map(|p| p.name().to_string()).unwrap_or_else(|| provider.clone()),
         }
     }
 
-    fn connect(&self, secrets: &dyn SecretStore) -> std::result::Result<Box<dyn Remote>, String> {
+    fn connect(&self, secrets: &Arc<dyn SecretStore>, platform: &crate::cloud::Platform) -> std::result::Result<Box<dyn Remote>, String> {
         match self {
+            Target::Cloud { provider, account, folder } => {
+                let p = marrow_cloud::Provider::from_id(provider).ok_or("This copy of Marrow doesn't know that cloud service.")?;
+                Ok(marrow_cloud::connect(p, crate::cloud::tokens(p, account, secrets, platform)?, account, folder))
+            }
             Target::Webdav { url, user } => {
                 let password = self.secret_id().and_then(|id| secrets.get(id)).unwrap_or_default();
                 Ok(Box::new(marrow_webdav::WebDav::new(url, user, &password)?))
@@ -64,6 +72,9 @@ fn passphrase_id(root: &Path) -> String {
 pub enum SyncKind {
     Webdav,
     Folder,
+    GoogleDrive,
+    OneDrive,
+    Dropbox,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -136,7 +147,7 @@ fn problem(stop: &SyncStop) -> SyncProblem {
     }
 }
 
-fn check_sealed(remote: Box<dyn Remote>, passphrase: &str) -> Result<()> {
+pub(crate) fn check_sealed(remote: Box<dyn Remote>, passphrase: &str) -> Result<()> {
     if passphrase.chars().count() < 8 {
         return Err(fail("Use a sync passphrase of at least 8 characters."));
     }
@@ -164,14 +175,23 @@ impl Marrow {
         self.stop_sync();
         let (tx, rx) = channel::<Msg>();
         let status = Arc::new(Mutex::new(SyncStatus {
-            kind: match target {
+            kind: match &target {
                 Target::Webdav { .. } => SyncKind::Webdav,
                 Target::Folder { .. } => SyncKind::Folder,
+                Target::Cloud { provider, .. } => match marrow_cloud::Provider::from_id(provider) {
+                    Some(marrow_cloud::Provider::GoogleDrive) => SyncKind::GoogleDrive,
+                    Some(marrow_cloud::Provider::OneDrive) => SyncKind::OneDrive,
+                    _ => SyncKind::Dropbox,
+                },
             },
             label: target.label(),
             location: match &target {
                 Target::Webdav { url, .. } => url.clone(),
                 Target::Folder { path } => path.clone(),
+                Target::Cloud { provider, account, folder } => {
+                    let place = marrow_cloud::Provider::from_id(provider).map(|p| p.place()).unwrap_or_default();
+                    format!("{account} · {place} › {folder}")
+                }
             },
             encrypted,
             syncing: false,
@@ -183,11 +203,12 @@ impl Marrow {
         let worker_status = status.clone();
         let listener = self.listener.clone();
         let secrets = self.secrets.clone();
+        let platform = self.platform_tokens.clone();
         let root: PathBuf = root.to_path_buf();
         std::thread::Builder::new()
             .name("marrow-sync".into())
             .spawn(move || {
-                let remote = target.connect(secrets.as_ref()).and_then(|r| {
+                let remote = target.connect(&secrets, &platform).and_then(|r| {
                     if !encrypted {
                         return Ok(r);
                     }
@@ -268,7 +289,7 @@ impl Marrow {
         }
     }
 
-    fn set_target(&self, target: Option<Target>, passphrase: Option<String>) -> Result<()> {
+    pub(crate) fn set_target(&self, target: Option<Target>, passphrase: Option<String>) -> Result<()> {
         let root = self.root()?;
         let key = root.to_string_lossy().into_owned();
         let mut s = self.app_settings();

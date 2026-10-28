@@ -27,6 +27,7 @@ use marrow_core::{Engine, EngineEvent, VaultEvent, VaultPath, VaultService};
 
 mod ai;
 mod canvas;
+mod cloud;
 mod daily;
 mod files;
 mod graph;
@@ -151,6 +152,10 @@ pub struct Marrow {
     pub(crate) listener: Arc<Mutex<Option<Arc<dyn MarrowListener>>>>,
     pub(crate) secrets: Arc<dyn SecretStore>,
     pub(crate) sync: Mutex<Option<sync::Worker>>,
+    /// Sign-ins waiting for the browser to come back, by their `state`.
+    pub(crate) cloud_pending: Mutex<std::collections::HashMap<String, marrow_cloud::AuthStart>>,
+    /// The phone's own sign-in (Google on Android).
+    pub(crate) platform_tokens: Arc<Mutex<Option<Arc<dyn cloud::PlatformTokens>>>>,
 }
 
 impl Marrow {
@@ -252,6 +257,8 @@ impl Marrow {
             listener: Arc::new(Mutex::new(None)),
             secrets,
             sync: Mutex::new(None),
+            cloud_pending: Mutex::new(Default::default()),
+            platform_tokens: Arc::new(Mutex::new(None)),
         })
     }
 

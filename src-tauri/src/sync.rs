@@ -18,6 +18,9 @@ use marrow_core::merge2;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
+use marrow_cloud::oauth::Refreshing;
+use marrow_cloud::{Platform, Provider, TokenSource};
+
 use crate::commands::{emit_events, err, load_settings, save_settings, vp, with_engine, AppState, CmdResult};
 
 const INTERVAL: Duration = Duration::from_secs(15);
@@ -73,6 +76,9 @@ pub enum CloudTarget {
     /// Nextcloud, ownCloud, Synology, pCloud, Koofr and other WebDAV servers.
     #[serde(rename_all = "camelCase")]
     Webdav { url: String, user: String },
+    /// Google Drive, OneDrive or Dropbox, signed in with `account`.
+    #[serde(rename_all = "camelCase")]
+    Drive { provider: String, account: String, folder: String },
 }
 
 impl CloudTarget {
@@ -80,6 +86,7 @@ impl CloudTarget {
     fn secret_id(&self) -> String {
         match self {
             CloudTarget::Webdav { url, user } => format!("sync:webdav:{user}@{url}"),
+            CloudTarget::Drive { provider, account, .. } => drive_secret_id(provider, account),
         }
     }
 
@@ -89,8 +96,27 @@ impl CloudTarget {
                 let password = crate::ai::keys::get(app, &self.secret_id()).unwrap_or_default();
                 Ok(Box::new(crate::webdav::WebDav::new(url, user, &password)?))
             }
+            CloudTarget::Drive { provider, account, folder } => {
+                let p = Provider::from_id(provider).ok_or("This copy of Marrow doesn't know that cloud service.")?;
+                Ok(marrow_cloud::connect(p, drive_tokens(app, p, account)?, account, folder))
+            }
         }
     }
+}
+
+fn drive_secret_id(provider: &str, account: &str) -> String {
+    format!("sync:cloud:{provider}:{account}")
+}
+
+/// Access tokens for a signed-in Google Drive, OneDrive or Dropbox account.
+fn drive_tokens(app: &AppHandle, p: Provider, account: &str) -> Result<Arc<dyn TokenSource>, String> {
+    let client = marrow_cloud::keys::client(p, Platform::Desktop).ok_or_else(|| format!("This copy of Marrow isn't set up to sign in to {}.", p.name()))?;
+    let id = drive_secret_id(p.id(), account);
+    let refresh = crate::ai::keys::get(app, &id).ok_or_else(|| format!("Sign in to {} again: Settings → Vault → Sync.", p.name()))?;
+    let app = app.clone();
+    Ok(Arc::new(Refreshing::new(client, refresh, move |new| {
+        let _ = crate::ai::keys::set(&app, &id, Some(new));
+    })))
 }
 
 fn passphrase_id(local: &Path) -> String {
@@ -132,10 +158,15 @@ pub fn start_cloud(app: &AppHandle, state: &State<AppState>, local: &Path, targe
     let (remote, label, provider) = match &target {
         CloudTarget::Webdav { url, .. } => {
             let host = reqwest::Url::parse(url).ok().and_then(|u| u.host_str().map(str::to_string)).unwrap_or_else(|| url.clone());
-            (url.clone(), host, "webdav")
+            (url.clone(), host, "webdav".to_string())
+        }
+        CloudTarget::Drive { provider, account, folder } => {
+            let p = Provider::from_id(provider);
+            let place = p.map(|p| p.place()).unwrap_or_default();
+            (format!("{account} · {place} › {folder}"), p.map(|p| p.name()).unwrap_or("Cloud").to_string(), provider.clone())
         }
     };
-    let status = MirrorStatus { remote, label, provider: Some(provider.into()), ..Default::default() };
+    let status = MirrorStatus { remote, label, provider: Some(provider), ..Default::default() };
     let app2 = app.clone();
     let local2 = local.to_path_buf();
     start_worker(app, state, local, status, move |_| maybe_sealed(&app2, &local2, target.connect(&app2)?));
@@ -378,6 +409,127 @@ pub async fn set_cloud_sync(
     let mut settings = load_settings(&app);
     if let Some(old) = settings.mirrors.remove(&key) {
         Mirror::new(&root, old).reset();
+    }
+    Mirror::new(&root, "").reset();
+    set_encryption(&app, &mut settings, &root, passphrase.as_deref())?;
+    settings.clouds.insert(key, target.clone());
+    save_settings(&app, &settings)?;
+    start_cloud(&app, &state, &root, target);
+    Ok(())
+}
+
+/// Google Drive, OneDrive and Dropbox, and whether this copy can sign in to each.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DriveService {
+    /// "gdrive", "onedrive" or "dropbox".
+    pub provider: String,
+    pub name: String,
+    /// Where the vaults go there, e.g. "Apps › Marrow".
+    pub place: String,
+    pub available: bool,
+}
+
+#[tauri::command]
+pub fn drive_services() -> Vec<DriveService> {
+    Provider::ALL
+        .into_iter()
+        .map(|p| DriveService { provider: p.id().into(), name: p.name().into(), place: p.place().into(), available: marrow_cloud::keys::available(p, Platform::Desktop) })
+        .collect()
+}
+
+/// A signed-in account and the vault folders already there.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DriveAccount {
+    pub provider: String,
+    pub account: String,
+    pub folders: Vec<String>,
+    /// A folder name for this vault, to start a new one.
+    pub suggested: String,
+}
+
+static SIGN_IN_CANCEL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Signs in in the browser and keeps the sign-in in the credential store.
+#[tauri::command]
+pub async fn drive_sign_in(app: AppHandle, state: State<'_, AppState>, provider: String) -> CmdResult<DriveAccount> {
+    let p = Provider::from_id(&provider).ok_or("Unknown cloud service.")?;
+    let suggested = marrow_cloud::folder_name(&vault_root(&state).ok().and_then(|r| r.file_name().map(|n| n.to_string_lossy().into_owned())).unwrap_or_default());
+    SIGN_IN_CANCEL.store(false, std::sync::atomic::Ordering::Relaxed);
+    on_blocking_thread(move || {
+        use tauri_plugin_opener::OpenerExt;
+        let opener = app.clone();
+        let open = move |url: &str| opener.opener().open_url(url, None::<&str>).map_err(|e| format!("Couldn't open the browser: {e}"));
+        let done = marrow_cloud::loopback::sign_in(p, &open, &SIGN_IN_CANCEL, Duration::from_secs(300))?;
+        let client = marrow_cloud::keys::client(p, Platform::Desktop).ok_or("Can't sign in.")?;
+        let token: Arc<dyn TokenSource> = Arc::new(Refreshing::new(client, done.refresh_token.clone(), |_| {}).with_access(done.access_token.clone(), done.expires_in));
+        let account = match done.account.clone() {
+            Some(a) => a,
+            None => marrow_cloud::account_name(p, token.clone())?,
+        };
+        crate::ai::keys::set(&app, &drive_secret_id(p.id(), &account), Some(&done.refresh_token))?;
+        let folders = marrow_cloud::vault_folders(p, token)?;
+        Ok(DriveAccount { provider: p.id().into(), account, folders, suggested })
+    })
+    .await
+}
+
+/// Stops waiting for a sign-in in the browser.
+#[tauri::command]
+pub fn drive_sign_in_cancel() {
+    SIGN_IN_CANCEL.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+fn drive_remote(app: &AppHandle, provider: &str, account: &str, folder: &str) -> CmdResult<Box<dyn Remote>> {
+    let p = Provider::from_id(provider).ok_or("Unknown cloud service.")?;
+    Ok(marrow_cloud::connect(p, drive_tokens(app, p, account)?, account, &marrow_cloud::folder_name(folder)))
+}
+
+/// Makes the vault folder if needed and says what's in it.
+#[tauri::command]
+pub async fn drive_check(app: AppHandle, provider: String, account: String, folder: String) -> CmdResult<TargetInfo> {
+    on_blocking_thread(move || {
+        let r = drive_remote(&app, &provider, &account, &folder)?;
+        r.check().map_err(|e| e.to_string())?;
+        Ok(TargetInfo { files: r.list().map(|l| l.len()).map_err(err)?, encrypted: marrow_core::sealed::is_encrypted(r.as_ref()) })
+    })
+    .await
+}
+
+/// Turns on sync with a folder in Google Drive, OneDrive or Dropbox.
+#[tauri::command]
+pub async fn set_drive_sync(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    provider: String,
+    account: String,
+    folder: String,
+    passphrase: Option<String>,
+) -> CmdResult<()> {
+    let root = vault_root(&state)?;
+    let key = root.to_string_lossy().into_owned();
+    let folder = marrow_cloud::folder_name(&folder);
+    let (a, pr, ac, fo, phrase) = (app.clone(), provider.clone(), account.clone(), folder.clone(), passphrase.clone());
+    on_blocking_thread(move || {
+        let r = drive_remote(&a, &pr, &ac, &fo)?;
+        r.check().map_err(|e| e.to_string())?;
+        match phrase {
+            Some(phrase) => check_sealed(r, &phrase),
+            None if marrow_core::sealed::is_encrypted(r.as_ref()) => Err("That folder holds an encrypted vault. Turn on encryption and enter its sync passphrase.".into()),
+            None => Ok(()),
+        }
+    })
+    .await?;
+    let target = CloudTarget::Drive { provider, account, folder };
+    let mut settings = load_settings(&app);
+    if let Some(old) = settings.mirrors.remove(&key) {
+        Mirror::new(&root, old).reset();
+    }
+    if let Some(old) = settings.clouds.get(&key) {
+        if old.secret_id() != target.secret_id() {
+            let _ = crate::ai::keys::set(&app, &old.secret_id(), None);
+        }
     }
     Mirror::new(&root, "").reset();
     set_encryption(&app, &mut settings, &root, passphrase.as_deref())?;

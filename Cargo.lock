@@ -2701,6 +2701,7 @@ dependencies = [
  "futures-util",
  "keyring",
  "log",
+ "marrow-cloud",
  "marrow-core",
  "marrow-webdav",
  "png 0.17.16",
@@ -2717,6 +2718,21 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tempfile",
  "tokio",
+]
+
+[[package]]
+name = "marrow-cloud"
+version = "1.3.0"
+dependencies = [
+ "base64 0.22.1",
+ "getrandom 0.2.17",
+ "marrow-core",
+ "percent-encoding",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
 ]
 
 [[package]]
@@ -2755,6 +2771,7 @@ dependencies = [
 name = "marrow-ffi"
 version = "1.3.0"
 dependencies = [
+ "marrow-cloud",
  "marrow-core",
  "marrow-webdav",
  "pulldown-cmark",

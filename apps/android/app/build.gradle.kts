@@ -14,6 +14,11 @@ val release: String = Regex("""(?m)^version\s*=\s*"([^"]+)"""")
 // 1.4.0 -> 10400; a whole number that grows with each release.
 val versionNumber = release.split(".").map { it.takeWhile(Char::isDigit).toInt() }.let { (a, b, c) -> a * 10_000 + b * 100 + c }
 
+// The Dropbox app key, from the engine's sign-in keys (Dropbox comes back to db-<key>://).
+val dropboxKey: String = Regex("""(?m)^dropbox_key\s*=\s*"([^"]*)"""")
+    .find(rootProject.file("../../crates/marrow-cloud/keys.toml").readText())?.groupValues?.get(1)
+    ?.ifBlank { null } ?: System.getenv("MARROW_DROPBOX_KEY") ?: "none"
+
 // Signing for release builds: apps/android/keystore.properties (not in git) or environment variables in CI.
 val signing = Properties().apply {
     val f = rootProject.file("keystore.properties")
@@ -32,6 +37,7 @@ android {
         versionCode = versionNumber
         versionName = release
         vectorDrawables.useSupportLibrary = true
+        manifestPlaceholders["dropboxScheme"] = "db-$dropboxKey"
     }
 
     signingConfigs {
@@ -117,6 +123,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
+    // Signing in to cloud services: the browser (Custom Tabs), and Google's own sign-in.
+    implementation("androidx.browser:browser:1.8.0")
+    implementation("com.google.android.gms:play-services-auth:21.3.0")
     implementation("net.java.dev.jna:jna:5.18.1@aar")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

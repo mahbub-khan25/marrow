@@ -96,6 +96,10 @@ private final class Listener: MarrowListener, @unchecked Sendable {
 
     func syncChanged(status: SyncStatus) {
         DispatchQueue.main.async { [weak store] in store?.sync = status }
+        // Syncing with iCloud: have it download what it only keeps a stand-in for.
+        if status.kind == .folder, !status.syncing, ICloud.isICloudFolder(status.location) {
+            ICloud.downloadAll(in: URL(fileURLWithPath: status.location))
+        }
     }
 
     func locksChanged() {

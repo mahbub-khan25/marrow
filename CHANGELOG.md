@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Sync with Google Drive, OneDrive and Dropbox**, on computers and
+  phones: sign in once, pick the vault's folder, and your notes stay the same
+  everywhere, free with the storage you already have. Notes stay plain
+  Markdown files in *My Drive › Marrow* or *Apps › Marrow*, and Marrow can't
+  see anything else in your account. End-to-end encryption works with them
+  too.
+- **iCloud on iPhone and iPad:** keep a vault in iCloud Drive › Marrow and
+  open or sync the same folder in Marrow for Mac. Files iCloud hasn't
+  downloaded yet are waited for, never taken as deleted.
 - **Marrow on iPhone, iPad and Android:** native apps made with SwiftUI and
   Jetpack Compose, with Today and daily notes, the calendar, tasks, search,
   quick capture (with a photo or by speaking), sync with end-to-end

@@ -243,6 +243,23 @@
         }
       }
     },
+    "A new folder for this vault": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A new folder for this vault"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "এই ভল্টের জন্য নতুন ফোল্ডার"
+          }
+        }
+      }
+    },
     "A new vault on this phone, with a short welcome": {
       "extractionState": "manual",
       "localizations": {
@@ -256,6 +273,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "এই ফোনে একটি নতুন ভল্ট, ছোট একটি স্বাগত বার্তাসহ"
+          }
+        }
+      }
+    },
+    "A new, empty folder: everything in this vault will be copied there.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A new, empty folder: everything in this vault will be copied there."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "নতুন খালি ফোল্ডার: এই ভল্টের সবকিছু সেখানে কপি হবে।"
           }
         }
       }
@@ -1586,6 +1620,40 @@
         }
       }
     },
+    "Finish signing in, then come back to Marrow.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finish signing in, then come back to Marrow."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সাইন-ইন শেষ করে ম্যারোতে ফিরে আসুন।"
+          }
+        }
+      }
+    },
+    "Folder name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folder name"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ফোল্ডারের নাম"
+          }
+        }
+      }
+    },
     "For a vault kept in sync by Syncthing or another app": {
       "extractionState": "manual",
       "localizations": {
@@ -1977,19 +2045,19 @@
         }
       }
     },
-    "Keep this vault the same on your phone, tablet and computer. Marrow syncs with a WebDAV server you choose: Nextcloud, ownCloud, Synology, pCloud, Koofr and many more. Turn on encryption and the server only ever sees sealed files.": {
+    "Keep this vault the same on your phone, tablet and computer. Sign in to your cloud and Marrow keeps your notes there, free with the storage your account already has. Turn on encryption and the cloud only ever sees sealed files.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Keep this vault the same on your phone, tablet and computer. Marrow syncs with a WebDAV server you choose: Nextcloud, ownCloud, Synology, pCloud, Koofr and many more. Turn on encryption and the server only ever sees sealed files."
+            "value": "Keep this vault the same on your phone, tablet and computer. Sign in to your cloud and Marrow keeps your notes there, free with the storage your account already has. Turn on encryption and the cloud only ever sees sealed files."
           }
         },
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "আপনার ফোন, ট্যাবলেট ও কম্পিউটারে এই ভল্ট একই রাখুন। ম্যারো আপনার পছন্দের WebDAV সার্ভারের সাথে সিঙ্ক করে: Nextcloud, ownCloud, Synology, pCloud, Koofr ও আরও অনেক। এনক্রিপশন চালু করলে সার্ভার শুধু সিল করা ফাইল দেখে।"
+            "value": "আপনার ফোন, ট্যাবলেট ও কম্পিউটারে এই ভল্ট একই রাখুন। আপনার ক্লাউডে সাইন ইন করলে ম্যারো নোটগুলো সেখানে রাখে, আপনার অ্যাকাউন্টের স্টোরেজেই, আলাদা খরচ ছাড়া। এনক্রিপশন চালু করলে ক্লাউড শুধু সিল করা ফাইল দেখে।"
           }
         }
       }
@@ -2914,6 +2982,23 @@
         }
       }
     },
+    "Nextcloud, ownCloud, Synology, pCloud, Koofr and more": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nextcloud, ownCloud, Synology, pCloud, Koofr and more"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nextcloud, ownCloud, Synology, pCloud, Koofr ও আরও"
+          }
+        }
+      }
+    },
     "No AI set up": {
       "extractionState": "manual",
       "localizations": {
@@ -3216,6 +3301,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "নোট এই ফোনেই পাসফ্রেজ দিয়ে সিল করা হয়; সার্ভার সেগুলো পড়তে পারে না।"
+          }
+        }
+      }
+    },
+    "Notes go in %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes go in %1$@"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "নোট থাকবে %1$@-এ"
           }
         }
       }
@@ -4240,6 +4342,74 @@
         }
       }
     },
+    "Sign in to %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in to %1$@"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@-এ সাইন ইন করুন"
+          }
+        }
+      }
+    },
+    "Sign in to iCloud in the Settings app and turn on iCloud Drive, then come back.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in to iCloud in the Settings app and turn on iCloud Drive, then come back."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings অ্যাপে iCloud-এ সাইন ইন করে iCloud Drive চালু করুন, তারপর ফিরে আসুন।"
+          }
+        }
+      }
+    },
+    "Sign-in was cancelled.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign-in was cancelled."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সাইন-ইন বাতিল হয়েছে।"
+          }
+        }
+      }
+    },
+    "Signed in as %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Signed in as %1$@"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ হিসেবে সাইন ইন করা আছে"
+          }
+        }
+      }
+    },
     "Signed in. The folder has %lld files: they'll be merged with this vault.": {
       "extractionState": "manual",
       "localizations": {
@@ -4270,6 +4440,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "সাইন ইন হয়েছে। ফোল্ডারটি খালি: এই ভল্ট সেখানে কপি হবে।"
+          }
+        }
+      }
+    },
+    "Signing in to Google needs Google Play services on this phone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Signing in to Google needs Google Play services on this phone."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google-এ সাইন ইন করতে এই ফোনে Google Play services লাগবে।"
           }
         }
       }
@@ -5328,6 +5515,23 @@
         }
       }
     },
+    "Use another account": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use another account"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "অন্য অ্যাকাউন্ট ব্যবহার করুন"
+          }
+        }
+      }
+    },
     "User name": {
       "extractionState": "manual",
       "localizations": {
@@ -5358,6 +5562,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "ভল্ট"
+          }
+        }
+      }
+    },
+    "Vault folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vault folder"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ভল্টের ফোল্ডার"
           }
         }
       }
@@ -5600,6 +5821,74 @@
         }
       }
     },
+    "Your iPhone, iPad and Mac, with your iCloud storage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your iPhone, iPad and Mac, with your iCloud storage"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আপনার iPhone, iPad ও Mac, আপনার iCloud স্টোরেজে"
+          }
+        }
+      }
+    },
+    "Your notes go in %@, as plain Markdown files you can open there too. Marrow can't see anything else in your %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your notes go in %1$@, as plain Markdown files you can open there too. Marrow can't see anything else in your %2$@."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আপনার নোট থাকবে %1$@-এ, সাধারণ Markdown ফাইল হিসেবে, যা সেখানেও খোলা যায়। আপনার %2$@-এর আর কিছুই ম্যারো দেখতে পায় না।"
+          }
+        }
+      }
+    },
+    "Your notes go in iCloud Drive › Marrow › %@. On a Mac, open that folder in Marrow, or sync with it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your notes go in iCloud Drive › Marrow › %1$@. On a Mac, open that folder in Marrow, or sync with it."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আপনার নোট থাকবে iCloud Drive › Marrow › %1$@-এ। Mac-এ ম্যারোতে ওই ফোল্ডার খুলুন, অথবা তার সাথে সিঙ্ক করুন।"
+          }
+        }
+      }
+    },
+    "Your own server (WebDAV)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your own server (WebDAV)"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "নিজের সার্ভার (WebDAV)"
+          }
+        }
+      }
+    },
     "Your vault on": {
       "extractionState": "manual",
       "localizations": {
@@ -5630,6 +5919,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "এনক্রিপ্টেড"
+          }
+        }
+      }
+    },
+    "iCloud": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud"
           }
         }
       }

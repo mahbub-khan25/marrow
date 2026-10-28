@@ -20,3 +20,7 @@ apps/ios/Marrow.xcodeproj/
 apps/ios/rust/
 apps/ios/Generated/
 apps/ios/build/
+apps/ios/Marrow/Info.plist
+apps/ios/Marrow/Marrow.entitlements
+apps/ios/shots/
+ui/sync-preview.html

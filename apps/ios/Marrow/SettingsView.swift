@@ -97,6 +97,7 @@ struct SyncView: View {
     @State private var error: String?
     @State private var stopping = false
     @State private var pickingFolder = false
+    @State private var ownServer = false
 
     var body: some View {
         Form {
@@ -121,43 +122,59 @@ struct SyncView: View {
                 Section { Button("Turn off sync", role: .destructive) { stopping = true } }
             } else {
                 Section {
-                    Text("Keep this vault the same on your phone, tablet and computer. Marrow syncs with a WebDAV server you choose: Nextcloud, ownCloud, Synology, pCloud, Koofr and many more. Turn on encryption and the server only ever sees sealed files.")
+                    Text("Keep this vault the same on your phone, tablet and computer. Sign in to your cloud and Marrow keeps your notes there, free with the storage your account already has. Turn on encryption and the cloud only ever sees sealed files.")
                         .font(.callout).foregroundStyle(Color.inkSoft)
                 }
+                CloudSection()
                 Section {
-                    TextField("Server address", text: $url).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    TextField("User name", text: $user).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    SecureField("Password", text: $password)
-                } footer: {
-                    Text("The folder to sync with. In Nextcloud: Files → Settings → WebDAV, then add a folder name.")
-                }
-                Section {
-                    Toggle(isOn: Binding(get: { encrypt || place?.encrypted == true }, set: { encrypt = $0 })) {
-                        VStack(alignment: .leading) {
-                            Text("Encrypt end to end")
-                            Text("Notes are sealed on this phone with a passphrase; the server can't read them.").font(.caption).foregroundStyle(Color.inkSoft)
+                    Button { withAnimation { ownServer.toggle() } } label: {
+                        HStack(spacing: 14) {
+                            Image(systemName: "server.rack").font(.title2).foregroundStyle(Color.inkSoft).frame(width: 32)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Your own server (WebDAV)").foregroundStyle(Color.ink)
+                                Text("Nextcloud, ownCloud, Synology, pCloud, Koofr and more").font(.caption).foregroundStyle(Color.inkSoft)
+                            }
+                            Spacer()
+                            Image(systemName: ownServer ? "chevron.up" : "chevron.down").font(.footnote.weight(.semibold)).foregroundStyle(Color.faint)
                         }
                     }
-                    .disabled(place?.encrypted == true)
-                    if encrypt || place?.encrypted == true {
-                        SecureField("Sync passphrase", text: $pass)
-                        if place?.encrypted != true { SecureField("Passphrase again", text: $pass2) }
-                    }
-                } footer: {
-                    if encrypt || place?.encrypted == true {
-                        Text(place?.encrypted == true ? "This folder is already encrypted: enter the passphrase you chose for it." : "At least 8 characters. Use the same one on every device. Without it the notes there can't be read.")
-                    }
                 }
-                Section {
-                    if let p = place {
-                        Text(p.files == 0 ? String(localized: "Signed in. The folder is empty: this vault will be copied there.") : String(localized: "Signed in. The folder has \(Int(p.files)) files: they'll be merged with this vault.")).foregroundStyle(Color.accent)
+                if ownServer {
+                    Section {
+                        TextField("Server address", text: $url).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        TextField("User name", text: $user).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        SecureField("Password", text: $password)
+                    } footer: {
+                        Text("The folder to sync with. In Nextcloud: Files → Settings → WebDAV, then add a folder name.")
                     }
-                    if let error { Text(verbatim: error).foregroundStyle(Color.danger) }
-                    HStack {
-                        Button("Check") { check() }.disabled(busy || url.isEmpty)
-                        Spacer()
-                        if busy { ProgressView() }
-                        Button("Start syncing") { start() }.buttonStyle(.borderedProminent).disabled(busy || url.isEmpty || !passOk)
+                    Section {
+                        Toggle(isOn: Binding(get: { encrypt || place?.encrypted == true }, set: { encrypt = $0 })) {
+                            VStack(alignment: .leading) {
+                                Text("Encrypt end to end")
+                                Text("Notes are sealed on this phone with a passphrase; the server can't read them.").font(.caption).foregroundStyle(Color.inkSoft)
+                            }
+                        }
+                        .disabled(place?.encrypted == true)
+                        if encrypt || place?.encrypted == true {
+                            SecureField("Sync passphrase", text: $pass)
+                            if place?.encrypted != true { SecureField("Passphrase again", text: $pass2) }
+                        }
+                    } footer: {
+                        if encrypt || place?.encrypted == true {
+                            Text(place?.encrypted == true ? "This folder is already encrypted: enter the passphrase you chose for it." : "At least 8 characters. Use the same one on every device. Without it the notes there can't be read.")
+                        }
+                    }
+                    Section {
+                        if let p = place {
+                            Text(p.files == 0 ? String(localized: "Signed in. The folder is empty: this vault will be copied there.") : String(localized: "Signed in. The folder has \(Int(p.files)) files: they'll be merged with this vault.")).foregroundStyle(Color.accent)
+                        }
+                        if let error { Text(verbatim: error).foregroundStyle(Color.danger) }
+                        HStack {
+                            Button("Check") { check() }.disabled(busy || url.isEmpty)
+                            Spacer()
+                            if busy { ProgressView() }
+                            Button("Start syncing") { start() }.buttonStyle(.borderedProminent).disabled(busy || url.isEmpty || !passOk)
+                        }
                     }
                 }
                 Section {

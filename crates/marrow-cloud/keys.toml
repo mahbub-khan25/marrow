@@ -1,0 +1,20 @@
+# The IDs Marrow uses to sign in to each cloud service. They aren't secret
+# (every copy of the app carries them), so they live here in the open.
+# How to get each one: docs/cloud-setup.md. Leave one empty and that service
+# doesn't appear in the app.
+
+# Google Cloud console → APIs & Services → Credentials.
+# A "Desktop app" client: its ID and the "client secret" Google shows with it
+# (for desktop apps it isn't really secret; Google says so).
+google_desktop_id = ""
+google_desktop_secret = ""
+# An "iOS" client, bundle ID app.marrow.notes.
+google_ios_id = ""
+# (Android needs no ID here: Google recognises the app by its package name
+# and signing certificate, registered as an "Android" client.)
+
+# Microsoft Entra → App registrations → Application (client) ID.
+onedrive_id = ""
+
+# Dropbox App Console → your app → App key.
+dropbox_key = ""
