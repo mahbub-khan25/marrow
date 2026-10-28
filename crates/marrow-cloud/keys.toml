@@ -1,7 +1,12 @@
-# The IDs Marrow uses to sign in to each cloud service. They aren't secret
-# (every copy of the app carries them), so they live here in the open.
-# How to get each one: docs/cloud-setup.md. Leave one empty and that service
-# doesn't appear in the app.
+# The IDs Marrow uses to sign in to each cloud service. How to get each one:
+# docs/cloud-setup.md. Leave one empty and that service doesn't appear in
+# the app.
+#
+# Marrow's own builds don't take them from here: GitHub won't accept them in
+# the repository, so the build workflows pass them in as the repository
+# secrets MARROW_GOOGLE_DESKTOP_ID, MARROW_GOOGLE_DESKTOP_SECRET,
+# MARROW_GOOGLE_IOS_ID, MARROW_ONEDRIVE_ID and MARROW_DROPBOX_KEY. Fill them
+# in here only for a build of your own, and don't commit them.
 
 # Google Cloud console → APIs & Services → Credentials.
 # A "Desktop app" client: its ID and the "client secret" Google shows with it

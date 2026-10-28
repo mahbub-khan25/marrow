@@ -111,3 +111,25 @@ mod tests {
         assert_eq!(scheme, "com.googleusercontent.apps.123-abc");
     }
 }
+
+#[cfg(test)]
+mod set_up {
+    use super::*;
+
+    /// With the IDs given (Marrow's own builds), every service can sign in
+    /// from every kind of device.
+    #[test]
+    fn this_copy_is_set_up() {
+        if get("dropbox_key").is_empty() {
+            return; // a build without the IDs
+        }
+        for p in Provider::ALL {
+            for pl in [Platform::Desktop, Platform::Ios, Platform::Android] {
+                assert!(available(p, pl), "{p:?} on {pl:?}");
+            }
+        }
+        assert!(client(Provider::GoogleDrive, Platform::Ios).unwrap().redirect.starts_with("com.googleusercontent.apps."));
+        assert_eq!(client(Provider::Dropbox, Platform::Android).unwrap().redirect, format!("db-{}://2/token", get("dropbox_key")));
+        assert_eq!(client(Provider::OneDrive, Platform::Desktop).unwrap().redirect, "http://localhost:53682/");
+    }
+}

@@ -33,6 +33,13 @@ jobs:
           - os: ubuntu-22.04
             args: "--bundles deb,rpm,appimage"
     runs-on: ${{ matrix.os }}
+    env:
+      # Sign-in IDs for Google Drive, OneDrive and Dropbox (crates/marrow-cloud/keys.toml).
+      MARROW_GOOGLE_DESKTOP_ID: ${{ secrets.MARROW_GOOGLE_DESKTOP_ID }}
+      MARROW_GOOGLE_DESKTOP_SECRET: ${{ secrets.MARROW_GOOGLE_DESKTOP_SECRET }}
+      MARROW_GOOGLE_IOS_ID: ${{ secrets.MARROW_GOOGLE_IOS_ID }}
+      MARROW_ONEDRIVE_ID: ${{ secrets.MARROW_ONEDRIVE_ID }}
+      MARROW_DROPBOX_KEY: ${{ secrets.MARROW_DROPBOX_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -140,6 +147,13 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-24.04
+    env:
+      # Sign-in IDs for Google Drive, OneDrive and Dropbox (crates/marrow-cloud/keys.toml).
+      MARROW_GOOGLE_DESKTOP_ID: ${{ secrets.MARROW_GOOGLE_DESKTOP_ID }}
+      MARROW_GOOGLE_DESKTOP_SECRET: ${{ secrets.MARROW_GOOGLE_DESKTOP_SECRET }}
+      MARROW_GOOGLE_IOS_ID: ${{ secrets.MARROW_GOOGLE_IOS_ID }}
+      MARROW_ONEDRIVE_ID: ${{ secrets.MARROW_ONEDRIVE_ID }}
+      MARROW_DROPBOX_KEY: ${{ secrets.MARROW_DROPBOX_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

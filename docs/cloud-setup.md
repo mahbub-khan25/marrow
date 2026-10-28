@@ -1,17 +1,19 @@
 # Setting up Google Drive, OneDrive, Dropbox and iCloud sync
 
 Marrow signs in to each service as an app that you, the publisher, register
-once with that service. Registering is free. Each one gives you an ID,
-which goes into [`crates/marrow-cloud/keys.toml`](../crates/marrow-cloud/keys.toml).
-The IDs aren't secret (every copy of the app carries them), so they can be
-committed. A service whose ID is empty simply doesn't appear in the app.
+once with that service. Registering is free. Each one gives you an ID. For
+Marrow's own builds the IDs are repository secrets (Settings → Secrets and
+variables → Actions), which every build workflow passes in. GitHub refuses
+Google's IDs in the code itself. For a build of your own, put them in
+[`crates/marrow-cloud/keys.toml`](../crates/marrow-cloud/keys.toml) and
+don't commit it. A service without an ID simply doesn't appear in the app.
 
 Your users never set anything up: they tap "Sign in to Google Drive", sign
 in, and their notes sync, using the free storage their account already has.
 
-Instead of editing `keys.toml`, the IDs can also be given when building, as
-environment variables: `MARROW_GOOGLE_DESKTOP_ID`, `MARROW_GOOGLE_DESKTOP_SECRET`,
-`MARROW_GOOGLE_IOS_ID`, `MARROW_ONEDRIVE_ID`, `MARROW_DROPBOX_KEY`.
+The secrets (and the environment variables a build reads) are
+`MARROW_GOOGLE_DESKTOP_ID`, `MARROW_GOOGLE_DESKTOP_SECRET`,
+`MARROW_GOOGLE_IOS_ID`, `MARROW_ONEDRIVE_ID` and `MARROW_DROPBOX_KEY`.
 
 The privacy policy the services ask for is [PRIVACY.md](../PRIVACY.md):
 link to `https://github.com/mahbub-khan25/marrow/blob/main/PRIVACY.md`.
@@ -123,6 +125,7 @@ up sync, and iCloud for Windows shows it too.
 
 ## After adding the IDs
 
-Commit `keys.toml` and build as usual. To check a sign-in without
+Add the five secrets, then run Actions → Test build (desktop) or wait for
+the Android and iOS workflows. To check a sign-in without
 publishing: build the desktop app (`npm run tauri dev`), open a vault,
 Settings → Vault → Sync → Set up, and pick the service.

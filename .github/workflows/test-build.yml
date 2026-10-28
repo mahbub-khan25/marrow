@@ -1,0 +1,51 @@
+# A test version of the desktop app, from any commit, without making a
+# release: Actions → Test build → Run workflow. The installers land under
+# that run's Artifacts. They're unsigned (Windows SmartScreen and macOS
+# Gatekeeper warn before opening them); releases are signed.
+name: Test build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: "--bundles nsis"
+            name: windows
+          - os: macos-latest
+            args: "--target universal-apple-darwin --bundles dmg"
+            name: mac
+    runs-on: ${{ matrix.os }}
+    env:
+      # Sign-in IDs for Google Drive, OneDrive and Dropbox (crates/marrow-cloud/keys.toml).
+      MARROW_GOOGLE_DESKTOP_ID: ${{ secrets.MARROW_GOOGLE_DESKTOP_ID }}
+      MARROW_GOOGLE_DESKTOP_SECRET: ${{ secrets.MARROW_GOOGLE_DESKTOP_SECRET }}
+      MARROW_GOOGLE_IOS_ID: ${{ secrets.MARROW_GOOGLE_IOS_ID }}
+      MARROW_ONEDRIVE_ID: ${{ secrets.MARROW_ONEDRIVE_ID }}
+      MARROW_DROPBOX_KEY: ${{ secrets.MARROW_DROPBOX_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      - run: npx tauri build ${{ matrix.args }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: marrow-${{ matrix.name }}
+          path: |
+            target/release/bundle/nsis/*.exe
+            target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
