@@ -4,7 +4,7 @@ members = ["crates/marrow-core", "crates/marrow-webdav", "crates/marrow-cloud", 
 
 [workspace.package]
 edition = "2021"
-version = "1.3.0"
+version = "1.4.0"
 license = "MIT"
 rust-version = "1.82"
 

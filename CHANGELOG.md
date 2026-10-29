@@ -1,22 +1,27 @@
 # Changelog
 
-## Unreleased
+## 1.4.0
 
+Marrow comes to Android, and syncs through the cloud storage you already have.
+
+- **Marrow for Android:** download `Marrow_1.4.0_android.apk` below and open
+  it on your phone or tablet (allow "Install unknown apps" when Android
+  asks). Today and daily notes, the calendar, tasks, search, quick capture
+  with a photo or by speaking, locked notes, the graph, canvases, version
+  history, Ask your notes, English or Bangla.
+- **Desktop layout on Android tablets:** in Android's desktop mode, on an
+  external screen or on a tablet in landscape, a sidebar shows your folders
+  and notes beside the page. Keyboard shortcuts: Ctrl K search, Ctrl D
+  today, Ctrl N new note, Ctrl \ sidebar. Right-click works like a long press.
 - **Sync with Google Drive, OneDrive and Dropbox**, on computers and
   phones: sign in once, pick the vault's folder, and your notes stay the same
   everywhere, free with the storage you already have. Notes stay plain
   Markdown files in *My Drive › Marrow* or *Apps › Marrow*, and Marrow can't
   see anything else in your account. End-to-end encryption works with them
   too.
-- **iCloud on iPhone and iPad:** keep a vault in iCloud Drive › Marrow and
-  open or sync the same folder in Marrow for Mac. Files iCloud hasn't
-  downloaded yet are waited for, never taken as deleted.
-- **Marrow on iPhone, iPad and Android:** native apps made with SwiftUI and
-  Jetpack Compose, with Today and daily notes, the calendar, tasks, search,
-  quick capture (with a photo or by speaking), sync with end-to-end
-  encryption, locked notes, the graph, canvases, version history, the time
-  machine, Ask your notes, import and English or Bangla. Both share the same
-  engine as the desktop app. See [apps/README.md](apps/README.md).
+- **iPhone and iPad:** the app is built and tested, with iCloud sync, and
+  comes to the App Store and TestFlight next. See
+  [apps/README.md](apps/README.md).
 - The lock and WebDAV code moved into the engine crates so the phone apps
   use the same code as the desktop app.
 
