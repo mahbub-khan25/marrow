@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.5.0
+
+Reminders, and your tasks on the home screen.
+
+- **Reminders on tasks:** tap the alarm on a task (or "Remind me" while
+  writing) and pick in an hour, this evening, tomorrow morning, or any date
+  and time. The time is kept in the note as `⏰ 2026-11-03 09:00`, so it
+  syncs like everything else. Notifications have **Done** and **Snooze
+  10 min** buttons.
+  - On Android, iPhone and iPad they arrive even when Marrow is closed.
+  - On computers they arrive while Marrow runs. It can keep running in the
+    tray and start when you sign in (Settings › Editor › "Keep running for
+    reminders"); missed reminders from the last day ring when it opens.
+- **Home-screen widget (Android, iPhone and iPad):** what's due today and
+  overdue, with a tick box for each task and a button to add one. Tap a task
+  to open its note.
+
 ## 1.4.0
 
 Marrow comes to Android, and syncs through the cloud storage you already have.
