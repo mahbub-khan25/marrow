@@ -192,6 +192,23 @@
         }
       }
     },
+    "+%lld more": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+%1$lld more"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আরও %1$lldটি"
+          }
+        }
+      }
+    },
     "1 item": {
       "extractionState": "manual",
       "localizations": {
@@ -3441,6 +3458,23 @@
         }
       }
     },
+    "Nothing due today.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing due today."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আজ কোনো কাজ বাকি নেই।"
+          }
+        }
+      }
+    },
     "Nothing found": {
       "extractionState": "manual",
       "localizations": {
@@ -3590,6 +3624,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "খুলুন"
+          }
+        }
+      }
+    },
+    "Open Marrow to choose your notes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Marrow to choose your notes."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "নোট বেছে নিতে ম্যারো খুলুন।"
           }
         }
       }
@@ -5600,6 +5651,23 @@
         }
       }
     },
+    "Today's tasks": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today's tasks"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আজকের কাজ"
+          }
+        }
+      }
+    },
     "Tomorrow": {
       "extractionState": "manual",
       "localizations": {
@@ -5970,6 +6038,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "কী করতে হবে?"
+          }
+        }
+      }
+    },
+    "What's due today and overdue, with a button to add a task.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's due today and overdue, with a button to add a task."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আজকের ও পেরিয়ে যাওয়া কাজ, সাথে নতুন কাজ যোগ করার বোতাম।"
           }
         }
       }

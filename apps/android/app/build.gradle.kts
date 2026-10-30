@@ -128,6 +128,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
+    // The home-screen widget.
+    implementation("androidx.glance:glance-appwidget:1.1.1")
     // Signing in to cloud services: the browser (Custom Tabs), and Google's own sign-in.
     implementation("androidx.browser:browser:1.8.0")
     implementation("com.google.android.gms:play-services-auth:21.3.0")
