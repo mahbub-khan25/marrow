@@ -12,8 +12,13 @@ struct MarkdownEditor: UIViewRepresentable {
     var suggest: (String) -> [FileHit] = { _ in [] }
     var onPhoto: () -> Void = {}
     var onDictate: (() -> Void)? = nil
+    /// "Remind me" on the cursor's line: gets that line, and later a new one
+    /// for it (with its reminder) through `replaceLine`.
+    var onRemind: ((String) -> Void)? = nil
     /// Set to insert text at the cursor (a photo's embed, dictated words).
     @Binding var insert: String?
+    /// Set to replace the cursor's line.
+    var replaceLine: Binding<String?> = .constant(nil)
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -56,6 +61,13 @@ struct MarkdownEditor: UIViewRepresentable {
             DispatchQueue.main.async {
                 context.coordinator.insert(s)
                 insert = nil
+            }
+        }
+        if let l = replaceLine.wrappedValue {
+            let binding = replaceLine
+            DispatchQueue.main.async {
+                context.coordinator.replaceLine(l)
+                binding.wrappedValue = nil
             }
         }
     }
@@ -182,6 +194,26 @@ struct MarkdownEditor: UIViewRepresentable {
             let inner = ns.substring(with: r)
             v.textStorage.replaceCharacters(in: r, with: mark + inner + mark)
             v.selectedRange = NSRange(location: r.location + (mark as NSString).length, length: r.length)
+            textViewDidChange(v)
+        }
+
+        /// The cursor's line, without its line break.
+        func currentLine() -> String {
+            guard let v = view else { return "" }
+            let ns = (v.text ?? "") as NSString
+            let r = ns.lineRange(for: NSRange(location: min(v.selectedRange.location, ns.length), length: 0))
+            return ns.substring(with: r).trimmingCharacters(in: .newlines)
+        }
+
+        /// Replaces the cursor's line (keeping its line break), cursor at its end.
+        func replaceLine(_ new: String) {
+            guard let v = view else { return }
+            let ns = (v.text ?? "") as NSString
+            let r = ns.lineRange(for: NSRange(location: min(v.selectedRange.location, ns.length), length: 0))
+            let old = ns.substring(with: r)
+            let body = NSRange(location: r.location, length: (old.trimmingCharacters(in: .newlines) as NSString).length)
+            v.textStorage.replaceCharacters(in: body, with: new)
+            v.selectedRange = NSRange(location: body.location + (new as NSString).length, length: 0)
             textViewDidChange(v)
         }
 
@@ -329,6 +361,7 @@ private struct EditorBar: View {
                     tool("chevron.left.forwardslash.chevron.right", "Code") { coordinator.wrap("`") }
                     tool("photo", "Add a photo") { coordinator.parent.onPhoto() }
                     if let d = coordinator.parent.onDictate { tool("mic", "Dictate", d) }
+                    if let r = coordinator.parent.onRemind { tool("alarm", "Remind me") { r(coordinator.currentLine()) } }
                     tool("keyboard.chevron.compact.down", "Done") { coordinator.done() }
                 }
                 .padding(.horizontal, 6)

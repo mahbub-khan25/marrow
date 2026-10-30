@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UserNotifications
 
 @main
 struct MarrowApp: App {
@@ -32,6 +33,13 @@ struct MarrowApp: App {
                 .tint(.accent)
                 .task { await start() }
                 .onReceive(NotificationCenter.default.publisher(for: QuickActions.notice)) { _ in handleQuickAction() }
+                .onReceive(NotificationCenter.default.publisher(for: ReminderTap.notice)) { _ in handleReminderTap() }
+                .task(id: store.tick) {
+                    // Notes changed (here or by sync): schedule their reminders again.
+                    guard demo == nil, store.vault != nil else { return }
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    await Reminders.refresh(store.marrow)
+                }
         }
         .onChange(of: phase) { _, now in
             switch now {
@@ -65,6 +73,7 @@ struct MarrowApp: App {
             return
         }
         Bookmarks.restore()
+        ReminderCenter.shared.marrow = store.marrow
         await store.openLast()
         if store.prefs.afterOpen == "sync" {
             router.tab = .today
@@ -72,6 +81,15 @@ struct MarrowApp: App {
         }
         store.prefs.afterOpen = nil
         handleQuickAction()
+        handleReminderTap()
+    }
+
+    @MainActor
+    private func handleReminderTap() {
+        guard store.vault != nil, let tap = ReminderTap.pending else { return }
+        ReminderTap.pending = nil
+        router.tab = .tasks
+        router.note(tap.path, line: tap.line)
     }
 
     @MainActor
@@ -171,6 +189,12 @@ enum QuickActions {
 }
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = ReminderCenter.shared
+        Reminders.registerCategory()
+        return true
+    }
+
     func application(_ application: UIApplication, configurationForConnecting session: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
         if let item = options.shortcutItem { QuickActions.pending = item.type }
         let config = UISceneConfiguration(name: nil, sessionRole: session.role)

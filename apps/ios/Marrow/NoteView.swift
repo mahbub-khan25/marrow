@@ -34,6 +34,9 @@ struct NoteView: View {
     @State private var photo: PhotosPickerItem?
     @State private var pickingPhoto = false
     @State private var dictating = false
+    /// The editor line a reminder is being set on.
+    @State private var remindLine: String?
+    @State private var newLine: String?
     @State private var saveTask: Task<Void, Never>?
 
     var body: some View {
@@ -80,6 +83,13 @@ struct NoteView: View {
                 }
             }
             .sheet(isPresented: $dictating) { DictationSheet { said in insert = said } }
+            .sheet(isPresented: Binding(get: { remindLine != nil }, set: { if !$0 { remindLine = nil } })) {
+                let line = remindLine ?? ""
+                RemindSheet(current: reminderOfLine(line: line)) { at in
+                    newLine = lineWithReminder(line: taskLine(line), at: at)
+                    store.say(at.map { String(localized: "Reminder set: \(Reminders.label($0))") } ?? String(localized: "Reminder removed"))
+                }
+            }
             .photosPicker(isPresented: $pickingPhoto, selection: $photo, matching: .images)
             .onChange(of: photo) { _, item in addPhoto(item) }
             .alert("Rename", isPresented: $renaming) {
@@ -117,7 +127,9 @@ struct NoteView: View {
                 suggest: { q in (try? store.marrow.findFiles(query: q, source: current, limit: 8).filter(\.isNote)) ?? [] },
                 onPhoto: { pickingPhoto = true },
                 onDictate: { dictating = true },
-                insert: $insert
+                onRemind: { line in remindLine = line },
+                insert: $insert,
+                replaceLine: $newLine
             )
             .padding(.horizontal, 20)
             .readingWidth()
@@ -615,4 +627,13 @@ struct MoveSheet: View {
         }
         .presentationDetents([.medium, .large])
     }
+}
+
+/// The line as a task (`- [ ] …`), if it isn't one already.
+func taskLine(_ line: String) -> String {
+    if line.range(of: #"^\s*(?:>\s*)*(?:[-*+]|\d+[.)]) \[[ xX]\] "#, options: .regularExpression) != nil { return line }
+    let indent = String(line.prefix { $0 == " " || $0 == "\t" })
+    var rest = String(line.dropFirst(indent.count))
+    if let r = rest.range(of: #"^[-*+] "#, options: .regularExpression) { rest.removeSubrange(r) }
+    return indent + "- [ ] " + rest
 }

@@ -235,6 +235,7 @@ struct TaskRow: View {
     @Environment(Store.self) private var store
     @Environment(Router.self) private var router
     @State private var ticked = false
+    @State private var reminding = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -261,12 +262,33 @@ struct TaskRow: View {
                 if !meta.isEmpty {
                     Text(verbatim: meta).font(.caption).foregroundStyle(overdue ? Color.danger : Color.faint)
                 }
+                if let at = task.remind, !task.done { ReminderChip(at: at) }
             }
             Spacer(minLength: 0)
+            if !task.done {
+                Button { reminding = true } label: {
+                    Image(systemName: task.remind == nil ? "alarm" : "alarm.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(task.remind == nil ? Color.faint : Color.accent)
+                        .frame(width: 32, height: 28)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("Remind me"))
+            }
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
         .onTapGesture { router.note(task.path, line: Int(task.line)) }
+        .sheet(isPresented: $reminding) {
+            RemindSheet(current: task.remind) { at in
+                Task {
+                    do {
+                        _ = try await store.run { try $0.setReminder(path: task.path, line: task.line, text: task.text, at: at) }
+                        store.say(at.map { String(localized: "Reminder set: \(Reminders.label($0))") } ?? String(localized: "Reminder removed"))
+                    } catch { store.say(error) }
+                }
+            }
+        }
     }
 
     private var overdue: Bool { (task.due ?? "9999") < today }
