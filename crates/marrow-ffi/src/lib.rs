@@ -27,6 +27,7 @@ use marrow_core::{Engine, EngineEvent, VaultEvent, VaultPath, VaultService};
 
 mod ai;
 mod canvas;
+mod clip;
 mod cloud;
 mod daily;
 mod files;

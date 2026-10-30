@@ -19,6 +19,14 @@
     <string name="reminders">Reminders</string>
     <string name="reminder_done">Done</string>
     <string name="reminder_snooze">Snooze 10 min</string>
+    <string name="save_the_page">Save the page</string>
+    <string name="saving_the_page">Saving…</string>
+    <string name="page_saved">Saved “%1$s” in Clippings</string>
+    <string name="share_page_saved_hint">The page is saved as a note in Clippings.</string>
+    <string name="share_link_hint">The link is added to today\'s note.</string>
+    <string name="share_later_hint">Added to today\'s note when you next open Marrow.</string>
+    <string name="share_cant">Marrow can\'t take this right now. Open Marrow once, then try again.</string>
+    <string name="shared_added">Added what you shared.</string>
     <string name="widget_today">Today\'s tasks</string>
     <string name="widget_description">What\'s due today and overdue, with a button to add a task.</string>
     <string name="widget_nothing_due">Nothing due today.</string>

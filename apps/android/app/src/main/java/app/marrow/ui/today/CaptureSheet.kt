@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Mic
@@ -75,6 +76,9 @@ fun CaptureSheet(shared: Incoming.Shared?, onDismiss: () -> Unit, onSaved: (Stri
     val scope = rememberCoroutineScope()
     var text by remember { mutableStateOf(shared?.text.orEmpty()) }
     var asTask by remember { mutableStateOf(false) }
+    // A shared link: save the page itself (in Clippings), not just the link.
+    val link = remember { shared?.text?.let { app.marrow.core.linkIn(it) } }
+    var savePage by remember { mutableStateOf(link != null) }
     var saving by remember { mutableStateOf(false) }
     val images = remember { mutableStateListOf<Uri>().apply { addAll(shared?.images.orEmpty()) } }
     val focus = remember { FocusRequester() }
@@ -89,6 +93,11 @@ fun CaptureSheet(shared: Incoming.Shared?, onDismiss: () -> Unit, onSaved: (Stri
         saving = true
         scope.launch {
             try {
+                if (link != null && savePage) {
+                    val path = engine.run { clipPage(link, null, null, null, today()) }
+                    onSaved(ctx.getString(R.string.page_saved, path.substringAfterLast('/').removeSuffix(".md")))
+                    return@launch
+                }
                 val embeds = withContext(Dispatchers.IO) {
                     images.mapIndexed { i, uri ->
                         val bytes = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@mapIndexed null
@@ -135,14 +144,21 @@ fun CaptureSheet(shared: Incoming.Shared?, onDismiss: () -> Unit, onSaved: (Stri
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                FilterChip(asTask, { asTask = !asTask }, label = { Text(stringResource(R.string.as_a_task)) }, leadingIcon = { Icon(Icons.Outlined.CheckBox, null, Modifier.size(18.dp)) })
+                if (link != null) {
+                    FilterChip(savePage, { savePage = !savePage }, label = { Text(stringResource(R.string.save_the_page)) }, leadingIcon = { Icon(Icons.Outlined.Article, null, Modifier.size(18.dp)) })
+                }
+                if (link == null || !savePage) {
+                    FilterChip(asTask, { asTask = !asTask }, label = { Text(stringResource(R.string.as_a_task)) }, leadingIcon = { Icon(Icons.Outlined.CheckBox, null, Modifier.size(18.dp)) })
+                }
                 IconButton(onClick = { pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Icon(Icons.Outlined.PhotoLibrary, stringResource(R.string.add_photo)) }
                 IconButton(onClick = {
                     val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                     runCatching { dictate.launch(i) }.onFailure { engine.say(ctx.getString(R.string.no_dictation)) }
                 }) { Icon(Icons.Outlined.Mic, stringResource(R.string.dictate)) }
                 Spacer(Modifier.weight(1f))
-                Button(onClick = ::save, enabled = !saving && (text.isNotBlank() || images.isNotEmpty())) { Text(stringResource(R.string.save)) }
+                Button(onClick = ::save, enabled = !saving && (text.isNotBlank() || images.isNotEmpty())) {
+                    Text(stringResource(if (saving && link != null && savePage) R.string.saving_the_page else R.string.save))
+                }
             }
         }
     }

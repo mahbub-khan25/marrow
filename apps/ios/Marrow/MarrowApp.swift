@@ -59,6 +59,7 @@ struct MarrowApp: App {
                     store.marrow.syncNow(force: false)
                 }
                 handleQuickAction()
+                Task { await ShareImport.run(store) }
             default: break
             }
         }
@@ -86,6 +87,7 @@ struct MarrowApp: App {
         handleQuickAction()
         handleReminderTap()
         handleLink()
+        await ShareImport.run(store)
     }
 
     /// `marrow://today`, `capture`, `note?path=&line=` and `done?path=&line=&text=`.

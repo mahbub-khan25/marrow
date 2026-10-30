@@ -19,6 +19,14 @@
     <string name="reminders">রিমাইন্ডার</string>
     <string name="reminder_done">সম্পন্ন</string>
     <string name="reminder_snooze">১০ মিনিট পরে</string>
+    <string name="save_the_page">পুরো পেজ রাখুন</string>
+    <string name="saving_the_page">রাখা হচ্ছে…</string>
+    <string name="page_saved">“%1$s” Clippings-এ রাখা হয়েছে</string>
+    <string name="share_page_saved_hint">পেজটি Clippings-এ নোট হিসেবে রাখা হবে।</string>
+    <string name="share_link_hint">লিংকটি আজকের নোটে যোগ হবে।</string>
+    <string name="share_later_hint">পরের বার ম্যারো খুললে আজকের নোটে যোগ হবে।</string>
+    <string name="share_cant">ম্যারো এখন এটি নিতে পারছে না। একবার ম্যারো খুলে আবার চেষ্টা করুন।</string>
+    <string name="shared_added">আপনার শেয়ার করা জিনিস যোগ হয়েছে।</string>
     <string name="widget_today">আজকের কাজ</string>
     <string name="widget_description">আজকের ও পেরিয়ে যাওয়া কাজ, সাথে নতুন কাজ যোগ করার বোতাম।</string>
     <string name="widget_nothing_due">আজ কোনো কাজ বাকি নেই।</string>

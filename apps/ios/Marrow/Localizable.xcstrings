@@ -549,6 +549,23 @@
         }
       }
     },
+    "Added to today's note when you next open Marrow.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added to today's note when you next open Marrow."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "পরের বার ম্যারো খুললে আজকের নোটে যোগ হবে।"
+          }
+        }
+      }
+    },
     "Added to today's note.": {
       "extractionState": "manual",
       "localizations": {
@@ -579,6 +596,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "আজকের কাজে যোগ হয়েছে।"
+          }
+        }
+      }
+    },
+    "Added what you shared.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added what you shared."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আপনার শেয়ার করা জিনিস যোগ হয়েছে।"
           }
         }
       }
@@ -2659,6 +2693,23 @@
         }
       }
     },
+    "Marrow can't take this right now. Open Marrow once, then try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marrow can't take this right now. Open Marrow once, then try again."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ম্যারো এখন এটি নিতে পারছে না। একবার ম্যারো খুলে আবার চেষ্টা করুন।"
+          }
+        }
+      }
+    },
     "Marrow finds the parts of your notes that match and sends only those to your AI. Each point in the answer links to the note it comes from.": {
       "extractionState": "manual",
       "localizations": {
@@ -4427,6 +4478,23 @@
         }
       }
     },
+    "Save the page": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save the page"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "পুরো পেজ রাখুন"
+          }
+        }
+      }
+    },
     "Saved (leave empty to keep it)": {
       "extractionState": "manual",
       "localizations": {
@@ -4440,6 +4508,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "সংরক্ষিত (রাখতে চাইলে খালি রাখুন)"
+          }
+        }
+      }
+    },
+    "Saved “%@” in Clippings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved “%1$@” in Clippings"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” Clippings-এ রাখা হয়েছে"
+          }
+        }
+      }
+    },
+    "Saving…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saving…"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "রাখা হচ্ছে…"
           }
         }
       }
@@ -5362,6 +5464,23 @@
         }
       }
     },
+    "The link is added to today's note.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The link is added to today's note."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "লিংকটি আজকের নোটে যোগ হবে।"
+          }
+        }
+      }
+    },
     "The note as it is now is kept as a version too, so you can switch back.": {
       "extractionState": "manual",
       "localizations": {
@@ -5392,6 +5511,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "নোটটি ডিস্কে ও সিঙ্কে এনক্রিপ্ট করা থাকবে। পাসওয়ার্ড ছাড়া এটি পড়া যাবে না, আপনিও পারবেন না, তাই পাসওয়ার্ডটি নিরাপদে রাখুন।"
+          }
+        }
+      }
+    },
+    "The page is saved as a note in Clippings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The page is saved as a note in Clippings."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "পেজটি Clippings-এ নোট হিসেবে রাখা হবে।"
           }
         }
       }

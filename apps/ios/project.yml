@@ -32,6 +32,7 @@ targets:
       - path: Generated/MarrowCore.swift
     dependencies:
       - target: MarrowWidgets
+      - target: MarrowShare
     # iCloud: Marrow's own folder in iCloud Drive, shown there as "Marrow".
     # Needs a paid Apple developer team (a free one can't use iCloud: delete
     # these lines to build with one).
@@ -115,6 +116,45 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.marrow.notes.widgets
+        OTHER_LDFLAGS: ""
+        SWIFT_INCLUDE_PATHS: ""
+        LIBRARY_SEARCH_PATHS: ""
+  # "Add to Marrow" in the share sheet. What's shared waits in the app
+  # group's Inbox until the app opens and files it.
+  MarrowShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: MarrowShare
+        excludes: ["Info.plist", "GetPage.js"]
+      - path: MarrowShare/GetPage.js
+        buildPhase: resources
+      - path: Shared
+      - path: Marrow/Localizable.xcstrings
+    entitlements:
+      path: MarrowShare/MarrowShare.entitlements
+      properties:
+        com.apple.security.application-groups: [group.app.marrow.notes]
+    info:
+      path: MarrowShare/Info.plist
+      properties:
+        CFBundleDisplayName: Marrow
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, bn]
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: ShareViewController
+          NSExtensionAttributes:
+            NSExtensionJavaScriptPreprocessingFile: GetPage
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsWebPageWithMaxCount: 1
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsImageWithMaxCount: 6
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.marrow.notes.share
         OTHER_LDFLAGS: ""
         SWIFT_INCLUDE_PATHS: ""
         LIBRARY_SEARCH_PATHS: ""
