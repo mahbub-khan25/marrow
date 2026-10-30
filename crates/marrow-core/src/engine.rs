@@ -30,7 +30,7 @@ mod tasks;
 pub use graph::{GraphData, GraphEdge, GraphNode, GraphNodeKind, GraphOptions};
 pub use rename::RenameReport;
 pub use mentions::Mention;
-pub use tasks::TaskItem;
+pub use tasks::{remind_of, set_remind, task_text_of, TaskItem, REMIND};
 pub use search::{fold as fold_for_search, Query, SearchHit, SearchResults, Snippet};
 
 /// What the UI needs to hear about after any change.

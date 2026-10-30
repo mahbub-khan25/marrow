@@ -133,6 +133,7 @@ fun NoteScreen(path: String, line: Int, startEditing: Boolean) {
     var renaming by remember { mutableStateOf(false) }
     var moving by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
+    var reminding by remember { mutableStateOf(false) }
     var unlocking by remember { mutableStateOf(false) }
     var unlockError by remember { mutableStateOf<String?>(null) }
     var locking by remember { mutableStateOf(false) }
@@ -312,6 +313,7 @@ fun NoteScreen(path: String, line: Int, startEditing: Boolean) {
                         runCatching { dictate.launch(i) }.onFailure { engine.say(ctx.getString(R.string.no_dictation)) }
                     },
                     modifier = Modifier.navigationBarsPadding().imePadding(),
+                    onRemind = { reminding = true },
                 )
             }
         },
@@ -380,6 +382,13 @@ fun NoteScreen(path: String, line: Int, startEditing: Boolean) {
         }
     }
 
+    if (reminding) {
+        val line = app.marrow.ui.note.currentLine(value).second
+        app.marrow.ui.reminders.RemindSheet(app.marrow.core.reminderOfLine(line), onDismiss = { reminding = false }) { at ->
+            reminding = false
+            value = app.marrow.ui.note.withReminder(value, at)
+        }
+    }
     if (info) NoteInfoSheet(current, onDismiss = { info = false })
     if (ai) NoteAiSheet(current, value.text, onDismiss = { ai = false }, onReplace = { text ->
         value = TextFieldValue(text, TextRange(text.length))

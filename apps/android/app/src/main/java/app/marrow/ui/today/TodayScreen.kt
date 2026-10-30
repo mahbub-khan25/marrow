@@ -1,5 +1,11 @@
 package app.marrow.ui.today
 
+import androidx.compose.runtime.mutableStateOf
+
+import androidx.compose.material.icons.outlined.AlarmAdd
+
+import androidx.compose.material.icons.outlined.Alarm
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -275,8 +281,10 @@ private fun Week(today: LocalDate, withNotes: Set<Int>, onDay: (String) -> Unit)
 fun TaskLine(t: TaskItem, today: String, showNote: Boolean = true) {
     val engine = LocalEngine.current
     val nav = LocalNav.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
-    Row(Modifier.fillMaxWidth().clickable { nav.note(t.path, t.line.toInt()) }.padding(start = 8.dp, end = 20.dp, top = 2.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+    var reminding by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().clickable { nav.note(t.path, t.line.toInt()) }.padding(start = 8.dp, end = 4.dp, top = 2.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Checkbox(t.done, onCheckedChange = {
             scope.launch { runCatching { engine.run { toggleTask(t.path, t.line) } }.onFailure { engine.say(it.words()) } }
         })
@@ -304,6 +312,26 @@ fun TaskLine(t: TaskItem, today: String, showNote: Boolean = true) {
             ).joinToString(" · ")
             if (meta.isNotEmpty()) {
                 Text(meta, style = MaterialTheme.typography.labelMedium, color = if (overdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline)
+            }
+            if (!t.done) t.remind?.let { app.marrow.ui.reminders.ReminderChip(it, Modifier.padding(top = 2.dp)) }
+        }
+        if (!t.done) {
+            IconButton(onClick = { reminding = true }) {
+                Icon(
+                    if (t.remind != null) Icons.Outlined.Alarm else Icons.Outlined.AlarmAdd,
+                    stringResource(R.string.remind_me),
+                    tint = if (t.remind != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                )
+            }
+        }
+    }
+    if (reminding) {
+        app.marrow.ui.reminders.RemindSheet(t.remind, onDismiss = { reminding = false }) { at ->
+            reminding = false
+            scope.launch {
+                runCatching { engine.run { setReminder(t.path, t.line, t.text, at) } }
+                    .onSuccess { engine.say(if (at == null) ctx.getString(R.string.reminder_removed) else ctx.getString(R.string.reminder_saved, app.marrow.ui.reminders.reminderText(ctx, at))) }
+                    .onFailure { engine.say(it.words()) }
             }
         }
     }

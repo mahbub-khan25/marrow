@@ -112,6 +112,23 @@ pub struct TaskItem {
     pub text: String,
     /// `YYYY-MM-DD`, if it has a due date (or sits in a daily note).
     pub due: Option<String>,
+    /// `YYYY-MM-DD HH:MM` (local time), if it has a reminder.
+    pub remind: Option<String>,
+}
+
+/// A task with a reminder that isn't done.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct Reminder {
+    /// Stable while the task, its note and its time stay the same: use it
+    /// as the notification's id, so scheduling again replaces it.
+    pub id: String,
+    pub path: String,
+    /// The note's name.
+    pub title: String,
+    pub line: u32,
+    pub text: String,
+    /// `YYYY-MM-DD HH:MM`, local time.
+    pub at: String,
 }
 
 /// Text kept from a save that failed, offered back.
@@ -221,6 +238,54 @@ impl Marrow {
         let next = lines.join("\n");
         self.write_note(path, next.clone(), Some(text))?;
         Ok(next)
+    }
+
+    /// Every task with a reminder that isn't done yet, soonest first. The
+    /// app schedules notifications for those still ahead (and again after
+    /// changes, since sync can bring new ones).
+    pub fn reminders(&self) -> Result<Vec<Reminder>> {
+        let mut out: Vec<Reminder> = self.with(|e| {
+            Ok(e.tasks(false)
+                .into_iter()
+                .filter_map(|t| {
+                    let at = t.remind?;
+                    let id = marrow_core::cache::hash_bytes(format!("{}\n{}\n{}", t.path, t.text, at).as_bytes())[..16].to_string();
+                    Some(Reminder { id, title: t.name, path: t.path.to_string(), line: t.line, text: t.text, at })
+                })
+                .collect())
+        })?;
+        out.sort_by(|a, b| a.at.cmp(&b.at).then(a.path.cmp(&b.path)));
+        Ok(out)
+    }
+
+    /// Sets (or with `at` None, removes) the reminder on a task. `text` is
+    /// the task's text, to find it if lines have moved. `at` is
+    /// `YYYY-MM-DD HH:MM`. Returns the note's new text.
+    pub fn set_reminder(&self, path: String, line: u32, text: String, at: Option<String>) -> Result<String> {
+        if let Some(a) = &at {
+            let ok = a.len() == 16 && a.as_bytes()[10] == b' ' && a.chars().enumerate().all(|(i, c)| match i { 4 | 7 => c == '-', 10 => c == ' ', 13 => c == ':', _ => c.is_ascii_digit() });
+            if !ok {
+                return Err(fail("Reminder times look like 2026-11-03 09:00."));
+            }
+        }
+        let old = self.read_note(path.clone())?;
+        let i = locate_task(&old, line, &text)?;
+        let mut lines: Vec<String> = old.split('\n').map(str::to_string).collect();
+        lines[i] = marrow_core::engine::set_remind(&lines[i], at.as_deref());
+        let next = lines.join("\n");
+        self.write_note(path, next.clone(), Some(old))?;
+        Ok(next)
+    }
+
+    /// Ticks a reminded task done (from the notification).
+    pub fn complete_task(&self, path: String, line: u32, text: String) -> Result<()> {
+        let old = self.read_note(path.clone())?;
+        let i = locate_task(&old, line, &text)?;
+        let l = old.split('\n').nth(i).unwrap_or_default();
+        if l.contains("[ ]") {
+            self.toggle_task(path, i as u32)?;
+        }
+        Ok(())
     }
 
     /// The info sheet for a note.
@@ -402,7 +467,7 @@ impl Marrow {
         self.with(|e| {
             Ok(e.tasks(include_done)
                 .into_iter()
-                .map(|t| TaskItem { title: t.name, path: t.path.to_string(), line: t.line, done: t.done, text: t.text, due: t.due })
+                .map(|t| TaskItem { title: t.name, path: t.path.to_string(), line: t.line, done: t.done, text: t.text, due: t.due, remind: t.remind })
                 .collect())
         })
     }
@@ -440,8 +505,44 @@ pub struct Counts {
     pub open_tasks: u32,
 }
 
+/// Finds a task by its line, or by its text if the note has changed since
+/// (sync, edits elsewhere).
+fn locate_task(text: &str, line: u32, want: &str) -> Result<usize> {
+    let lines: Vec<&str> = text.split('\n').collect();
+    let is = |i: usize| lines.get(i).and_then(|l| marrow_core::engine::task_text_of(l)).as_deref() == Some(want);
+    if is(line as usize) {
+        return Ok(line as usize);
+    }
+    (0..lines.len()).find(|&i| is(i)).ok_or_else(|| fail("That task isn't in the note any more."))
+}
+
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn reminders_set_snooze_and_done() {
+        let dir = tempfile::tempdir().unwrap();
+        let m = crate::tests::vault(dir.path(), &[("Plan.md", "# Plan\n- [ ] Call the dentist\n- [ ] Buy bread ⏰ 2026-11-03 18:00\n- [x] Old ⏰ 2026-01-01 08:00")]);
+        let r = m.reminders().unwrap();
+        assert_eq!(r.len(), 1);
+        assert_eq!((r[0].text.as_str(), r[0].at.as_str(), r[0].line), ("Buy bread", "2026-11-03 18:00", 2));
+        let id = r[0].id.clone();
+        // Set one; then lines move when text is added above.
+        m.set_reminder("Plan.md".into(), 1, "Call the dentist".into(), Some("2026-11-03 09:00".into())).unwrap();
+        let text = m.read_note("Plan.md".into()).unwrap();
+        m.write_note("Plan.md".into(), format!("Intro\n{text}"), Some(text)).unwrap();
+        let r = m.reminders().unwrap();
+        assert_eq!(r.iter().map(|x| x.at.as_str()).collect::<Vec<_>>(), ["2026-11-03 09:00", "2026-11-03 18:00"]);
+        assert_eq!(r[1].id, id, "same task, same time: same id");
+        // Snooze with the old line number: found by its text.
+        m.set_reminder("Plan.md".into(), 2, "Buy bread".into(), Some("2026-11-03 18:10".into())).unwrap();
+        m.complete_task("Plan.md".into(), 1, "Call the dentist".into()).unwrap();
+        let r = m.reminders().unwrap();
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].at, "2026-11-03 18:10");
+        assert!(m.read_note("Plan.md".into()).unwrap().contains("- [x] Call the dentist ⏰ 2026-11-03 09:00"));
+        assert!(m.set_reminder("Plan.md".into(), 0, "Buy bread".into(), Some("tomorrow".into())).is_err());
+    }
 
     #[test]
     fn notes_save_link_and_tick() {
@@ -584,4 +685,18 @@ mod tidy_tests {
         let (out, _) = tidy_line("## See [[Daily/2026-10-24|the weekend]] and **this**", &[]);
         assert_eq!(out, "See the weekend and this");
     }
+}
+
+/// A task line with its reminder set to `at` (`YYYY-MM-DD HH:MM`), or
+/// removed with None, for the editor to change the line in place.
+#[uniffi::export]
+pub fn line_with_reminder(line: String, at: Option<String>) -> String {
+    marrow_core::engine::set_remind(&line, at.as_deref())
+}
+
+/// The reminder on a task line (`YYYY-MM-DD HH:MM`), if it has one with a
+/// date. A time alone (`⏰ 09:00`) counts on the line's own due date.
+#[uniffi::export]
+pub fn reminder_of_line(line: String) -> Option<String> {
+    marrow_core::engine::remind_of(&line)
 }

@@ -135,6 +135,10 @@ class ScreenshotTest {
         compose.onRoot().captureRoboImage(File(out, "21-desktop-note.png").path)
     }
 
+    @Test fun remindSheet() = shot("22-remind") {
+        app.marrow.ui.reminders.RemindSheet("2026-11-03 09:00", onDismiss = {}) {}
+    }
+
     @Test fun today() = shot("01-today") { TodayScreen(onCapture = {}) }
     @Test fun notes() = shot("02-notes") { BrowserScreen("") }
     @Test fun folder() = shot("03-folder") { BrowserScreen("Projects") }

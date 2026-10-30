@@ -40,6 +40,8 @@ class MainActivity : AppCompatActivity() {
     private fun read(intent: Intent?): Incoming? = when (intent?.action) {
         "app.marrow.CAPTURE" -> Incoming.Capture
         "app.marrow.TODAY" -> Incoming.Today
+        // A reminder's notification was tapped.
+        "app.marrow.OPEN_NOTE" -> intent.getStringExtra("path")?.let { Incoming.Note(it, intent.getIntExtra("line", -1)) }
         Intent.ACTION_SEND -> {
             val text = listOfNotNull(intent.getStringExtra(Intent.EXTRA_SUBJECT), intent.getStringExtra(Intent.EXTRA_TEXT)).joinToString("\n").trim()
             val image = stream(intent)

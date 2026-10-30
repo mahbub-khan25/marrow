@@ -116,6 +116,7 @@ import kotlinx.serialization.Serializable
 sealed interface Incoming {
     data object Capture : Incoming
     data object Today : Incoming
+    data class Note(val path: String, val line: Int) : Incoming
     data class Shared(val text: String, val images: List<Uri>) : Incoming
 }
 
@@ -247,6 +248,7 @@ private fun Main(engine: Engine, incoming: Incoming?, onHandled: () -> Unit) {
                 val path = runCatching { engine.run { openDay(today()) } }.getOrNull()
                 if (path != null) appNav.note(path, edit = true)
             }
+            is Incoming.Note -> appNav.note(incoming.path, incoming.line)
             is Incoming.Shared -> {
                 capture = incoming
                 captureOpen = true

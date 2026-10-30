@@ -651,6 +651,23 @@
         }
       }
     },
+    "Allow alarms": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow alarms"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "অ্যালার্মের অনুমতি দিন"
+          }
+        }
+      }
+    },
     "Another": {
       "extractionState": "manual",
       "localizations": {
@@ -1977,6 +1994,23 @@
         }
       }
     },
+    "In an hour": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In an hour"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "এক ঘণ্টা পরে"
+          }
+        }
+      }
+    },
     "In year and month folders": {
       "extractionState": "manual",
       "localizations": {
@@ -2965,6 +2999,23 @@
         }
       }
     },
+    "Next": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "পরবর্তী"
+          }
+        }
+      }
+    },
     "Next 7 days": {
       "extractionState": "manual",
       "localizations": {
@@ -3815,6 +3866,23 @@
         }
       }
     },
+    "Pick a date and time…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a date and time…"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "তারিখ ও সময় বেছে নিন…"
+          }
+        }
+      }
+    },
     "Pick a folder in the phone's own storage.": {
       "extractionState": "manual",
       "localizations": {
@@ -3828,6 +3896,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "ফোনের নিজস্ব স্টোরেজের একটি ফোল্ডার বেছে নিন।"
+          }
+        }
+      }
+    },
+    "Pick a time": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a time"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সময় বেছে নিন"
           }
         }
       }
@@ -3968,6 +4053,108 @@
         }
       }
     },
+    "Remind me": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remind me"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "মনে করিয়ে দিন"
+          }
+        }
+      }
+    },
+    "Reminder removed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminder removed"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "রিমাইন্ডার মুছে ফেলা হয়েছে"
+          }
+        }
+      }
+    },
+    "Reminder set for %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminder set for %1$@"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "রিমাইন্ডার: %1$@"
+          }
+        }
+      }
+    },
+    "Reminder set: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminder set: %1$@"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "রিমাইন্ডার সেট হয়েছে: %1$@"
+          }
+        }
+      }
+    },
+    "Reminders": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminders"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "রিমাইন্ডার"
+          }
+        }
+      }
+    },
+    "Reminders may come a few minutes late until Marrow is allowed to use alarms.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminders may come a few minutes late until Marrow is allowed to use alarms."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ম্যারোকে অ্যালার্ম ব্যবহারের অনুমতি না দেওয়া পর্যন্ত রিমাইন্ডার কয়েক মিনিট দেরিতে আসতে পারে।"
+          }
+        }
+      }
+    },
     "Remove": {
       "extractionState": "manual",
       "localizations": {
@@ -4015,6 +4202,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "লক সরান"
+          }
+        }
+      }
+    },
+    "Remove the reminder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove the reminder"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "রিমাইন্ডার মুছুন"
           }
         }
       }
@@ -4508,6 +4712,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "ছোট"
+          }
+        }
+      }
+    },
+    "Snooze 10 min": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Snooze 10 min"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "১০ মিনিট পরে"
           }
         }
       }
@@ -5158,6 +5379,23 @@
         }
       }
     },
+    "This evening": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This evening"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আজ সন্ধ্যায়"
+          }
+        }
+      }
+    },
     "This folder is already encrypted: enter the passphrase you chose for it.": {
       "extractionState": "manual",
       "localizations": {
@@ -5358,6 +5596,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "আজকের নোট"
+          }
+        }
+      }
+    },
+    "Tomorrow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tomorrow"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আগামীকাল"
+          }
+        }
+      }
+    },
+    "Tomorrow morning": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tomorrow morning"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আগামীকাল সকালে"
           }
         }
       }

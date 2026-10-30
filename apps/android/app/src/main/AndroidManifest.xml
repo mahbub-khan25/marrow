@@ -4,6 +4,10 @@
 
     <!-- Sync (WebDAV) and the AI you set up. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Task reminders: notify, ring on time, and survive a restart. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Only when you choose to keep your vault in a folder on the phone, like Documents. -->
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
@@ -60,6 +64,15 @@
             <!-- The quick-capture shortcut on the home screen. -->
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
+
+        <receiver android:name=".data.ReminderReceiver" android:exported="false" />
+        <receiver android:name=".data.ReminderBootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <!-- The browser comes back here after signing in to OneDrive or Dropbox. -->
         <activity

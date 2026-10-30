@@ -22,6 +22,10 @@ pub struct TaskItem {
     pub due: Option<String>,
     /// Whether `due` came from the daily note's name rather than the task.
     pub from_note: bool,
+    /// When to remind, `YYYY-MM-DD HH:MM` in local time, from
+    /// `⏰ 2026-10-30 09:00` (or `⏰ 09:00` on the task's due date).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remind: Option<String>,
 }
 
 impl Engine {
@@ -38,16 +42,20 @@ impl Engine {
                 scan(&c.text)
                     .into_iter()
                     .filter(move |t| include_done || !t.1)
-                    .map(move |(line, done, text, due)| {
+                    .map(move |(line, done, text, due, remind)| {
                         let from_note = due.is_none() && note_date.is_some();
+                        let due = due.or_else(|| note_date.clone());
+                        // A time alone is on the task's date.
+                        let remind = remind.and_then(|(d, t)| d.or_else(|| due.clone()).map(|d| format!("{d} {t}")));
                         TaskItem {
                             path: p.clone(),
                             name: name.clone(),
                             line,
                             done,
                             text,
-                            due: due.or_else(|| note_date.clone()),
+                            due,
                             from_note,
+                            remind,
                         }
                     })
             })
@@ -63,6 +71,73 @@ fn is_date(s: &str) -> bool {
         && b[4] == b'-'
         && b[7] == b'-'
         && b.iter().enumerate().all(|(i, c)| i == 4 || i == 7 || c.is_ascii_digit())
+}
+
+/// The reminder marker.
+pub const REMIND: &str = "⏰";
+
+fn is_time(s: &str) -> bool {
+    let b = s.as_bytes();
+    b.len() == 5 && b[2] == b':' && b[..2].iter().chain(&b[3..]).all(u8::is_ascii_digit) && s[..2] <= *"23" && s[3..] <= *"59"
+}
+
+/// Finds a reminder (`⏰ 2026-10-30 09:00`, `⏰ 2026-10-30T09:00` or
+/// `⏰ 09:00`) and returns the text without it, and the (date, time).
+pub(crate) fn take_remind(text: &str) -> (String, Option<(Option<String>, String)>) {
+    let Some(i) = text.find(REMIND) else { return (text.to_string(), None) };
+    let after = &text[i + REMIND.len()..];
+    let rest = after.trim_start();
+    let skipped = after.len() - rest.len();
+    let (date, time, used) = if rest.len() >= 16 && is_date(&rest[..10]) && matches!(rest.as_bytes()[10], b' ' | b'T') && is_time(&rest[11..16]) {
+        (Some(rest[..10].to_string()), rest[11..16].to_string(), 16)
+    } else if rest.len() >= 5 && is_time(&rest[..5]) {
+        (None, rest[..5].to_string(), 5)
+    } else {
+        return (text.to_string(), None);
+    };
+    let end = i + REMIND.len() + skipped + used;
+    let cleaned = format!("{}{}", &text[..i], &text[end..]);
+    (cleaned.split_whitespace().collect::<Vec<_>>().join(" "), Some((date, time)))
+}
+
+/// A task line with its reminder set to `at` (`YYYY-MM-DD HH:MM`), or
+/// removed with `None`. Other text stays as it was.
+pub fn set_remind(line: &str, at: Option<&str>) -> String {
+    let mut out = line.to_string();
+    if let Some(i) = out.find(REMIND) {
+        let after = &out[i + REMIND.len()..];
+        let rest = after.trim_start();
+        let skipped = after.len() - rest.len();
+        let used = if rest.len() >= 16 && is_date(&rest[..10]) && matches!(rest.as_bytes()[10], b' ' | b'T') && is_time(&rest[11..16]) {
+            16
+        } else if rest.len() >= 5 && is_time(&rest[..5]) {
+            5
+        } else {
+            0
+        };
+        let end = i + REMIND.len() + skipped + used;
+        // Take one space before the marker with it.
+        let start = if out[..i].ends_with(' ') { i - 1 } else { i };
+        out = format!("{}{}", &out[..start], &out[end..]);
+    }
+    match at {
+        Some(at) => format!("{} {REMIND} {at}", out.trim_end()),
+        None => out,
+    }
+}
+
+/// The reminder on one task line, `YYYY-MM-DD HH:MM` (a time alone counts
+/// on the line's due date).
+pub fn remind_of(line: &str) -> Option<String> {
+    let t = scan(line).into_iter().next()?;
+    let (d, time) = t.4?;
+    Some(format!("{} {time}", d.or(t.3)?))
+}
+
+/// A task line's text as the Tasks view shows it (no box, dates or
+/// reminder), to recognise the task after lines move.
+pub fn task_text_of(line: &str) -> Option<String> {
+    scan(line).into_iter().next().map(|t| t.2)
 }
 
 /// Finds a due date in the task text and returns it with the text cleaned.
@@ -100,8 +175,10 @@ fn take_due(text: &str) -> (String, Option<String>) {
     (text.trim().to_string(), None)
 }
 
-/// (line, done, text, due) for every task line outside code and frontmatter.
-fn scan(text: &str) -> Vec<(u32, bool, String, Option<String>)> {
+type Remind = Option<(Option<String>, String)>;
+
+/// (line, done, text, due, reminder) for every task line outside code and frontmatter.
+fn scan(text: &str) -> Vec<(u32, bool, String, Option<String>, Remind)> {
     let mut out = Vec::new();
     let mut fence: Option<&str> = None;
     let mut in_front = false;
@@ -156,15 +233,41 @@ fn scan(text: &str) -> Vec<(u32, bool, String, Option<String>)> {
         if body.is_empty() {
             continue;
         }
-        let (text, due) = take_due(body);
-        out.push((n as u32, done, text, due));
+        let (body, remind) = take_remind(body);
+        let (text, due) = take_due(&body);
+        out.push((n as u32, done, text, due, remind));
     }
     out
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{scan, take_due};
+    use super::{scan, take_due, take_remind};
+
+    #[test]
+    fn setting_reminders() {
+        use super::{set_remind, task_text_of};
+        let l = "  - [ ] Call the dentist 📅 2026-11-03";
+        let a = set_remind(l, Some("2026-11-03 09:00"));
+        assert_eq!(a, "  - [ ] Call the dentist 📅 2026-11-03 ⏰ 2026-11-03 09:00");
+        assert_eq!(set_remind(&a, Some("2026-11-03 09:10")), "  - [ ] Call the dentist 📅 2026-11-03 ⏰ 2026-11-03 09:10");
+        assert_eq!(set_remind(&a, None), l);
+        assert_eq!(set_remind("- [ ] A ⏰ 08:00 later", None), "- [ ] A later");
+        assert_eq!(task_text_of(&a).as_deref(), Some("Call the dentist"));
+    }
+
+    #[test]
+    fn reminders() {
+        let t = scan("- [ ] Call the dentist ⏰ 2026-11-03 09:00\n- [ ] Pay rent 📅 2026-12-01 ⏰ 08:30\n- [ ] Bad ⏰ 25:00\n- [x] Old ⏰ 2026-01-01T07:05");
+        assert_eq!(t[0].2, "Call the dentist");
+        assert_eq!(t[0].4, Some((Some("2026-11-03".into()), "09:00".into())));
+        assert_eq!(t[1].2, "Pay rent");
+        assert_eq!(t[1].3.as_deref(), Some("2026-12-01"));
+        assert_eq!(t[1].4, Some((None, "08:30".into())));
+        assert_eq!(t[2].4, None);
+        assert_eq!(t[3].4, Some((Some("2026-01-01".into()), "07:05".into())));
+        assert_eq!(take_remind("x").1, None);
+    }
 
     #[test]
     fn finds_tasks_and_dates() {

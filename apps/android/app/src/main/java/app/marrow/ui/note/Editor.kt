@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.AlarmAdd
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.FormatBold
@@ -170,6 +171,22 @@ fun linePrefix(v: TextFieldValue, prefix: String): TextFieldValue {
     return TextFieldValue(text, TextRange((v.selection.start + shift).coerceAtLeast(start), (v.selection.end + shift).coerceAtLeast(start)))
 }
 
+/** The cursor's line: where it starts, and its text. */
+fun currentLine(v: TextFieldValue): Pair<Int, String> {
+    val start = v.text.lastIndexOf('\n', (v.selection.start - 1).coerceAtLeast(-1)) + 1
+    return start to v.text.substring(start).substringBefore('\n')
+}
+
+/** Makes the cursor's line a task if it isn't one, then sets its reminder (or removes it with null). */
+fun withReminder(v: TextFieldValue, at: String?): TextFieldValue {
+    val isTask = Regex("^\\s*(?:>\\s*)*(?:[-*+]|\\d+[.)]) \\[[ xX]\\] ")
+    val v2 = if (isTask.containsMatchIn(currentLine(v).second)) v else linePrefix(v, "- [ ] ")
+    val (start, line) = currentLine(v2)
+    val next = app.marrow.core.lineWithReminder(line, at)
+    val text = v2.text.substring(0, start) + next + v2.text.substring(start + line.length)
+    return TextFieldValue(text, TextRange(start + next.length))
+}
+
 fun insert(v: TextFieldValue, s: String): TextFieldValue {
     val text = v.text.substring(0, v.selection.min) + s + v.text.substring(v.selection.max)
     return TextFieldValue(text, TextRange(v.selection.min + s.length))
@@ -208,6 +225,7 @@ fun EditorBar(
     onPhoto: () -> Unit,
     onDictate: () -> Unit,
     modifier: Modifier = Modifier,
+    onRemind: () -> Unit = {},
 ) {
     val focus = LocalFocusManager.current
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = modifier.fillMaxWidth()) {
@@ -232,6 +250,7 @@ fun EditorBar(
                 Tool(Icons.Outlined.FormatItalic, stringResource(R.string.italic)) { onChange(wrap(value, "*")) }
                 Tool(Icons.AutoMirrored.Outlined.FormatListBulleted, stringResource(R.string.list)) { onChange(linePrefix(value, "- ")) }
                 Tool(Icons.Outlined.CheckBox, stringResource(R.string.task)) { onChange(linePrefix(value, "- [ ] ")) }
+                Tool(Icons.Outlined.AlarmAdd, stringResource(R.string.remind_me), onRemind)
                 Tool(Icons.Outlined.Link, stringResource(R.string.link_to_note)) { onChange(insert(value, "[[").let { TextFieldValue(it.text.substring(0, it.selection.start) + "]]" + it.text.substring(it.selection.start), it.selection) }) }
                 Tool(Icons.Outlined.Tag, stringResource(R.string.tag)) { onChange(insert(value, "#")) }
                 Tool(Icons.Outlined.FormatQuote, stringResource(R.string.quote)) { onChange(linePrefix(value, "> ")) }
