@@ -1467,6 +1467,23 @@
         }
       }
     },
+    "Done: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done: %1$@"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সম্পন্ন: %1$@"
+          }
+        }
+      }
+    },
     "Due today and overdue": {
       "extractionState": "manual",
       "localizations": {

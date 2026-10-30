@@ -57,6 +57,7 @@ final class Store {
     @MainActor
     func close() {
         marrow.closeVault()
+        WidgetData.clear()
         vault = nil
         sync = nil
     }

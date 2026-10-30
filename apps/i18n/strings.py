@@ -43,6 +43,7 @@ STRINGS = [
     ("widget_description", "What's due today and overdue, with a button to add a task.", "আজকের ও পেরিয়ে যাওয়া কাজ, সাথে নতুন কাজ যোগ করার বোতাম।"),
     ("widget_nothing_due", "Nothing due today.", "আজ কোনো কাজ বাকি নেই।"),
     ("widget_open_app", "Open Marrow to choose your notes.", "নোট বেছে নিতে ম্যারো খুলুন।"),
+    ("widget_done", "Done: %1$s", "সম্পন্ন: %1$s"),
     ("widget_more", "+%1$d more", "আরও %1$dটি"),
     ("remind_me", "Remind me", "মনে করিয়ে দিন"),
     ("reminder_set_for", "Reminder set for %1$s", "রিমাইন্ডার: %1$s"),

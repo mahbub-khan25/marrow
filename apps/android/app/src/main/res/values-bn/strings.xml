@@ -23,6 +23,7 @@
     <string name="widget_description">আজকের ও পেরিয়ে যাওয়া কাজ, সাথে নতুন কাজ যোগ করার বোতাম।</string>
     <string name="widget_nothing_due">আজ কোনো কাজ বাকি নেই।</string>
     <string name="widget_open_app">নোট বেছে নিতে ম্যারো খুলুন।</string>
+    <string name="widget_done">সম্পন্ন: %1$s</string>
     <string name="widget_more">আরও %1$dটি</string>
     <string name="remind_me">মনে করিয়ে দিন</string>
     <string name="reminder_set_for">রিমাইন্ডার: %1$s</string>

@@ -39,7 +39,10 @@ struct MarrowApp: App {
                     guard demo == nil, store.vault != nil else { return }
                     try? await Task.sleep(nanoseconds: 1_500_000_000)
                     await Reminders.refresh(store.marrow)
+                    await WidgetData.refresh(store.marrow)
                 }
+                .onOpenURL { url in OpenedLink.pending = url }
+                .onReceive(NotificationCenter.default.publisher(for: OpenedLink.notice)) { _ in handleLink() }
         }
         .onChange(of: phase) { _, now in
             switch now {
@@ -82,6 +85,39 @@ struct MarrowApp: App {
         store.prefs.afterOpen = nil
         handleQuickAction()
         handleReminderTap()
+        handleLink()
+    }
+
+    /// `marrow://today`, `capture`, `note?path=&line=` and `done?path=&line=&text=`.
+    @MainActor
+    private func handleLink() {
+        guard store.vault != nil, let url = OpenedLink.pending, url.scheme == "marrow" else { return }
+        OpenedLink.pending = nil
+        let q = Dictionary(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.compactMap { i in i.value.map { (i.name, $0) } } ?? [], uniquingKeysWith: { a, _ in a })
+        let line = q["line"].flatMap(Int.init) ?? -1
+        switch url.host {
+        case "capture":
+            router.capture = true
+        case "note":
+            guard let p = q["path"] else { return }
+            router.tab = .tasks
+            router.note(p, line: line)
+        case "done":
+            guard let p = q["path"], let text = q["text"], line >= 0 else { return }
+            Task {
+                do {
+                    try await store.run { try $0.completeTask(path: p, line: UInt32(line), text: text) }
+                    store.say(String(localized: "Done: \(plainTask(text))"))
+                } catch { store.say(error) }
+            }
+        default:
+            Task {
+                if let p = try? await store.run({ try $0.openDay(day: todayString()) }) {
+                    router.tab = .today
+                    router.note(p, edit: false)
+                }
+            }
+        }
     }
 
     @MainActor

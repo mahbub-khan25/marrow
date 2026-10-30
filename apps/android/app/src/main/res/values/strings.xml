@@ -23,6 +23,7 @@
     <string name="widget_description">What\'s due today and overdue, with a button to add a task.</string>
     <string name="widget_nothing_due">Nothing due today.</string>
     <string name="widget_open_app">Open Marrow to choose your notes.</string>
+    <string name="widget_done">Done: %1$s</string>
     <string name="widget_more">+%1$d more</string>
     <string name="remind_me">Remind me</string>
     <string name="reminder_set_for">Reminder set for %1$s</string>
