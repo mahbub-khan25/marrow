@@ -5,6 +5,7 @@
 
 import { api, type TaskItem } from "./api";
 import { editNote } from "./database";
+import { pickReminder, setReminder, whenLabel } from "./reminders";
 import { $, h, icon, isoDay, storage, store } from "./util";
 
 export interface TasksApp {
@@ -46,6 +47,22 @@ const plain = (s: string) =>
     .replace(/!?\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, a: string, b?: string) => b ?? a.split("/").pop()!)
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
     .replace(/(\*\*|__|==|~~|`)/g, "");
+
+/**
+ * After the first reminder: reminders only arrive while Marrow runs, so
+ * offer once to keep it running in the tray and start it at sign-in.
+ */
+export async function maybeAskBackground(toast: (t: string, k?: "info" | "error") => void) {
+  if (storage<boolean>("marrow.reminders.asked", false)) return;
+  store("marrow.reminders.asked", true);
+  if (await api.backgroundEnabled().catch(() => true)) return;
+  const { ask } = await import("@tauri-apps/plugin-dialog");
+  const yes = await ask(
+    "Reminders arrive while Marrow is running. Keep Marrow running in the tray when you close its window, and start it when you sign in? You can change this in Settings.",
+    { title: "Reminders", okLabel: "Keep running", cancelLabel: "Not now" },
+  );
+  if (yes) await api.setBackground(true).then(() => toast("Marrow will keep running in the tray.")).catch((e) => toast(String(e), "error"));
+}
 
 export class TasksView {
   private showDone = storage<boolean>("marrow.tasks.done", false);
@@ -129,6 +146,29 @@ export class TasksView {
     );
     const meta = h("span.task-meta", null, t.name);
     if (t.due && !t.fromNote) meta.append(" · ", h(`span.task-due${t.due < today && !t.done ? ".late" : ""}` as "span", null, dueLabel(t.due, today)));
+    if (t.remind && !t.done) meta.append(" · ", h("span.task-remind", null, icon("bell"), whenLabel(t.remind)));
+    const bell: HTMLElement = h(
+      `button.task-bell${t.remind ? ".is-set" : ""}` as "button",
+      {
+        title: t.remind ? `Reminder: ${whenLabel(t.remind)}` : "Remind me",
+        "aria-label": "Remind me",
+        hidden: t.done,
+        onclick: (e: Event) => {
+          e.stopPropagation();
+          pickReminder(bell, t.remind ?? null, async (at) => {
+            try {
+              await setReminder(t.path, t.line, t.text, at);
+              this.app.toast(at ? `Reminder set: ${whenLabel(at)}.` : "Reminder removed.");
+              await maybeAskBackground(this.app.toast);
+            } catch (err) {
+              this.app.toast(String(err instanceof Error ? err.message : err), "error");
+            }
+            void this.refresh();
+          });
+        },
+      },
+      icon(t.remind ? "bell-ringing" : "bell-simple-plus"),
+    );
     const row = h(
       `div.task${t.done ? ".is-done" : ""}` as "div",
       {
@@ -137,6 +177,7 @@ export class TasksView {
       },
       check,
       h("span.task-body", null, h("span.task-text", null, plain(t.text)), meta),
+      bell,
     );
     return row;
   }

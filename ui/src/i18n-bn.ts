@@ -673,10 +673,29 @@ export const BN: Record<string, string> = {
   "Everything in this vault will be copied there, and kept in sync both ways from then on.": "এই ভল্টের সবকিছু সেখানে কপি হবে, তারপর থেকে দুই দিকেই সিঙ্কে থাকবে।",
   "Keep this vault the same on all your devices, phones too: sign in to Google Drive, OneDrive or Dropbox, or use a folder your cloud app syncs, or your own server.":
     "ফোনসহ আপনার সব ডিভাইসে এই ভল্ট একই রাখুন: Google Drive, OneDrive বা Dropbox-এ সাইন ইন করুন, অথবা ক্লাউড অ্যাপের সিঙ্ক করা কোনো ফোল্ডার বা নিজের সার্ভার ব্যবহার করুন।",
+  "Remind me": "মনে করিয়ে দিন",
+  "In an hour": "এক ঘণ্টা পরে",
+  "This evening": "আজ সন্ধ্যায়",
+  "Tomorrow morning": "আগামীকাল সকালে",
+  "Remove the reminder": "রিমাইন্ডার মুছুন",
+  "Set": "সেট করুন",
+  "Done": "সম্পন্ন",
+  "Snooze 10 min": "১০ মিনিট পরে",
+  "Reminder removed.": "রিমাইন্ডার মুছে ফেলা হয়েছে।",
+  "Remind me about this task": "এই কাজটির কথা মনে করিয়ে দিন",
+  "Keep running for reminders": "রিমাইন্ডারের জন্য চালু রাখুন",
+  "Reminders arrive while Marrow is running. With this on, closing the window keeps Marrow in the tray (beside the clock), and it starts when you sign in.":
+    "ম্যারো চালু থাকলে রিমাইন্ডার আসে। এটি চালু থাকলে উইন্ডো বন্ধ করলেও ম্যারো ট্রেতে (ঘড়ির পাশে) থাকে, আর সাইন ইন করলে নিজে থেকে চালু হয়।",
+  "Marrow will keep running in the tray.": "ম্যারো ট্রেতে চালু থাকবে।",
 };
 
 /** Words with numbers: "16 notes", "4 weeks ago"… */
 export const BN_PATTERNS: [RegExp, string][] = [
+  [/^Today, (.+)$/, "আজ, $1"],
+  [/^Tomorrow, (.+)$/, "আগামীকাল, $1"],
+  [/^Reminder: (.+)$/, "রিমাইন্ডার: $1"],
+  [/^Reminder set: (.+)\.$/, "রিমাইন্ডার সেট হয়েছে: $1।"],
+  [/^Snoozed for (\d+) minutes\.$/, "$1 মিনিট পরে আবার মনে করাব।"],
   [/^Sign in to (Google Drive|OneDrive|Dropbox)$/, "$1-এ সাইন ইন করুন"],
   [/^Sign in to (Google Drive|OneDrive|Dropbox) first\.$/, "আগে $1-এ সাইন ইন করুন।"],
   [/^Sign in · (.+)$/, "সাইন ইন · $1"],

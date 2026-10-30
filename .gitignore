@@ -24,3 +24,4 @@ apps/ios/Marrow/Info.plist
 apps/ios/Marrow/Marrow.entitlements
 apps/ios/shots/
 ui/sync-preview.html
+ui/remind-preview.html

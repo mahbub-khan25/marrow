@@ -107,6 +107,33 @@ const isMacLabel = (mac: string, other: string) => (isMac ? mac : other);
 const row = (label: string, desc: string, control: HTMLElement) =>
   h("div.set-row", null, h("div", null, h("div.l", null, label), h("div.d", null, desc)), control);
 
+let background: boolean | null = null;
+
+/** "Keep running for reminders": in the tray, and started at sign-in. */
+function backgroundRow(): HTMLElement {
+  if (background === null) {
+    void api.backgroundEnabled().then((on) => {
+      background = on;
+      render();
+    });
+  }
+  return row(
+    "Keep running for reminders",
+    "Reminders arrive while Marrow is running. With this on, closing the window keeps Marrow in the tray (beside the clock), and it starts when you sign in.",
+    seg(
+      [
+        [true, "On"],
+        [false, "Off"],
+      ],
+      background ?? false,
+      (v) => {
+        background = v;
+        void api.setBackground(v).catch(() => {});
+      },
+    ),
+  );
+}
+
 function prefSeg<K extends keyof Prefs>(k: K, opts: [Prefs[K], string][]) {
   return seg(opts, prefs[k], (v) => setPref(k, v));
 }
@@ -186,6 +213,7 @@ function render() {
             ["CommandOrControl+Shift+Space", isMacLabel("⌘⇧Space", "Ctrl+Shift+Space")],
           ]),
         ),
+        backgroundRow(),
         row(
           "Spell check",
           "Underlines misspelt words while you write in Source. Right-click a word for suggestions. Uses your computer's dictionaries and languages.",

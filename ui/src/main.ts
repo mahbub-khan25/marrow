@@ -37,7 +37,8 @@ import { setLanguage, uiLocale } from "./i18n";
 import { markSeen, openWeeklyReview, renderResurface, seenMoved, type ResurfaceApp } from "./resurface";
 import { openCapture } from "./capture";
 import { usePropertyTypes } from "./properties";
-import { TasksView } from "./tasks";
+import { maybeAskBackground, TasksView } from "./tasks";
+import { lineWithReminder, pickReminder, reminderOf, startReminders, whenLabel } from "./reminders";
 import { openImport } from "./import";
 import { openPublish } from "./publish";
 import { present } from "./present";
@@ -1508,6 +1509,7 @@ function commands(): Command[] {
     cmd("Focus mode", "arrows-out", () => toggleFocus(), "F11"),
     cmd("Quick capture", "lightning", () => quickCapture(), prefs.captureKey ? prefs.captureKey.replace("CommandOrControl", isMac ? "⌘" : "Ctrl") : ""),
     cmd("Show all tasks", "check-square", () => setSide("tasks")),
+    cmd("Remind me about this task", "bell-simple-plus", () => void remindHere()),
     cmd("Find and replace in all notes", "magnifying-glass", () => {
       setSide("search");
       searchView.showReplace(true);
@@ -1581,6 +1583,28 @@ function commands(): Command[] {
 /** The pane being worked in: the split one if it has focus. */
 function focusedPane(): NotePane {
   return split && splitPane.root.contains(document.activeElement) ? splitPane : primary;
+}
+
+/** "Remind me" on the editor's current line (made a task if it isn't one). */
+async function remindHere() {
+  const pane = focusedPane();
+  if (!pane.doc) return toast("Open a note first.");
+  if (pane.mode !== "source") pane.toggleMode();
+  const view = pane.view;
+  const line = view.state.doc.lineAt(view.state.selection.main.head);
+  const current = await reminderOf(line.text).catch(() => null);
+  const coords = view.coordsAtPos(line.from);
+  const anchor = h("span", { style: `position:fixed;left:${coords?.left ?? 200}px;top:${coords?.bottom ?? 200}px` });
+  document.body.append(anchor);
+  pickReminder(anchor, current, async (at) => {
+    anchor.remove();
+    const now = view.state.doc.lineAt(Math.min(line.from, view.state.doc.length));
+    const next = await lineWithReminder(now.text, at);
+    view.dispatch({ changes: { from: now.from, to: now.to, insert: next } });
+    toast(at ? `Reminder set: ${whenLabel(at)}.` : "Reminder removed.");
+    if (at) void maybeAskBackground(toast);
+  });
+  window.setTimeout(() => anchor.isConnected && !document.querySelector(".remind-pop") && anchor.remove(), 30_000);
 }
 
 function aiAboutNote() {
@@ -2184,6 +2208,7 @@ async function boot() {
     organize: organizeDaily,
   });
   tasksView = new TasksView({ openNote: sideApp.openNote, addTask: (text) => appendToToday(`- [ ] ${text}`, "Tasks"), toast });
+  if (!platform.mobile) startReminders({ openNote: (p, at) => void openPath(p, "replace", at), toast });
 
   inspector = new Inspector({
     openPath: (path, at, inSplit) => void (inSplit ? openInSplit(path, at) : openPath(path, "replace", at)),

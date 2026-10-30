@@ -146,6 +146,8 @@ export interface TaskItem {
   due: string | null;
   /** The date comes from the daily note the task is in. */
   fromNote: boolean;
+  /** `YYYY-MM-DD HH:MM`, local time, from `⏰ …`. */
+  remind?: string;
 }
 
 /** A Notion or Evernote export found in Downloads. */
@@ -363,6 +365,9 @@ export const api = {
   setDriveSync: (provider: string, account: string, folder: string, passphrase?: string) =>
     invoke<void>("set_drive_sync", { provider, account, folder, passphrase: passphrase ?? null }),
   syncNow: (force = false) => invoke<void>("sync_now", { force }),
+  /** Keep Marrow running in the tray and start it at sign-in, so reminders arrive. */
+  backgroundEnabled: () => invoke<boolean>("background_enabled"),
+  setBackground: (on: boolean) => invoke<void>("set_background", { on }),
   conflictCopies: () => invoke<ConflictCopy[]>("conflict_copies"),
   /** Merges a conflict copy into its original; returns places where both versions were kept. */
   resolveConflict: (copy: string, original: string) => invoke<number>("resolve_conflict", { copy, original }),

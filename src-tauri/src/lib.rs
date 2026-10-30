@@ -10,6 +10,7 @@ mod commands;
 mod portable;
 mod publish;
 mod recall;
+mod reminders;
 mod sync;
 use marrow_webdav as webdav;
 
@@ -35,7 +36,18 @@ pub fn run() {
                 let _ = w.set_focus();
             }
         }))
-        .plugin(capture::plugin());
+        .plugin(capture::plugin())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--background"])))
+        // With "keep running for reminders" on, closing the window hides it
+        // to the tray instead of quitting.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" && commands::load_settings(window.app_handle()).background {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        });
     builder
         .plugin(log_plugin())
         .setup(|app| {
@@ -57,13 +69,19 @@ pub fn run() {
                 if let Some(dir) = portable::data("webview") {
                     win = win.data_directory(dir);
                 }
+                // Started at sign-in: stay in the tray until opened.
+                let quiet = std::env::args().any(|a| a == "--background");
+                win = win.visible(!quiet);
                 win.build()?;
+                tray(app.handle())?;
             }
+            reminders::start(app.handle());
             // Phones and tablets: one full-screen window.
             #[cfg(mobile)]
             WebviewWindowBuilder::new(app, "main", WebviewUrl::default()).build()?;
             Ok(())
         })
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(locks::Locks::default())
@@ -165,9 +183,48 @@ pub fn run() {
             sync::sync_now,
             sync::conflict_copies,
             sync::resolve_conflict,
+            reminders::reminder_line,
+            reminders::task_text,
+            reminders::reminder_of,
+            reminders::background_enabled,
+            reminders::set_background,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Marrow");
+}
+
+/// The tray icon: open Marrow or quit it (closing the window only hides it
+/// while "keep running for reminders" is on).
+#[cfg(desktop)]
+fn tray(app: &tauri::AppHandle) -> tauri::Result<()> {
+    use tauri::menu::{Menu, MenuItem};
+    use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+    let open = MenuItem::with_id(app, "open", "Open Marrow", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit Marrow", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open, &quit])?;
+    let show = |app: &tauri::AppHandle| {
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.unminimize();
+            let _ = w.show();
+            let _ = w.set_focus();
+        }
+    };
+    let mut b = TrayIconBuilder::with_id("marrow").tooltip("Marrow").menu(&menu).show_menu_on_left_click(false);
+    if let Some(icon) = app.default_window_icon() {
+        b = b.icon(icon.clone());
+    }
+    b.on_menu_event(move |app, e| match e.id().as_ref() {
+        "open" => show(app),
+        "quit" => app.exit(0),
+        _ => {}
+    })
+    .on_tray_icon_event(move |tray, e| {
+        if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e {
+            show(tray.app_handle());
+        }
+    })
+    .build(app)?;
+    Ok(())
 }
 
 /// Diagnostic log: what Marrow did and what went wrong, for bug reports.

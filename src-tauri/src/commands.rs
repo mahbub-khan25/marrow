@@ -71,6 +71,9 @@ pub(crate) struct Settings {
     /// Vaults whose sync is end-to-end encrypted (the passphrase is in the
     /// system's credential store).
     pub encrypted: std::collections::BTreeSet<String>,
+    /// Keep running in the tray and start at sign-in (for reminders).
+    #[serde(default)]
+    pub background: bool,
 }
 
 fn settings_path(app: &AppHandle) -> CmdResult<PathBuf> {
