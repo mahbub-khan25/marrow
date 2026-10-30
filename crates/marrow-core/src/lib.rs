@@ -28,6 +28,7 @@
 pub mod atomic;
 pub mod backup;
 pub mod cache;
+pub mod clip;
 pub mod cloud;
 pub mod conflicts;
 pub mod engine;

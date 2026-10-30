@@ -2209,6 +2209,9 @@ async function boot() {
   });
   tasksView = new TasksView({ openNote: sideApp.openNote, addTask: (text) => appendToToday(`- [ ] ${text}`, "Tasks"), toast });
   if (!platform.mobile) startReminders({ openNote: (p, at) => void openPath(p, "replace", at), toast });
+  // From the browser extension (Marrow Clipper).
+  void listen<{ path: string; title: string }>("clipped", (e) => toast(`Clipped “${e.payload.title}”.`));
+  void listen<string>("open-note", (e) => void openPath(e.payload, "replace"));
 
   inspector = new Inspector({
     openPath: (path, at, inSplit) => void (inSplit ? openInSplit(path, at) : openPath(path, "replace", at)),

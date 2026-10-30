@@ -1,0 +1,57 @@
+{
+  "name": {
+    "message": "ম্যারো ক্লিপার"
+  },
+  "description": {
+    "message": "ওয়েব পেজ ও বাছাই করা অংশ ম্যারোতে নোট হিসেবে রাখুন। এই কম্পিউটারে ম্যারো খোলা থাকতে হবে।"
+  },
+  "actionTitle": {
+    "message": "ম্যারোতে ক্লিপ করুন"
+  },
+  "menuPage": {
+    "message": "এই পেজ ম্যারোতে ক্লিপ করুন"
+  },
+  "menuSelection": {
+    "message": "বাছাই করা অংশ ম্যারোতে ক্লিপ করুন"
+  },
+  "clipPage": {
+    "message": "এই পেজ ক্লিপ করুন"
+  },
+  "clipSelection": {
+    "message": "বাছাই করা অংশ ক্লিপ করুন"
+  },
+  "openInMarrow": {
+    "message": "ম্যারোতে খুলুন"
+  },
+  "looking": {
+    "message": "ম্যারো খোঁজা হচ্ছে…"
+  },
+  "savingTo": {
+    "message": "“$VAULT$” › Clippings-এ রাখা হবে",
+    "placeholders": {
+      "vault": {
+        "content": "$1"
+      }
+    }
+  },
+  "clipping": {
+    "message": "ক্লিপ করা হচ্ছে…"
+  },
+  "saved": {
+    "message": "“$TITLE$” সংরক্ষণ হয়েছে।",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "notRunning": {
+    "message": "এই কম্পিউটারে ম্যারো খোলা নেই। খুলে আবার চেষ্টা করুন।"
+  },
+  "noVault": {
+    "message": "ম্যারোতে আপনার নোট খুলে আবার চেষ্টা করুন।"
+  },
+  "cantRead": {
+    "message": "এই পেজ ক্লিপ করা যায় না (ব্রাউজারের নিজের পেজ ও স্টোরে এক্সটেনশন কাজ করে না)।"
+  }
+}

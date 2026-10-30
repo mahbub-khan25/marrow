@@ -3,6 +3,7 @@
 
 mod ai;
 mod capture;
+mod clipper;
 mod import;
 mod extras;
 mod locks;
@@ -76,6 +77,8 @@ pub fn run() {
                 tray(app.handle())?;
             }
             reminders::start(app.handle());
+            #[cfg(desktop)]
+            clipper::start(app.handle());
             // Phones and tablets: one full-screen window.
             #[cfg(mobile)]
             WebviewWindowBuilder::new(app, "main", WebviewUrl::default()).build()?;

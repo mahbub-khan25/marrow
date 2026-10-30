@@ -1,0 +1,57 @@
+{
+  "name": {
+    "message": "Marrow Clipper"
+  },
+  "description": {
+    "message": "Save web pages and selections as notes in Marrow, the Markdown notes app. Marrow must be open on this computer."
+  },
+  "actionTitle": {
+    "message": "Clip to Marrow"
+  },
+  "menuPage": {
+    "message": "Clip this page to Marrow"
+  },
+  "menuSelection": {
+    "message": "Clip the selection to Marrow"
+  },
+  "clipPage": {
+    "message": "Clip this page"
+  },
+  "clipSelection": {
+    "message": "Clip the selection"
+  },
+  "openInMarrow": {
+    "message": "Open in Marrow"
+  },
+  "looking": {
+    "message": "Looking for Marrow…"
+  },
+  "savingTo": {
+    "message": "Saves to “$VAULT$” › Clippings",
+    "placeholders": {
+      "vault": {
+        "content": "$1"
+      }
+    }
+  },
+  "clipping": {
+    "message": "Clipping…"
+  },
+  "saved": {
+    "message": "Saved “$TITLE$”.",
+    "placeholders": {
+      "title": {
+        "content": "$1"
+      }
+    }
+  },
+  "notRunning": {
+    "message": "Marrow isn't open on this computer. Open it, then try again."
+  },
+  "noVault": {
+    "message": "Open your notes in Marrow, then try again."
+  },
+  "cantRead": {
+    "message": "This page can't be clipped (browser pages and stores keep extensions out)."
+  }
+}

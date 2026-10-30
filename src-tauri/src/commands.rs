@@ -385,7 +385,7 @@ pub fn merge_text(base: String, mine: String, theirs: String) -> MergeOutcome {
 }
 
 /// Picks `base.ext`, `base 1.ext`, `base 2.ext`... inside `folder`.
-fn unique_child(e: &Engine, folder: &VaultPath, base: &str, ext: &str) -> CmdResult<VaultPath> {
+pub(crate) fn unique_child(e: &Engine, folder: &VaultPath, base: &str, ext: &str) -> CmdResult<VaultPath> {
     for n in 0..10_000 {
         let name = match (n, ext.is_empty()) {
             (0, true) => base.to_string(),

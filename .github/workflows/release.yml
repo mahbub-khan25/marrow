@@ -196,3 +196,13 @@ jobs:
             gh release create "$TAG" --draft $pre --title "Marrow $TAG" --notes "See CHANGELOG.md for what's new."
           fi
           gh release upload "$TAG" "$apk" --clobber
+      - name: Browser extension (Marrow Clipper)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$version\"/" clipper/manifest.json
+          zip="$PWD/Marrow_Clipper_${version}.zip"
+          (cd clipper && zip -qr "$zip" . -x '*.md')
+          gh release upload "$TAG" "$zip" --clobber

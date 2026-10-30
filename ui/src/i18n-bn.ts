@@ -696,6 +696,7 @@ export const BN_PATTERNS: [RegExp, string][] = [
   [/^Reminder: (.+)$/, "রিমাইন্ডার: $1"],
   [/^Reminder set: (.+)\.$/, "রিমাইন্ডার সেট হয়েছে: $1।"],
   [/^Snoozed for (\d+) minutes\.$/, "$1 মিনিট পরে আবার মনে করাব।"],
+  [/^Clipped “(.+)”\.$/, "“$1” সংরক্ষণ হয়েছে।"],
   [/^Sign in to (Google Drive|OneDrive|Dropbox)$/, "$1-এ সাইন ইন করুন"],
   [/^Sign in to (Google Drive|OneDrive|Dropbox) first\.$/, "আগে $1-এ সাইন ইন করুন।"],
   [/^Sign in · (.+)$/, "সাইন ইন · $1"],

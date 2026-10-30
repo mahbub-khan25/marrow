@@ -25,6 +25,7 @@ similar.workspace = true
 zip.workspace = true
 quick-xml.workspace = true
 htmd.workspace = true
+dom_smoothie.workspace = true
 base64.workspace = true
 md-5.workspace = true
 csv.workspace = true
