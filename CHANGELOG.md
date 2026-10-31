@@ -1,9 +1,26 @@
 # Changelog
 
-## 1.5.0
+## 1.6.0
 
-Reminders, and your tasks on the home screen.
+Draw inside your notes, save web pages, get reminded, and see today's tasks on your home screen.
 
+- **Drawings inside notes:** type `/drawing` (or use the pencil button)
+  and a drawing area opens right where you're writing. Sketch with the pen,
+  rectangles, circles, diamonds, arrows and words, in six colours.
+  - On phones and tablets, tap a drawing to draw on it with your finger, a
+    stylus or Apple Pencil, then tap **Done**. "Drawing" in the editor bar
+    adds a new one.
+  - Each drawing is saved as a small canvas next to your notes, so it syncs
+    and keeps its history. Any canvas can be shown in a note with
+    `![[Name.canvas]]`.
+- **Save web pages (web clipper):** the new **Marrow Clipper** browser
+  extension (Chrome, Edge, Brave, Firefox) saves the article you're reading,
+  or just the part you selected, as a note in **Clippings**, without the
+  menus and ads. Download `Marrow_Clipper_1.6.0.zip` below; the steps to
+  install it are in its README. Marrow must be open on the same computer.
+- **Share a link to Marrow** on Android or iPhone to save the whole page in
+  Clippings. On iPhone and iPad, "Add to Marrow" is now in the share sheet,
+  for pages, words and photos.
 - **Reminders on tasks:** tap the alarm on a task (or "Remind me" while
   writing) and pick in an hour, this evening, tomorrow morning, or any date
   and time. The time is kept in the note as `⏰ 2026-11-03 09:00`, so it
