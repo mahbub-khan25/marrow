@@ -220,6 +220,11 @@ function makeMd(): MarkdownIt {
       const w = /^\d+(x\d+)?$/.test(size) ? ` width="${size.split("x")[0]}"` : "";
       return `<img data-embed="${esc(target)}" alt="${esc(size && !w ? size : target)}"${w}>`;
     }
+    // Drawings show (and are drawn on) right in the note.
+    if (/\.canvas$/i.test(target) && env.depth < 1) {
+      const hgt = /^\d+$/.test(size) ? size : "";
+      return `<span class="drawing" data-embed-canvas="${esc(target)}" data-h="${esc(hgt)}"></span>`;
+    }
     // Voice notes and clips play in place.
     if (AUDIO_EXT.test(target)) return `<audio controls preload="metadata" data-embed-media="${esc(target)}"></audio>`;
     if (VIDEO_EXT.test(target)) return `<video controls preload="metadata" playsinline data-embed-media="${esc(target)}"></video>`;
@@ -390,7 +395,7 @@ export function renderMarkdown(text: string, unresolved: Set<string>, depth = 0)
   const env: RenderEnv = { lineOffset: fm.lines, unresolved, depth };
   const html = md.render(fm.text, env);
   return DOMPurify.sanitize(html, {
-    ADD_ATTR: ["data-line", "data-link", "data-tag", "data-task", "data-embed", "data-embed-note", "data-embed-media", "playsinline", "data-href", "data-heading", "data-callout", "data-button", "data-db", "data-mermaid", "open"],
+    ADD_ATTR: ["data-line", "data-link", "data-tag", "data-task", "data-embed", "data-embed-note", "data-embed-media", "data-embed-canvas", "data-h", "playsinline", "data-href", "data-heading", "data-callout", "data-button", "data-db", "data-mermaid", "open"],
     FORBID_TAGS: ["style", "form", "input", "button", "textarea", "select"],
   });
 }

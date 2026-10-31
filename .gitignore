@@ -29,3 +29,4 @@ apps/ios/MarrowShare/MarrowShare.entitlements
 apps/ios/shots/
 ui/sync-preview.html
 ui/remind-preview.html
+ui/draw-preview.html

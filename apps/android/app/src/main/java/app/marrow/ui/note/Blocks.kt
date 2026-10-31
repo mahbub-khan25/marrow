@@ -197,6 +197,7 @@ private fun BlockView(b: Block, actions: BlockActions) {
                 Text(b.text.ifEmpty { b.target }, style = MaterialTheme.typography.titleSmall)
             }
         }
+        BlockKind.DRAWING -> app.marrow.ui.drawing.InlineDrawing(b.target, b.number.toInt(), onOpenFull = { actions.onOpen(b.target) }, modifier = Modifier.padding(vertical = 6.dp))
         BlockKind.PROPERTIES -> Properties(b)
         BlockKind.CALLOUT_TITLE -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val c = calloutColor(b.callout, isDark())

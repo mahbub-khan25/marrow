@@ -25,6 +25,7 @@ import { prefs } from "./prefs";
 import { BlockHandles } from "./blocks";
 import { highlightCodeBlocks, renderMermaid } from "./codeblocks";
 import { openDiagramEditor } from "./diagram-editor";
+import { clampHeight, createDrawing, DRAWING_HEIGHT, lineWithHeight, mountDrawing, type DrawingHost, type DrawingRef, type MountedDrawing } from "./drawing";
 import { FormatBar } from "./format";
 import { Database, editNote, setConfigKey } from "./database";
 import { linkTarget, renderMarkdown, type ButtonSpec } from "./preview";
@@ -110,6 +111,8 @@ export class NotePane {
   private renderedFor: string | null = null;
   private refreshSeq = 0;
   private embedTimer: number | undefined;
+  /** Drawings shown in Preview (saved and let go of when it's redrawn). */
+  private drawings: MountedDrawing[] = [];
   /** Where the reader was when an edit made from Preview arrived; put back after the redraw. */
   private keepTop: number | null = null;
   /** The hidden source editor is behind the doc (updated when it's shown). */
@@ -137,7 +140,9 @@ export class NotePane {
         templates: async () => this.app.templates(),
         templateText: (path) => this.app.templateText(path, this.doc ? displayName(this.doc.path) : ""),
         editDiagram: (line) => this.editDiagramAt(line),
+        newDrawing: () => createDrawing(),
       },
+      drawing: (box, ref, setHeight) => mountDrawing(box, ref, this.drawingHost(this.doc?.path ?? ""), setHeight),
       onFolds: () => this.saveFolds(),
       onSelection: (state) => this.formatBar?.sync(state),
     };
@@ -549,6 +554,7 @@ export class NotePane {
     this.doc = null;
     this.info = null;
     this.view.setState(makeState("", this.hooks));
+    this.releaseDrawings();
     this.preview.replaceChildren();
     this.renderedFor = null;
   }
@@ -1061,6 +1067,7 @@ export class NotePane {
       return;
     }
     this.blocks.hide();
+    this.releaseDrawings();
     this.preview.innerHTML = renderMarkdown(doc.text, this.unresolved);
     // A first "# Heading" that repeats the title shows once, as the title.
     const first = this.preview.firstElementChild;
@@ -1165,6 +1172,12 @@ export class NotePane {
       const path = await api.resolveLink(target, source).catch(() => null);
       if (path) img.src = this.assetUrl(path);
       else img.replaceWith(h("span.embed-missing", null, `Missing image: ${target}`));
+    }
+    for (const box of container.querySelectorAll<HTMLElement>("[data-embed-canvas]")) {
+      const ref: DrawingRef = { target: box.dataset.embedCanvas!, height: box.dataset.h ? clampHeight(Number(box.dataset.h)) : DRAWING_HEIGHT };
+      const line = Number(box.closest<HTMLElement>("[data-line]")?.dataset.line ?? NaN);
+      const d = mountDrawing(box, ref, this.drawingHost(source), container === this.preview && Number.isFinite(line) ? (hgt) => this.setDrawingHeight(line, ref.target, hgt) : undefined);
+      if (container === this.preview) this.drawings.push(d);
     }
     for (const media of container.querySelectorAll<HTMLMediaElement>("[data-embed-media]")) {
       const target = media.dataset.embedMedia!;
@@ -1390,6 +1403,33 @@ export class NotePane {
     const want = text.trim().toLowerCase();
     const hd = headings(this.doc?.text ?? "").find((x) => x.text.trim().toLowerCase() === want);
     if (hd) this.scrollToLine(hd.line, true);
+  }
+
+  /** What a drawing in this note needs from the app. */
+  drawingHost(source: string): DrawingHost {
+    return {
+      vaultRoot: () => this.app.vaultRoot(),
+      openPath: (path, inSplit) => this.app.openPath(path, this, inSplit),
+      toast: (text, kind) => this.app.toast(text, kind),
+      resolve: (target) => api.resolveLink(target, source),
+    };
+  }
+
+  private releaseDrawings() {
+    for (const d of this.drawings) d.destroy();
+    this.drawings = [];
+  }
+
+  /** Saves a drawing's new height in its embed line (searched near `line`). */
+  private setDrawingHeight(line: number, target: string, height: number) {
+    const doc = this.doc;
+    if (!doc) return;
+    const lines = doc.text.split("\n");
+    const order = [line, ...lines.keys()];
+    const i = order.find((n) => lines[n] !== undefined && lines[n].includes(`![[${target}`) && lineWithHeight(lines[n], height) !== lines[n]);
+    if (i === undefined) return;
+    lines[i] = lineWithHeight(lines[i], height);
+    replaceText(doc, lines.join("\n"));
   }
 
   private toggleTask(line: number) {

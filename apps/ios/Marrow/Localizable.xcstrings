@@ -549,6 +549,23 @@
         }
       }
     },
+    "Add words": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add words"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "লেখা যোগ করুন"
+          }
+        }
+      }
+    },
     "Added to today's note when you next open Marrow.": {
       "extractionState": "manual",
       "localizations": {
@@ -766,6 +783,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "চেহারা"
+          }
+        }
+      }
+    },
+    "Arrow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrow"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "তীর"
           }
         }
       }
@@ -1467,6 +1501,23 @@
         }
       }
     },
+    "Diamond": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diamond"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "রম্বস"
+          }
+        }
+      }
+    },
     "Dictate": {
       "extractionState": "manual",
       "localizations": {
@@ -1514,6 +1565,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "সম্পন্ন: %1$@"
+          }
+        }
+      }
+    },
+    "Drawing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drawing"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আঁকা"
           }
         }
       }
@@ -1586,6 +1654,23 @@
         }
       }
     },
+    "Ellipse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ellipse"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "উপবৃত্ত"
+          }
+        }
+      }
+    },
     "Encrypt end to end": {
       "extractionState": "manual",
       "localizations": {
@@ -1616,6 +1701,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "এন্ড-টু-এন্ড এনক্রিপ্টেড"
+          }
+        }
+      }
+    },
+    "Eraser": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eraser"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "মুছুন"
           }
         }
       }
@@ -2177,6 +2279,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "আপনার ফোন, ট্যাবলেট ও কম্পিউটারে এই ভল্ট একই রাখুন। আপনার ক্লাউডে সাইন ইন করলে ম্যারো নোটগুলো সেখানে রাখে, আপনার অ্যাকাউন্টের স্টোরেজেই, আলাদা খরচ ছাড়া। এনক্রিপশন চালু করলে ক্লাউড শুধু সিল করা ফাইল দেখে।"
+          }
+        }
+      }
+    },
+    "Label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Label"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "লেবেল"
+          }
+        }
+      }
+    },
+    "Label (optional)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Label (optional)"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "লেবেল (ইচ্ছা হলে)"
           }
         }
       }
@@ -3781,6 +3917,23 @@
         }
       }
     },
+    "Open full size": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open full size"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "পুরো আকারে খুলুন"
+          }
+        }
+      }
+    },
     "Open in another app": {
       "extractionState": "manual",
       "localizations": {
@@ -3930,6 +4083,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "আবার পাসওয়ার্ড"
+          }
+        }
+      }
+    },
+    "Pen": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pen"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কলম"
           }
         }
       }
@@ -4168,6 +4338,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "সাম্প্রতিক খোঁজ"
+          }
+        }
+      }
+    },
+    "Rectangle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rectangle"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আয়তক্ষেত্র"
           }
         }
       }
@@ -5277,6 +5464,23 @@
         }
       }
     },
+    "Tap to draw": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap to draw"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আঁকতে ট্যাপ করুন"
+          }
+        }
+      }
+    },
     "Task": {
       "extractionState": "manual",
       "localizations": {
@@ -5579,6 +5783,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "ভাবছে…"
+          }
+        }
+      }
+    },
+    "This drawing was moved or deleted.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This drawing was moved or deleted."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "এই আঁকাটি সরানো বা মুছে ফেলা হয়েছে।"
           }
         }
       }
@@ -5974,6 +6195,23 @@
         }
       }
     },
+    "Undo": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আগের অবস্থায়"
+          }
+        }
+      }
+    },
     "Unlock": {
       "extractionState": "manual",
       "localizations": {
@@ -6293,6 +6531,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Word ও OneNote"
+          }
+        }
+      }
+    },
+    "Words": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Words"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "লেখা"
           }
         }
       }

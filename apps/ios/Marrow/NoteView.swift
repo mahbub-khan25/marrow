@@ -37,6 +37,10 @@ struct NoteView: View {
     /// The editor line a reminder is being set on.
     @State private var remindLine: String?
     @State private var newLine: String?
+    /// A drawing just put into the note, drawn on full size.
+    @State private var drawingPath: String?
+    /// A drawing in the note is being drawn on: the page holds still.
+    @State private var drawingActive = false
     @State private var saveTask: Task<Void, Never>?
 
     var body: some View {
@@ -83,6 +87,9 @@ struct NoteView: View {
                 }
             }
             .sheet(isPresented: $dictating) { DictationSheet { said in insert = said } }
+            .fullScreenCover(isPresented: Binding(get: { drawingPath != nil }, set: { if !$0 { drawingPath = nil } })) {
+                if let p = drawingPath { DrawingEditorSheet(path: p) }
+            }
             .sheet(isPresented: Binding(get: { remindLine != nil }, set: { if !$0 { remindLine = nil } })) {
                 let line = remindLine ?? ""
                 RemindSheet(current: reminderOfLine(line: line)) { at in
@@ -128,6 +135,7 @@ struct NoteView: View {
                 onPhoto: { pickingPhoto = true },
                 onDictate: { dictating = true },
                 onRemind: { line in remindLine = line },
+                onDrawing: { addDrawing() },
                 insert: $insert,
                 replaceLine: $newLine
             )
@@ -162,7 +170,24 @@ struct NoteView: View {
             .padding(.horizontal, 22)
             .readingWidth()
         }
+        .scrollDisabled(drawingActive)
+        .onPreferenceChange(DrawingActiveKey.self) { drawingActive = $0 }
         .textSelection(.enabled)
+    }
+
+    /// Makes an empty drawing, puts it below the cursor's line, and opens it to draw on.
+    private func addDrawing() {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd HHmmss"
+        let stamp = f.string(from: Date())
+        Task {
+            do {
+                let p = try await store.run { try $0.createDrawing(stamp: stamp) }
+                insert = "\n" + drawingEmbed(path: p, height: 360) + "\n"
+                drawingPath = p
+            } catch { store.say(error) }
+        }
     }
 
     private var actions: BlockActions {

@@ -15,6 +15,8 @@ struct MarkdownEditor: UIViewRepresentable {
     /// "Remind me" on the cursor's line: gets that line, and later a new one
     /// for it (with its reminder) through `replaceLine`.
     var onRemind: ((String) -> Void)? = nil
+    /// "Drawing": put a drawing in the note and draw on it.
+    var onDrawing: (() -> Void)? = nil
     /// Set to insert text at the cursor (a photo's embed, dictated words).
     @Binding var insert: String?
     /// Set to replace the cursor's line.
@@ -362,6 +364,7 @@ private struct EditorBar: View {
                     tool("photo", "Add a photo") { coordinator.parent.onPhoto() }
                     if let d = coordinator.parent.onDictate { tool("mic", "Dictate", d) }
                     if let r = coordinator.parent.onRemind { tool("alarm", "Remind me") { r(coordinator.currentLine()) } }
+                    if let d = coordinator.parent.onDrawing { tool("scribble.variable", "Drawing", d) }
                     tool("keyboard.chevron.compact.down", "Done") { coordinator.done() }
                 }
                 .padding(.horizontal, 6)

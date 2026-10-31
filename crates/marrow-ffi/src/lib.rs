@@ -26,16 +26,17 @@ use marrow_core::vault_locks::Locks;
 use marrow_core::{Engine, EngineEvent, VaultEvent, VaultPath, VaultService};
 
 mod ai;
-mod canvas;
+pub(crate) mod canvas;
 mod clip;
 mod cloud;
 mod daily;
+mod drawing;
 mod files;
 mod graph;
 mod history;
 mod locks;
 mod notes;
-mod render;
+pub(crate) mod render;
 mod settings;
 mod sync;
 

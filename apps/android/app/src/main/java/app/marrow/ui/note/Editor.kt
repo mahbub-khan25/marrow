@@ -17,7 +17,9 @@ import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.AlarmAdd
 import androidx.compose.material.icons.outlined.CheckBox
+import androidx.compose.material.icons.outlined.Draw
 import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Draw
 import androidx.compose.material.icons.outlined.FormatBold
 import androidx.compose.material.icons.outlined.FormatItalic
 import androidx.compose.material.icons.outlined.FormatQuote
@@ -187,6 +189,15 @@ fun withReminder(v: TextFieldValue, at: String?): TextFieldValue {
     return TextFieldValue(text, TextRange(start + next.length))
 }
 
+/** Puts a line on its own after the cursor's line (a drawing's embed, say); the cursor goes after it. */
+fun insertLine(v: TextFieldValue, line: String): TextFieldValue {
+    val end = v.text.indexOf('\n', v.selection.max).let { if (it < 0) v.text.length else it }
+    val before = v.text.substring(0, end)
+    val sep = if (before.isEmpty() || before.endsWith("\n")) "" else "\n"
+    val text = before + sep + line + "\n" + v.text.substring(end).removePrefix("\n")
+    return TextFieldValue(text, TextRange((before + sep + line + "\n").length))
+}
+
 fun insert(v: TextFieldValue, s: String): TextFieldValue {
     val text = v.text.substring(0, v.selection.min) + s + v.text.substring(v.selection.max)
     return TextFieldValue(text, TextRange(v.selection.min + s.length))
@@ -226,6 +237,7 @@ fun EditorBar(
     onDictate: () -> Unit,
     modifier: Modifier = Modifier,
     onRemind: () -> Unit = {},
+    onDrawing: () -> Unit = {},
 ) {
     val focus = LocalFocusManager.current
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = modifier.fillMaxWidth()) {
@@ -256,6 +268,7 @@ fun EditorBar(
                 Tool(Icons.Outlined.FormatQuote, stringResource(R.string.quote)) { onChange(linePrefix(value, "> ")) }
                 Tool(Icons.Outlined.Code, stringResource(R.string.code)) { onChange(wrap(value, "`")) }
                 Tool(Icons.Outlined.AddPhotoAlternate, stringResource(R.string.add_photo), onPhoto)
+                Tool(Icons.Outlined.Draw, stringResource(R.string.drawing), onDrawing)
                 Tool(Icons.Outlined.Mic, stringResource(R.string.dictate), onDictate)
                 Tool(Icons.Outlined.KeyboardHide, stringResource(R.string.done)) { focus.clearFocus() }
             }

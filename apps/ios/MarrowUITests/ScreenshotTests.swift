@@ -26,6 +26,7 @@ final class ScreenshotTests: XCTestCase {
         ("17-today-dark", "today", "dark"),
         ("18-capture", "capture", nil),
         ("19-note-bangla", "note:Reading/বাংলা কবিতা.md", nil),
+        ("20-note-drawing", "note:Projects/Shift tracker.md", nil),
     ]
 
     override func setUp() {

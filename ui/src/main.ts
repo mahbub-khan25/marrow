@@ -38,7 +38,9 @@ import { markSeen, openWeeklyReview, renderResurface, seenMoved, type ResurfaceA
 import { openCapture } from "./capture";
 import { usePropertyTypes } from "./properties";
 import { maybeAskBackground, TasksView } from "./tasks";
+import { createDrawing, drawingEmbed, drawingsChanged, flushDrawings } from "./drawing";
 import { lineWithReminder, pickReminder, reminderOf, startReminders, whenLabel } from "./reminders";
+import { insertDrawing } from "./slash";
 import { openImport } from "./import";
 import { openPublish } from "./publish";
 import { present } from "./present";
@@ -477,6 +479,7 @@ async function settleEdits(action: string, only?: Doc[]): Promise<boolean> {
   stashActive();
   const failed = (await saveAll()).filter((d) => !only || only.includes(d));
   const canvasOk = only ? true : await canvasView.flush();
+  if (!only) await flushDrawings();
   if (!failed.length && canvasOk) return true;
   const notKept: string[] = (await keepDrafts(failed)).map((d) => `“${d.name}”`);
   if (!canvasOk && canvasView.changesAtRisk) notKept.push("the open canvas");
@@ -1440,6 +1443,7 @@ let refreshTimer: number | undefined;
 async function onEngineEvents(events: EngineEvent[]) {
   // Database views refresh themselves from this.
   window.dispatchEvent(new Event("marrow-vault-changed"));
+  if (events.some((e) => JSON.stringify(e).includes(".canvas"))) drawingsChanged();
   let treeChanged = false;
   for (const ev of events) {
     if (ev.type !== "vault") continue;
@@ -1510,6 +1514,7 @@ function commands(): Command[] {
     cmd("Quick capture", "lightning", () => quickCapture(), prefs.captureKey ? prefs.captureKey.replace("CommandOrControl", isMac ? "⌘" : "Ctrl") : ""),
     cmd("Show all tasks", "check-square", () => setSide("tasks")),
     cmd("Remind me about this task", "bell-simple-plus", () => void remindHere()),
+    cmd("Insert a drawing", "pencil-simple-line", () => void drawHere()),
     cmd("Find and replace in all notes", "magnifying-glass", () => {
       setSide("search");
       searchView.showReplace(true);
@@ -1586,6 +1591,26 @@ function focusedPane(): NotePane {
 }
 
 /** "Remind me" on the editor's current line (made a task if it isn't one). */
+/** A drawing at the cursor (Source), or at the end of the note (Preview). */
+async function drawHere() {
+  const pane = focusedPane();
+  if (!pane.doc) return toast("Open a note first.");
+  const view = pane.view;
+  if (pane.mode === "source") {
+    const r = view.state.selection.main;
+    return insertDrawing(view, r.from, r.to);
+  }
+  try {
+    const path = await createDrawing();
+    const doc = pane.doc;
+    const text = doc.text.replace(/\s*$/, "");
+    replaceText(doc, `${text}${text ? "\n\n" : ""}${drawingEmbed(path)}\n`);
+    requestAnimationFrame(() => pane.scrollToLine(Math.max(0, pane.doc!.text.split("\n").length - 2)));
+  } catch (e) {
+    toast(`Couldn't make a drawing: ${e}`, "error");
+  }
+}
+
 async function remindHere() {
   const pane = focusedPane();
   if (!pane.doc) return toast("Open a note first.");
@@ -2298,6 +2323,7 @@ async function boot() {
   window.addEventListener("blur", () => {
     void saveAll();
     void canvasView.flush();
+    void flushDrawings();
     writeSession();
   });
   await getCurrentWindow().onCloseRequested(async (event) => {

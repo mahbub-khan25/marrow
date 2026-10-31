@@ -1,0 +1,509 @@
+package app.marrow.ui.drawing
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowRightAlt
+import androidx.compose.material.icons.automirrored.outlined.Undo
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CropSquare
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Draw
+import androidx.compose.material.icons.outlined.OpenInFull
+import androidx.compose.material.icons.outlined.PanoramaFishEye
+import androidx.compose.material.icons.outlined.TextFields
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.marrow.R
+import app.marrow.core.Board
+import app.marrow.core.CanvasNode
+import app.marrow.core.shapeNode
+import app.marrow.core.strokeNode
+import app.marrow.core.textNode
+import app.marrow.ui.common.LocalEngine
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.sin
+
+/*
+ * Drawings inside notes: a small canvas (a `.canvas` file) shown where its
+ * `![[Drawing ….canvas|360]]` line is. Tap it to draw right there, with a
+ * finger or a stylus: pen, shapes, arrows and words, in colour. The cards it
+ * makes are the same as on the desktop and in canvases, so the drawing looks
+ * the same everywhere.
+ */
+
+/** JSON Canvas colours "1"–"6". */
+private val PALETTE = listOf("1" to Color(0xFFE03E3E), "2" to Color(0xFFE8780C), "3" to Color(0xFFD4A106), "4" to Color(0xFF2F9E44), "5" to Color(0xFF0B8CB5), "6" to Color(0xFF8E44AD))
+
+private fun colorOf(c: String): Color? = PALETTE.firstOrNull { it.first == c }?.second
+    ?: if (Regex("#[0-9a-fA-F]{6}").matches(c)) Color(android.graphics.Color.parseColor(c)) else null
+
+enum class DrawTool { PEN, RECT, ELLIPSE, DIAMOND, ARROW, TEXT, ERASE }
+
+private val PEN_SIZES = listOf(2.0, 4.0, 8.0)
+
+/** How the drawing maps to the box on screen: screen = world * k + (tx, ty), in pixels. */
+private data class View(val k: Float, val tx: Float, val ty: Float) {
+    fun world(p: Offset) = Offset((p.x - tx) / k, (p.y - ty) / k)
+}
+
+/** Fits everything drawn into a box of `size` (pixels), never larger than life. */
+private fun fit(b: Board?, size: IntSize, density: Float): View {
+    val nodes = b?.nodes.orEmpty()
+    val pad = 16f * density
+    if (nodes.isEmpty() || size.width == 0) return View(density, pad, pad)
+    val x0 = nodes.minOf { it.x }.toFloat()
+    val y0 = nodes.minOf { it.y }.toFloat()
+    val x1 = nodes.maxOf { it.x + it.width }.toFloat()
+    val y1 = nodes.maxOf { it.y + it.height }.toFloat()
+    val k = min(min((size.width - 2 * pad) / max(1f, x1 - x0), (size.height - 2 * pad) / max(1f, y1 - y0)), density).coerceAtLeast(0.05f)
+    return View(k, (size.width - (x1 - x0) * k) / 2f - x0 * k, (size.height - (y1 - y0) * k) / 2f - y0 * k)
+}
+
+/**
+ * A drawing in a note. Shows it; a tap starts drawing on it in place (the
+ * note doesn't scroll under the pen while it's on). "Done" finishes.
+ */
+@Composable
+fun InlineDrawing(path: String, height: Int, onOpenFull: () -> Unit, modifier: Modifier = Modifier) {
+    var active by remember(path) { mutableStateOf(false) }
+    DrawingPad(path, active, { active = it }, onOpenFull, modifier.fillMaxWidth().height(height.dp))
+}
+
+/** A drawing that is being drawn on, filling `modifier` (used full size after inserting one). */
+@Composable
+fun DrawingEditor(path: String, onDone: () -> Unit, modifier: Modifier = Modifier) {
+    DrawingPad(path, true, { if (!it) onDone() }, null, modifier)
+}
+
+@Composable
+private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Unit, onOpenFull: (() -> Unit)?, modifier: Modifier) {
+    val engine = LocalEngine.current
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current.density
+    var board by remember(path) { mutableStateOf<Board?>(null) }
+    var missing by remember(path) { mutableStateOf(false) }
+    val past = remember(path) { mutableStateListOf<Board>() }
+    var tool by remember { mutableStateOf(DrawTool.PEN) }
+    var color by remember { mutableStateOf("") }
+    var penSize by remember { mutableStateOf(4.0) }
+    var box by remember { mutableStateOf(IntSize.Zero) }
+    var frozen by remember { mutableStateOf<View?>(null) }
+    var draft by remember { mutableStateOf<List<Offset>>(emptyList()) }
+    var asking by remember { mutableStateOf<((String) -> Unit)?>(null) }
+    var saveJob by remember { mutableStateOf<Job?>(null) }
+
+    LaunchedEffect(path) {
+        val b = runCatching { engine.run { readCanvas(path) } }.getOrNull()
+        if (b == null) missing = true else board = b
+    }
+    // While drawing, the view stays put (it would jump as the drawing grows).
+    val view = frozen ?: fit(board, box, density)
+    LaunchedEffect(active, box, board != null) {
+        if (!active) frozen = null
+        else if (frozen == null && box.width > 0 && board != null) frozen = fit(board, box, density)
+    }
+
+    fun change(next: Board) {
+        board?.let { past.add(it); if (past.size > 100) past.removeAt(0) }
+        board = next
+        saveJob?.cancel()
+        saveJob = scope.launch {
+            delay(400)
+            runCatching { engine.run { writeCanvas(path, next, null) } }.onFailure { engine.say(it.message ?: "") }
+        }
+    }
+
+    fun add(n: CanvasNode?) {
+        val b = board ?: return
+        if (n != null) change(b.copy(nodes = b.nodes + n))
+    }
+
+    fun finish(pts: List<Offset>) {
+        if (pts.isEmpty()) return
+        val w = pts.map { view.world(it) }
+        val a = w.first()
+        val z = w.last()
+        when (tool) {
+            DrawTool.PEN, DrawTool.ARROW -> add(strokeNode(w.flatMap { listOf(it.x.toDouble(), it.y.toDouble()) }, penSize, tool == DrawTool.ARROW, color, (view.k / density).toDouble()))
+            DrawTool.RECT, DrawTool.ELLIPSE, DrawTool.DIAMOND -> {
+                val kind = when (tool) { DrawTool.ELLIPSE -> "ellipse"; DrawTool.DIAMOND -> "diamond"; else -> "rect" }
+                val n = shapeNode(kind, a.x.toDouble(), a.y.toDouble(), z.x.toDouble(), z.y.toDouble(), color)
+                add(n)
+                asking = { label -> if (label.isNotBlank()) board?.let { b -> change(b.copy(nodes = b.nodes.map { if (it.id == n.id) it.copy(text = label.trim()) else it })) } }
+            }
+            DrawTool.TEXT -> asking = { text -> if (text.isNotBlank()) add(textNode(text.trim(), a.x.toDouble(), a.y.toDouble(), color)) }
+            DrawTool.ERASE -> {
+                val b = board ?: return
+                val tol = 10.0 * density / view.k
+                val hit = b.nodes.lastOrNull { n -> w.any { p -> p.x >= n.x - tol && p.x <= n.x + n.width + tol && p.y >= n.y - tol && p.y <= n.y + n.height + tol } } ?: return
+                change(b.copy(nodes = b.nodes - hit, edges = b.edges.filter { it.fromNode != hit.id && it.toNode != hit.id }))
+            }
+        }
+    }
+
+    val outline = MaterialTheme.colorScheme.outlineVariant
+    val accent = MaterialTheme.colorScheme.primary
+    val ink = MaterialTheme.colorScheme.onBackground
+    val paper = MaterialTheme.colorScheme.background
+    val fonts = LocalFontFamilyResolver.current
+    val dir = LocalLayoutDirection.current
+    val measurer = remember(fonts, dir) { TextMeasurer(fonts, Density(1f), dir) }
+
+    Column(modifier) {
+        if (active) {
+            Toolbar(tool, { tool = it }, color, { color = it }, penSize, { penSize = it }, canUndo = past.isNotEmpty(), onUndo = {
+                val prev = past.removeAt(past.lastIndex)
+                board = prev
+                saveJob?.cancel()
+                saveJob = scope.launch { runCatching { engine.run { writeCanvas(path, prev, null) } } }
+            }, onDone = { setActive(false) })
+        }
+        Box(
+            Modifier.fillMaxWidth().weight(1f)
+                .clip(RoundedCornerShape(12.dp))
+                .border(if (active) BorderStroke(2.dp, accent.copy(alpha = 0.7f)) else BorderStroke(1.dp, outline), RoundedCornerShape(12.dp))
+                .background(paper)
+                .onSizeChanged { box = it }
+                .semantics { contentDescription = "Drawing" }
+                .then(
+                    if (active) {
+                        Modifier.pointerInput(tool, color, penSize, view) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                down.consume()
+                                val pts = mutableListOf(down.position)
+                                draft = pts.toList()
+                                while (true) {
+                                    val ev = awaitPointerEvent()
+                                    ev.changes.forEach { it.consume() }
+                                    val c = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!c.pressed) break
+                                    if ((c.position - pts.last()).getDistance() > 1.5f) {
+                                        pts.add(c.position)
+                                        draft = pts.toList()
+                                    }
+                                }
+                                draft = emptyList()
+                                finish(pts)
+                            }
+                        }
+                    } else Modifier.clickable { setActive(true) },
+                ),
+        ) {
+            Canvas(Modifier.fillMaxSize()) {
+                val b = board ?: return@Canvas
+                withTransform({
+                    translate(view.tx, view.ty)
+                    scale(view.k, view.k, Offset.Zero)
+                }) {
+                    drawBoard(b, measurer, ink, paper)
+                }
+                if (draft.size > 1) drawDraft(tool, draft, colorOf(color) ?: ink, (penSize * view.k).toFloat(), accent)
+            }
+            when {
+                missing -> Text(stringResource(R.string.drawing_missing), Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                !active && board?.nodes?.isEmpty() == true -> Text(stringResource(R.string.tap_to_draw), Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (!active && onOpenFull != null && !missing) {
+                IconButton(onClick = onOpenFull, modifier = Modifier.align(Alignment.TopEnd).size(40.dp)) {
+                    Icon(Icons.Outlined.OpenInFull, stringResource(R.string.open_full_size), Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+
+    asking?.let { done ->
+        var text by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { asking = null },
+            title = { Text(stringResource(if (tool == DrawTool.TEXT) R.string.add_words else R.string.shape_label)) },
+            text = { OutlinedTextField(text, { text = it }, placeholder = { Text(stringResource(if (tool == DrawTool.TEXT) R.string.add_words else R.string.label_optional)) }) },
+            confirmButton = { TextButton(onClick = { asking = null; done(text) }) { Text(stringResource(R.string.ok)) } },
+            dismissButton = { TextButton(onClick = { asking = null }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+}
+
+@Composable
+private fun Toolbar(
+    tool: DrawTool, setTool: (DrawTool) -> Unit,
+    color: String, setColor: (String) -> Unit,
+    penSize: Double, setPenSize: (Double) -> Unit,
+    canUndo: Boolean, onUndo: () -> Unit, onDone: () -> Unit,
+) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+        Column(Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+                ToolButton(Icons.Outlined.Draw, stringResource(R.string.pen), tool == DrawTool.PEN) { setTool(DrawTool.PEN) }
+                ToolButton(Icons.Outlined.CropSquare, stringResource(R.string.rectangle), tool == DrawTool.RECT) { setTool(DrawTool.RECT) }
+                ToolButton(Icons.Outlined.PanoramaFishEye, stringResource(R.string.ellipse), tool == DrawTool.ELLIPSE) { setTool(DrawTool.ELLIPSE) }
+                ToolButton(DiamondIcon, stringResource(R.string.diamond), tool == DrawTool.DIAMOND) { setTool(DrawTool.DIAMOND) }
+                ToolButton(Icons.AutoMirrored.Outlined.ArrowRightAlt, stringResource(R.string.arrow), tool == DrawTool.ARROW) { setTool(DrawTool.ARROW) }
+                ToolButton(Icons.Outlined.TextFields, stringResource(R.string.words), tool == DrawTool.TEXT) { setTool(DrawTool.TEXT) }
+                ToolButton(Icons.Outlined.Delete, stringResource(R.string.eraser), tool == DrawTool.ERASE) { setTool(DrawTool.ERASE) }
+                Spacer(Modifier.width(4.dp))
+                IconButton(onClick = onUndo, enabled = canUndo) { Icon(Icons.AutoMirrored.Outlined.Undo, stringResource(R.string.undo)) }
+            }
+                TextButton(onClick = onDone) {
+                    Icon(Icons.Outlined.Check, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.done))
+                }
+            }
+            Row(Modifier.horizontalScroll(rememberScrollState()).padding(start = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Swatch(null, color == "") { setColor("") }
+                PALETTE.forEach { (id, c) -> Swatch(c, color == id) { setColor(id) } }
+                if (tool == DrawTool.PEN) {
+                    Spacer(Modifier.width(8.dp))
+                    PEN_SIZES.forEach { s ->
+                        Box(
+                            Modifier.size(32.dp).clip(CircleShape).background(if (s == penSize) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent).clickable { setPenSize(s) },
+                            contentAlignment = Alignment.Center,
+                        ) { Box(Modifier.size((s + 3).dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface)) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ToolButton(icon: ImageVector, label: String, on: Boolean, onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Box(
+            Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(if (on) MaterialTheme.colorScheme.primary else Color.Transparent),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, label, Modifier.size(20.dp), tint = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
+        }
+    }
+}
+
+@Composable
+private fun Swatch(c: Color?, on: Boolean, onClick: () -> Unit) {
+    val ring = MaterialTheme.colorScheme.onSurface
+    Box(
+        Modifier.size(28.dp).clip(CircleShape)
+            .border(if (on) BorderStroke(2.dp, ring) else BorderStroke(1.dp, ring.copy(alpha = 0.2f)), CircleShape)
+            .padding(4.dp).clip(CircleShape)
+            .background(c ?: MaterialTheme.colorScheme.background)
+            .clickable(onClick = onClick),
+    ) {
+        if (c == null) Canvas(Modifier.fillMaxSize()) { drawLine(Color(0xFFC33333), Offset(size.width, 0f), Offset(0f, size.height), 2.dp.toPx()) }
+    }
+}
+
+/** A diamond outline, drawn as an icon. */
+private val DiamondIcon: ImageVector by lazy {
+    ImageVector.Builder("Diamond", 24.dp, 24.dp, 24f, 24f).addPath(
+        pathData = androidx.compose.ui.graphics.vector.PathParser().parsePathString("M12,2.5 L21.5,12 L12,21.5 L2.5,12 Z").toNodes(),
+        fill = null,
+        stroke = androidx.compose.ui.graphics.SolidColor(Color.Black),
+        strokeLineWidth = 2f,
+        strokeLineJoin = StrokeJoin.Round,
+    ).build()
+}
+
+private fun mix(c: Color, bg: Color, a: Float) = Color(c.red * a + bg.red * (1 - a), c.green * a + bg.green * (1 - a), c.blue * a + bg.blue * (1 - a), 1f)
+
+/** Draws the cards, in world units (1 = 1 dp at 100%). */
+private fun DrawScope.drawBoard(b: Board, measurer: TextMeasurer, ink: Color, paper: Color) {
+    val byId = b.nodes.associateBy { it.id }
+    b.edges.forEach { e ->
+        val a = byId[e.fromNode] ?: return@forEach
+        val z = byId[e.toNode] ?: return@forEach
+        val p1 = Offset((a.x + a.width / 2).toFloat(), (a.y + a.height / 2).toFloat())
+        val p2 = Offset((z.x + z.width / 2).toFloat(), (z.y + z.height / 2).toFloat())
+        val c = colorOf(e.color) ?: ink.copy(alpha = 0.5f)
+        drawLine(c, p1, p2, 1.5f, StrokeCap.Round)
+        arrowHead(p1, p2, c, 1.5f)
+    }
+    // Groups underneath.
+    b.nodes.sortedBy { if (it.kind == "group") 0 else 1 }.forEach { n ->
+        val c = colorOf(n.color)
+        val tl = Offset(n.x.toFloat(), n.y.toFloat())
+        val sz = Size(n.width.toFloat(), n.height.toFloat())
+        val ink2 = n.ink
+        when {
+            ink2 != null -> {
+                val sx = sz.width / ink2.w.toFloat()
+                val sy = sz.height / ink2.h.toFloat()
+                val pts = ink2.points.chunked(2).filter { it.size == 2 }.map { Offset(tl.x + it[0].toFloat() * sx, tl.y + it[1].toFloat() * sy) }
+                if (pts.size < 2) return@forEach
+                val color = c ?: ink.copy(alpha = 0.85f)
+                val stroke = Stroke(ink2.size.toFloat(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                if (ink2.arrow) {
+                    drawLine(color, pts.first(), pts.last(), stroke.width, StrokeCap.Round)
+                    arrowHead(pts.first(), pts.last(), color, stroke.width)
+                } else drawPath(smooth(pts), color, style = stroke)
+            }
+            n.shape.isNotEmpty() -> {
+                val line = c ?: ink.copy(alpha = 0.7f)
+                val fill = if (c != null) mix(c, paper, 0.13f) else paper
+                val path = when (n.shape) {
+                    "ellipse" -> Path().apply { addOval(androidx.compose.ui.geometry.Rect(tl, sz)) }
+                    "diamond" -> Path().apply {
+                        moveTo(tl.x + sz.width / 2, tl.y); lineTo(tl.x + sz.width, tl.y + sz.height / 2)
+                        lineTo(tl.x + sz.width / 2, tl.y + sz.height); lineTo(tl.x, tl.y + sz.height / 2); close()
+                    }
+                    else -> Path().apply { addRoundRect(androidx.compose.ui.geometry.RoundRect(androidx.compose.ui.geometry.Rect(tl, sz), CornerRadius(4f))) }
+                }
+                drawPath(path, fill, style = Fill)
+                drawPath(path, line, style = Stroke(2f))
+                val (ix, iy) = when (n.shape) { "diamond" -> 0.2f to 0.16f; "ellipse" -> 0.1f to 0.1f; else -> 0.04f to 0.04f }
+                label(measurer, n.text, tl, sz, ink, 17f, ix, iy)
+            }
+            n.kind == "group" -> {
+                val col = c ?: Color(0xFF0B8CB5)
+                drawRoundRect(col.copy(alpha = 0.07f), tl, sz, CornerRadius(12f))
+                drawRoundRect(col.copy(alpha = 0.35f), tl, sz, CornerRadius(12f), style = Stroke(1f))
+            }
+            else -> {
+                // A text card, note or link card: a soft card with its words.
+                val bg = if (c != null) mix(c, paper, 0.14f) else mix(Color(0xFFE03E3E), paper, 0.06f)
+                drawRoundRect(bg, tl, sz, CornerRadius(10f))
+                val words = when (n.kind) { "file" -> n.file.substringAfterLast('/').removeSuffix(".md"); "link" -> n.url; else -> n.text }
+                label(measurer, words, tl, sz, ink, 15f, 0.03f, 0.03f, center = false)
+            }
+        }
+    }
+}
+
+private fun DrawScope.label(measurer: TextMeasurer, text: String, tl: Offset, sz: Size, ink: Color, size: Float, insetX: Float, insetY: Float, center: Boolean = true) {
+    if (text.isBlank()) return
+    val px = sz.width * insetX + 6f
+    val py = sz.height * insetY + 4f
+    val w = (sz.width - 2 * px).coerceAtLeast(1f)
+    val h = (sz.height - 2 * py).coerceAtLeast(1f)
+    val layout = measurer.measure(
+        text,
+        TextStyle(color = ink, fontSize = size.sp, textAlign = if (center) TextAlign.Center else TextAlign.Start, lineHeight = (size * 1.3f).sp),
+        overflow = TextOverflow.Ellipsis,
+        constraints = Constraints(maxWidth = w.toInt().coerceAtLeast(1), maxHeight = h.toInt().coerceAtLeast(1)),
+    )
+    val top = if (center) tl.y + (sz.height - layout.size.height) / 2 else tl.y + py
+    val left = if (center) tl.x + (sz.width - layout.size.width) / 2 else tl.x + px
+    drawText(layout, topLeft = Offset(left, top))
+}
+
+private fun smooth(pts: List<Offset>): Path = Path().apply {
+    moveTo(pts[0].x, pts[0].y)
+    for (i in 1 until pts.size) {
+        val mid = (pts[i - 1] + pts[i]) / 2f
+        quadraticTo(pts[i - 1].x, pts[i - 1].y, mid.x, mid.y)
+    }
+    lineTo(pts.last().x, pts.last().y)
+}
+
+private fun DrawScope.arrowHead(from: Offset, to: Offset, color: Color, width: Float) {
+    val a = atan2((to.y - from.y).toDouble(), (to.x - from.x).toDouble())
+    val len = 10f + width * 2
+    for (side in listOf(-0.45, 0.45)) {
+        val end = Offset((to.x - len * cos(a + side)).toFloat(), (to.y - len * sin(a + side)).toFloat())
+        drawLine(color, to, end, width, StrokeCap.Round)
+    }
+}
+
+/** What's being drawn right now, in screen pixels. */
+private fun DrawScope.drawDraft(tool: DrawTool, pts: List<Offset>, color: Color, penPx: Float, accent: Color) {
+    val a = pts.first()
+    val z = pts.last()
+    when (tool) {
+        DrawTool.PEN -> drawPath(smooth(pts), color, style = Stroke(penPx.coerceAtLeast(1.5f), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        DrawTool.ARROW -> {
+            drawLine(color, a, z, 2.5f * density, StrokeCap.Round)
+            arrowHead(a, z, color, 2.5f * density)
+        }
+        DrawTool.RECT, DrawTool.ELLIPSE, DrawTool.DIAMOND -> {
+            val tl = Offset(min(a.x, z.x), min(a.y, z.y))
+            val sz = Size(abs(z.x - a.x), abs(z.y - a.y))
+            val dash = Stroke(1.5f * density, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
+            when (tool) {
+                DrawTool.ELLIPSE -> drawOval(accent, tl, sz, style = dash)
+                DrawTool.DIAMOND -> drawPath(Path().apply {
+                    moveTo(tl.x + sz.width / 2, tl.y); lineTo(tl.x + sz.width, tl.y + sz.height / 2)
+                    lineTo(tl.x + sz.width / 2, tl.y + sz.height); lineTo(tl.x, tl.y + sz.height / 2); close()
+                }, accent, style = dash)
+                else -> drawRect(accent, tl, sz, style = dash)
+            }
+        }
+        DrawTool.ERASE -> drawCircle(accent.copy(alpha = 0.3f), 14f * density, z)
+        DrawTool.TEXT -> {}
+    }
+}

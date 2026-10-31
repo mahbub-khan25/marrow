@@ -80,6 +80,14 @@ export interface CanvasApp {
   toast(text: string, kind?: "info" | "error"): void;
 }
 
+export interface CanvasOptions {
+  /**
+   * Drawn inside a note: no title, the page scrolls with the wheel (zoom is
+   * Ctrl+wheel), and the tools show while it's being used.
+   */
+  inline?: boolean;
+}
+
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 const SVGNS = "http://www.w3.org/2000/svg";
 /** JSON Canvas colours "1"–"6" (red, orange, yellow, green, cyan, purple). */
@@ -152,6 +160,7 @@ export class CanvasView {
   constructor(
     private host: HTMLElement,
     private app: CanvasApp,
+    private opts: CanvasOptions = {},
   ) {
     this.world = h("div.canvas-world");
     this.edgesSvg = document.createElementNS(SVGNS, "svg") as SVGSVGElement;
@@ -166,15 +175,18 @@ export class CanvasView {
     this.toolbar = this.makeToolbar();
     this.nameEl = h("div.name");
     this.zoomLabel = h("span");
+    host.classList.toggle("is-inline", !!opts.inline);
     host.append(
       this.world,
-      h(
-        "div.canvas-over",
-        null,
-        h("div.smallcaps", null, "Canvas"),
-        this.nameEl,
-        h("div.canvas-hint", null, "Drag cards to arrange · double-click a note to open it · drop notes here from the sidebar · draw with the tools below"),
-      ),
+      opts.inline
+        ? ""
+        : h(
+            "div.canvas-over",
+            null,
+            h("div.smallcaps", null, "Canvas"),
+            this.nameEl,
+            h("div.canvas-hint", null, "Drag cards to arrange · double-click a note to open it · drop notes here from the sidebar · draw with the tools below"),
+          ),
       this.toolbar,
       h(
         "div.canvas-zoom",
@@ -655,7 +667,7 @@ export class CanvasView {
       x1 = Math.max(x1, n.x + n.width);
       y1 = Math.max(y1, n.y + n.height);
     }
-    const padX = 60, padTop = 130, padBottom = 80;
+    const [padX, padTop, padBottom] = this.opts.inline ? [24, 56, 24] : [60, 130, 80];
     const k = Math.min((r.width - padX * 2) / (x1 - x0), (r.height - padTop - padBottom) / (y1 - y0), 1);
     this.k = Math.max(0.1, k);
     this.tx = (r.width - (x1 - x0) * this.k) / 2 - x0 * this.k;
@@ -729,6 +741,16 @@ export class CanvasView {
   setTool(t: Tool) {
     this.tool = t;
     this.syncToolbar();
+  }
+
+  /** Ready to draw: the pen, with the keyboard here. */
+  startDrawing() {
+    this.setTool("pen");
+    this.host.focus({ preventScroll: true });
+  }
+
+  get isEmpty(): boolean {
+    return this.data.nodes.length === 0;
   }
 
   private setPenSize(sz: number) {
@@ -1078,6 +1100,8 @@ export class CanvasView {
       "wheel",
       (e) => {
         if ((e.target as HTMLElement).closest("textarea") && !e.ctrlKey) return;
+        // In a note, the wheel scrolls the page; Ctrl+wheel zooms the drawing.
+        if (this.opts.inline && !(e.ctrlKey || e.metaKey)) return;
         e.preventDefault();
         if (e.ctrlKey || e.metaKey) {
           const r = host.getBoundingClientRect();

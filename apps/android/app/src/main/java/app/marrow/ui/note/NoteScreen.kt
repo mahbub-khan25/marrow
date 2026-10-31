@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -134,6 +135,8 @@ fun NoteScreen(path: String, line: Int, startEditing: Boolean) {
     var moving by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var reminding by remember { mutableStateOf(false) }
+    /** A drawing just put into the note, being drawn on full size. */
+    var drawingPath by remember { mutableStateOf<String?>(null) }
     var unlocking by remember { mutableStateOf(false) }
     var unlockError by remember { mutableStateOf<String?>(null) }
     var locking by remember { mutableStateOf(false) }
@@ -314,6 +317,14 @@ fun NoteScreen(path: String, line: Int, startEditing: Boolean) {
                     },
                     modifier = Modifier.navigationBarsPadding().imePadding(),
                     onRemind = { reminding = true },
+                    onDrawing = {
+                        scope.launch {
+                            val stamp = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HHmmss"))
+                            val path = runCatching { engine.run { createDrawing(stamp) } }.getOrElse { engine.say(it.words()); return@launch }
+                            value = app.marrow.ui.note.insertLine(value, app.marrow.core.drawingEmbed(path, 360u))
+                            drawingPath = path
+                        }
+                    },
                 )
             }
         },
@@ -382,6 +393,16 @@ fun NoteScreen(path: String, line: Int, startEditing: Boolean) {
         }
     }
 
+    drawingPath?.let { p ->
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { drawingPath = null },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+                app.marrow.ui.drawing.DrawingEditor(p, onDone = { drawingPath = null }, modifier = Modifier.fillMaxSize().systemBarsPadding().padding(12.dp))
+            }
+        }
+    }
     if (reminding) {
         val line = app.marrow.ui.note.currentLine(value).second
         app.marrow.ui.reminders.RemindSheet(app.marrow.core.reminderOfLine(line), onDismiss = { reminding = false }) { at ->

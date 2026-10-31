@@ -230,6 +230,8 @@ private struct BlockView: View {
                     .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.line))
             }
             .buttonStyle(.plain)
+        case .drawing:
+            InlineDrawing(path: b.target, height: Int(b.number), onOpenFull: { actions.onOpen(b.target) })
         case .properties:
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(Array(b.props.enumerated()), id: \.offset) { _, p in

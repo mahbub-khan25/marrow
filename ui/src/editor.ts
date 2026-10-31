@@ -47,6 +47,7 @@ import { formatting } from "./format";
 import { writingOptions } from "./writing";
 import { livePreview } from "./livepreview";
 import { prefs } from "./prefs";
+import { drawingWidgets, type DrawingMount } from "./drawing-cm";
 import { slashCompletions, slashIcon, type SlashHooks } from "./slash";
 
 /** `[[target#sub|alias]]` and `![[...]]` on one line. */
@@ -231,6 +232,8 @@ export interface EditorHooks {
   slash?: SlashHooks;
   /** A section was folded or unfolded. */
   onFolds?: () => void;
+  /** Draws a drawing (`![[….canvas|360]]` on its own line) into the editor. */
+  drawing?: DrawingMount;
 }
 
 /** Fold arrows sit in the left margin, out of the writing column. */
@@ -258,6 +261,7 @@ export function editorExtensions(hooks: EditorHooks): Extension[] {
     syntaxHighlighting(highlight),
     writingTheme,
     livePreview(prefs.livePreview),
+    ...(hooks.drawing ? [drawingWidgets(hooks.drawing)] : []),
     unresolvedField,
     wikilinkPlugin,
     tagPlugin,

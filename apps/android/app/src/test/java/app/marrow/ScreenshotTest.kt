@@ -6,11 +6,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
+import androidx.compose.ui.geometry.Offset
 import app.marrow.ui.App
 import androidx.test.core.app.ApplicationProvider
 import app.marrow.data.Engine
@@ -137,6 +142,33 @@ class ScreenshotTest {
 
     @Test fun remindSheet() = shot("22-remind") {
         app.marrow.ui.reminders.RemindSheet("2026-11-03 09:00", onDismiss = {}) {}
+    }
+
+    @Test fun noteDrawing() = shot("25-note-drawing") { NoteScreen("Projects/Shift tracker.md", -1, false) }
+    @Test fun drawingPad() = shot("26-drawing-pad") { app.marrow.ui.drawing.DrawingEditor("Attachments/Drawing app screens.canvas", onDone = {}, modifier = androidx.compose.ui.Modifier.fillMaxSize().padding(12.dp)) }
+    /** A finger stroke and a dragged rectangle are saved into the drawing's file. */
+    @Test fun drawingStroke() {
+        val path = engine.marrow.createDrawing("test stroke")
+        compose.setContent {
+            MarrowTheme(Look()) {
+                CompositionLocalProvider(LocalEngine provides engine, LocalNav provides NoNav) {
+                    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                        app.marrow.ui.drawing.DrawingEditor(path, onDone = {}, modifier = Modifier.fillMaxSize().padding(12.dp))
+                    }
+                }
+            }
+        }
+        settle { false }
+        val pad = compose.onNode(androidx.compose.ui.test.hasContentDescription("Drawing"))
+        pad.performTouchInput { swipe(Offset(100f, 400f), Offset(500f, 600f), 300) }
+        compose.onNode(androidx.compose.ui.test.hasContentDescription(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>().getString(R.string.rectangle))).performClick()
+        pad.performTouchInput { swipe(Offset(150f, 800f), Offset(450f, 1000f), 200) }
+        // (The label box that opens next keeps the test runner busy, so read the file now.)
+        repeat(10) { Thread.sleep(80); compose.mainClock.advanceTimeBy(200) }
+        val saved = engine.marrow.readCanvas(path)
+        org.junit.Assert.assertEquals(2, saved.nodes.size)
+        org.junit.Assert.assertNotNull(saved.nodes[0].ink)
+        org.junit.Assert.assertEquals("rect", saved.nodes[1].shape)
     }
 
     @Test fun today() = shot("01-today") { TodayScreen(onCapture = {}) }

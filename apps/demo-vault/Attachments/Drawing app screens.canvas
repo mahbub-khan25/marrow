@@ -1,0 +1,11 @@
+{
+	"nodes": [
+		{ "id": "phone", "type": "text", "text": "", "shape": "rect", "x": 0, "y": 0, "width": 200, "height": 330, "color": "5" },
+		{ "id": "list", "type": "text", "text": "Job list", "shape": "rect", "x": 30, "y": 50, "width": 140, "height": 90 },
+		{ "id": "add", "type": "text", "text": "Add shift", "shape": "ellipse", "x": 40, "y": 200, "width": 120, "height": 60, "color": "4" },
+		{ "id": "go", "type": "text", "text": "✏️ Drawing — open this canvas in Marrow to see it.", "x": 220, "y": 120, "width": 140, "height": 60, "ink": { "w": 140, "h": 60, "size": 2.5, "points": "8,30 132,30", "arrow": true } },
+		{ "id": "report", "type": "text", "text": "Weekly report", "shape": "diamond", "x": 380, "y": 90, "width": 170, "height": 120, "color": "2" },
+		{ "id": "wave", "type": "text", "text": "✏️ Drawing — open this canvas in Marrow to see it.", "x": 380, "y": 240, "width": 180, "height": 60, "color": "6", "ink": { "w": 180, "h": 60, "size": 4, "points": "4,40 30,12 60,44 90,10 120,46 150,14 176,40" } }
+	],
+	"edges": []
+}

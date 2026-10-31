@@ -6,6 +6,7 @@ import { EditorSelection, StateField, type EditorState } from "@codemirror/state
 import { EditorView, keymap, showTooltip, type Tooltip } from "@codemirror/view";
 
 import { aiOnEditor } from "./ai-panel";
+import { insertDrawing } from "./slash";
 import { h, icon } from "./util";
 
 // ------------------------------------------------------------- inline marks
@@ -192,6 +193,7 @@ const INSERTS: Button[] = [
   { icon: "code-block", title: "Code block", run: (v) => insertBlock(v, "```\n$SEL\n```", 4) },
   { icon: "table", title: "Table", run: (v) => insertBlock(v, "| Column | Column |\n| --- | --- |\n|  |  |", 2) },
   { icon: "minus", title: "Divider", run: (v) => insertBlock(v, "---") },
+  { icon: "pencil-simple-line", title: "Drawing", run: (v) => void insertDrawing(v, v.state.selection.main.from, v.state.selection.main.to) },
 ];
 
 const KINDS: [LineKind, string][] = [

@@ -36,6 +36,9 @@ pub enum BlockKind {
     CalloutTitle,
     /// Display math (`$$ … $$`), shown as `text`.
     Math,
+    /// A drawing (`![[Drawing ….canvas|360]]`): `target` is the canvas's
+    /// path, `number` its height in the note.
+    Drawing,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -347,6 +350,11 @@ impl<'a> Builder<'a> {
             b.local = true;
         } else {
             b.target = file.to_string();
+        }
+        if b.kind == BlockKind::Embed && file.to_ascii_lowercase().ends_with(".canvas") {
+            b.kind = BlockKind::Drawing;
+            b.number = alt.trim().parse::<u32>().map(|h| h.clamp(120, 2000)).unwrap_or(crate::drawing::DEFAULT_HEIGHT);
+            b.text = String::new();
         }
         if b.kind == BlockKind::Embed && b.text.is_empty() {
             b.text = crate::files::display_name(&b.target);

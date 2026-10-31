@@ -8,6 +8,7 @@ import type { EditorView } from "@codemirror/view";
 
 import { aiOnEditor } from "./ai-panel";
 import { CALLOUTS } from "./callouts";
+import { drawingEmbed } from "./drawing";
 import { isoDay } from "./util";
 
 export interface SlashHooks {
@@ -17,6 +18,8 @@ export interface SlashHooks {
   templateText(path: string): Promise<string>;
   /** Opens the diagram editor on the ```mermaid block starting at `line` (0-based). */
   editDiagram?(line: number): void;
+  /** Makes an empty drawing; returns its path. */
+  newDrawing?(): Promise<string>;
 }
 
 interface Item {
@@ -67,6 +70,13 @@ const ITEMS: Item[] = [
   { label: "2 columns", icon: "columns", section: "Insert", keys: "layout side by side", text: "```columns\n${}\n\n+++\n\n\n```", block: true },
   { label: "3 columns", icon: "columns-plus-right", section: "Insert", keys: "layout side by side", text: "```columns\n${}\n\n+++\n\n\n+++\n\n\n```", block: true },
   { label: "Database", icon: "database", section: "Insert", keys: "board kanban calendar gallery view folder notion", text: "```database\nview: ${table}\n```", block: true },
+  {
+    label: "Drawing",
+    icon: "pencil-simple-line",
+    section: "Insert",
+    keys: "draw sketch canvas whiteboard pen shapes picture doodle mockup wireframe",
+    run: (v, f, t) => insertDrawing(v, f, t),
+  },
   { label: "Diagram", icon: "flow-arrow", section: "Insert", keys: "mermaid flowchart chart graph visual", run: (v, f, t) => insertDiagram(v, f, t) },
   { label: "Table", icon: "table", section: "Insert", keys: "grid", text: "| ${Column} | Column |\n| --- | --- |\n|  |  |", block: true },
   { label: "Code block", icon: "code-block", section: "Insert", keys: "pre snippet", text: "```${}\n\n```", block: true },
@@ -87,6 +97,26 @@ const ITEMS: Item[] = [
 ];
 
 let slashHooks: SlashHooks | null = null;
+
+/** An empty drawing on its own line, ready for the pen. */
+export async function insertDrawing(view: EditorView, from: number, to: number) {
+  if (!slashHooks?.newDrawing) return;
+  view.dispatch({ changes: { from, to } });
+  let path: string;
+  try {
+    path = await slashHooks.newDrawing();
+  } catch (e) {
+    console.error(e);
+    return;
+  }
+  const at = Math.min(from, view.state.doc.length);
+  const line = view.state.doc.lineAt(at);
+  const before = view.state.sliceDoc(line.from, at).trim() ? "\n" : "";
+  const after = view.state.sliceDoc(at, line.to).trim() ? "\n" : "";
+  const text = `${before}${drawingEmbed(path)}\n${after}`;
+  // The cursor goes below the drawing, so it shows (and you can keep typing).
+  view.dispatch({ changes: { from: at, insert: text }, selection: { anchor: at + text.length - after.length } });
+}
 
 /** A starter flowchart, then straight into the diagram editor. */
 function insertDiagram(view: EditorView, from: number, to: number) {
