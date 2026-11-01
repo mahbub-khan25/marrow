@@ -1688,6 +1688,23 @@
         }
       }
     },
+    "Edit words": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit words"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "লেখা বদলান"
+          }
+        }
+      }
+    },
     "Editing": {
       "extractionState": "manual",
       "localizations": {
@@ -4950,6 +4967,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "কপিটি দেখুন"
+          }
+        }
+      }
+    },
+    "Select and move": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select and move"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "বাছাই ও সরানো"
           }
         }
       }

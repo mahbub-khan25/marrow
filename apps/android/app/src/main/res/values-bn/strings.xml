@@ -29,6 +29,8 @@
     <string name="arrow">তীর</string>
     <string name="words">লেখা</string>
     <string name="eraser">মুছুন</string>
+    <string name="select_move">বাছাই ও সরানো</string>
+    <string name="edit_words">লেখা বদলান</string>
     <string name="shapes">আকার</string>
     <string name="line">রেখা</string>
     <string name="double_arrow">দুমুখো তীর</string>

@@ -6,6 +6,12 @@
   apps now use the same wings logo as the computer app, on the home screen,
   the welcome screen and in notifications. On Android 13 and later it also
   follows your themed-icons colour.
+- **Move what you've drawn on phones and tablets:** the new **Select and
+  move** tool (the hand) picks a shape, line, arrow, words or pen stroke.
+  Drag it to move it, drag its corner to resize it, and change its colour or
+  fill, edit its words or delete it. A shape, line or arrow you've just drawn
+  is picked straight away, so you can move it at once. See-through shapes are
+  picked by their outline, so what's under them can still be picked.
 
 ## 1.7.0
 

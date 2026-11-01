@@ -29,6 +29,8 @@
     <string name="arrow">Arrow</string>
     <string name="words">Words</string>
     <string name="eraser">Eraser</string>
+    <string name="select_move">Select and move</string>
+    <string name="edit_words">Edit words</string>
     <string name="shapes">Shapes</string>
     <string name="line">Line</string>
     <string name="double_arrow">Double arrow</string>

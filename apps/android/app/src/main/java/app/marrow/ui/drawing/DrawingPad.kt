@@ -30,6 +30,7 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Draw
 import androidx.compose.material.icons.outlined.OpenInFull
+import androidx.compose.material.icons.outlined.PanTool
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -118,7 +119,7 @@ private val PALETTE = listOf("1" to Color(0xFFE03E3E), "2" to Color(0xFFE8780C),
 private fun colorOf(c: String): Color? = PALETTE.firstOrNull { it.first == c }?.second
     ?: if (Regex("#[0-9a-fA-F]{6}").matches(c)) Color(android.graphics.Color.parseColor(c)) else null
 
-enum class DrawTool(val stroke: String = "") { PEN("pen"), SHAPE, LINE("line"), ARROW("arrow"), DOUBLE("double"), HIGHLIGHT("highlighter"), TEXT, ERASE }
+enum class DrawTool(val stroke: String = "") { SELECT, PEN("pen"), SHAPE, LINE("line"), ARROW("arrow"), DOUBLE("double"), HIGHLIGHT("highlighter"), TEXT, ERASE }
 
 /** The highlighter's colour when none is picked. */
 private val HIGHLIGHT = Color(0xFFF2C94C)
@@ -126,6 +127,41 @@ private val HIGHLIGHT = Color(0xFFF2C94C)
 /** The engine's shapes (the same list as the desktop's): outlines in a 100 × 100 box. */
 private val SHAPES: List<ShapeGeometry> by lazy { runCatching { shapeKinds() }.getOrDefault(emptyList()) }
 internal fun shapeOf(kind: String): ShapeGeometry? = SHAPES.firstOrNull { it.kind == kind } ?: SHAPES.firstOrNull()
+
+/** The distance from `p` to the segment a–b. */
+private fun segDist(p: Offset, a: Offset, b: Offset): Float {
+    val ab = b - a
+    val len2 = ab.x * ab.x + ab.y * ab.y
+    val t = if (len2 == 0f) 0f else (((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / len2).coerceIn(0f, 1f)
+    return (p - (a + ab * t)).getDistance()
+}
+
+/**
+ * The topmost card at `p` (world units). Strokes count only near their line,
+ * and see-through shapes only near their outline, so what's under them can
+ * still be picked.
+ */
+internal fun hitNode(b: Board, p: Offset, tol: Float): CanvasNode? = b.nodes.lastOrNull { n ->
+    val x0 = n.x.toFloat(); val y0 = n.y.toFloat(); val w = n.width.toFloat(); val h = n.height.toFloat()
+    if (p.x < x0 - tol || p.x > x0 + w + tol || p.y < y0 - tol || p.y > y0 + h + tol) return@lastOrNull false
+    val ink = n.ink
+    when {
+        ink != null -> {
+            val sx = w / ink.w.toFloat(); val sy = h / ink.h.toFloat()
+            val pts = ink.points.chunked(2).filter { it.size == 2 }.map { Offset(x0 + it[0].toFloat() * sx, y0 + it[1].toFloat() * sy) }
+            val reach = tol + ink.size.toFloat() / 2
+            if (pts.size == 1) (pts[0] - p).getDistance() < reach else pts.zipWithNext().any { (a, z) -> segDist(p, a, z) < reach }
+        }
+        n.shape.isNotEmpty() && n.fill == "none" -> {
+            val g = shapeOf(n.shape)
+            val m = androidx.compose.ui.graphics.PathMeasure()
+            m.setPath(g?.let { placePath(it.outline, Offset(x0, y0), Size(w, h)) } ?: Path().apply { addRect(androidx.compose.ui.geometry.Rect(Offset(x0, y0), Size(w, h))) }, false)
+            val len = m.length
+            (0..96).any { i -> (m.getPosition(len * i / 96f) - p).getDistance() < tol } || (n.text.isNotBlank() && abs(p.x - (x0 + w / 2)) < w / 4 && abs(p.y - (y0 + h / 2)) < h / 4)
+        }
+        else -> true
+    }
+}
 
 /** SVG path data (only M, L, C and Z) from the 100 × 100 box, placed in the box at `tl`. */
 internal fun placePath(d: String, tl: Offset, sz: Size): Path {
@@ -208,6 +244,10 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
     var frozen by remember { mutableStateOf<View?>(null) }
     var draft by remember { mutableStateOf<List<Offset>>(emptyList()) }
     var asking by remember { mutableStateOf<((String) -> Unit)?>(null) }
+    var askText by remember { mutableStateOf("") }
+    var askWords by remember { mutableStateOf(false) }
+    // The card picked with the select tool (moved by dragging it, resized by its corner).
+    var selected by remember(path) { mutableStateOf<String?>(null) }
     var saveJob by remember { mutableStateOf<Job?>(null) }
 
     LaunchedEffect(path) {
@@ -236,20 +276,43 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
         if (n != null) change(b.copy(nodes = b.nodes + n))
     }
 
+    fun update(id: String, f: (CanvasNode) -> CanvasNode) {
+        val b = board ?: return
+        change(b.copy(nodes = b.nodes.map { if (it.id == id) f(it) else it }))
+    }
+
+    /** After a shape, line, arrow or words: pick it, ready to move (pen and highlighter keep drawing). */
+    fun pick(n: CanvasNode?) {
+        if (n == null) return
+        selected = n.id
+        tool = DrawTool.SELECT
+    }
+
     fun finish(pts: List<Offset>) {
         if (pts.isEmpty()) return
         val w = pts.map { view.world(it) }
         val a = w.first()
         val z = w.last()
         when (tool) {
-            DrawTool.PEN, DrawTool.LINE, DrawTool.ARROW, DrawTool.DOUBLE, DrawTool.HIGHLIGHT ->
-                add(strokeNode(w.flatMap { listOf(it.x.toDouble(), it.y.toDouble()) }, penSize, tool.stroke, color, (view.k / density).toDouble()))
+            DrawTool.SELECT -> {}
+            DrawTool.PEN, DrawTool.LINE, DrawTool.ARROW, DrawTool.DOUBLE, DrawTool.HIGHLIGHT -> {
+                val n = strokeNode(w.flatMap { listOf(it.x.toDouble(), it.y.toDouble()) }, penSize, tool.stroke, color, (view.k / density).toDouble())
+                add(n)
+                if (tool != DrawTool.PEN && tool != DrawTool.HIGHLIGHT) pick(n)
+            }
             DrawTool.SHAPE -> {
                 val n = shapeNode(shapeKind, a.x.toDouble(), a.y.toDouble(), z.x.toDouble(), z.y.toDouble(), color, fill)
                 add(n)
-                asking = { label -> if (label.isNotBlank()) board?.let { b -> change(b.copy(nodes = b.nodes.map { if (it.id == n.id) it.copy(text = label.trim()) else it })) } }
+                pick(n)
+                askText = ""
+                askWords = false
+                asking = { label -> if (label.isNotBlank()) update(n.id) { it.copy(text = label.trim()) } }
             }
-            DrawTool.TEXT -> asking = { text -> if (text.isNotBlank()) add(textNode(text.trim(), a.x.toDouble(), a.y.toDouble(), color)) }
+            DrawTool.TEXT -> {
+                askText = ""
+                askWords = true
+                asking = { text -> if (text.isNotBlank()) textNode(text.trim(), a.x.toDouble(), a.y.toDouble(), color).let { add(it); pick(it) } }
+            }
             DrawTool.ERASE -> {
                 val b = board ?: return
                 val tol = 10.0 * density / view.k
@@ -269,7 +332,22 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
 
     Column(modifier) {
         if (active) {
-            Toolbar(tool, { tool = it }, color, { color = it }, penSize, { penSize = it }, shapeKind, { shapeKind = it }, fill, { fill = it }, canUndo = past.isNotEmpty(), onUndo = {
+            val sel = if (tool == DrawTool.SELECT) board?.nodes?.firstOrNull { it.id == selected } else null
+            Toolbar(
+                tool, { tool = it; if (it != DrawTool.SELECT) selected = null },
+                if (sel != null) sel.color else color, { c -> color = c; sel?.let { n -> update(n.id) { it.copy(color = c) } } },
+                penSize, { penSize = it }, shapeKind, { shapeKind = it },
+                if (sel != null) sel.fill else fill, { f -> fill = f; sel?.let { n -> update(n.id) { it.copy(fill = f) } } },
+                selection = sel,
+                onDelete = { sel?.let { n -> board?.let { b -> change(b.copy(nodes = b.nodes - n, edges = b.edges.filter { it.fromNode != n.id && it.toNode != n.id })) }; selected = null } },
+                onEditWords = {
+                    sel?.let { n ->
+                        askText = n.text
+                        askWords = n.shape.isEmpty()
+                        asking = { t -> update(n.id) { it.copy(text = t.trim()) } }
+                    }
+                },
+                canUndo = past.isNotEmpty(), onUndo = {
                 val prev = past.removeAt(past.lastIndex)
                 board = prev
                 saveJob?.cancel()
@@ -289,6 +367,35 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
                                 down.consume()
+                                if (tool == DrawTool.SELECT) {
+                                    // Pick what's under the finger (or the picked card's corner), then drag it.
+                                    val b0 = board
+                                    val start = view.world(down.position)
+                                    val tol = 12f * density / view.k
+                                    val cur = b0?.nodes?.firstOrNull { it.id == selected }
+                                    val corner = cur?.let { Offset((it.x + it.width).toFloat(), (it.y + it.height).toFloat()) }
+                                    val resizing = corner != null && (start - corner).getDistance() < tol * 1.8f
+                                    val target = if (resizing) cur else b0?.let { hitNode(it, start, tol) }
+                                    selected = target?.id
+                                    var moved = false
+                                    while (true) {
+                                        val ev = awaitPointerEvent()
+                                        ev.changes.forEach { it.consume() }
+                                        val c = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                        if (!c.pressed) break
+                                        if (b0 == null || target == null) continue
+                                        val d = view.world(c.position) - start
+                                        if (!moved && d.getDistance() * view.k < 4f * density) continue
+                                        moved = true
+                                        board = b0.copy(nodes = b0.nodes.map { n ->
+                                            if (n.id != target.id) n
+                                            else if (resizing) n.copy(width = max(16.0, Math.round(target.width + d.x).toDouble()), height = max(16.0, Math.round(target.height + d.y).toDouble()))
+                                            else n.copy(x = Math.round(target.x + d.x).toDouble(), y = Math.round(target.y + d.y).toDouble())
+                                        })
+                                    }
+                                    if (moved && b0 != null) board?.let { now -> board = b0; change(now) }
+                                    return@awaitEachGesture
+                                }
                                 val pts = mutableListOf(down.position)
                                 draft = pts.toList()
                                 while (true) {
@@ -315,6 +422,15 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
                     scale(view.k, view.k, Offset.Zero)
                 }) {
                     drawBoard(b, measurer, ink, paper)
+                    if (tool == DrawTool.SELECT) b.nodes.firstOrNull { it.id == selected }?.let { n ->
+                        val pad = 4f / view.k
+                        val tl = Offset(n.x.toFloat() - pad, n.y.toFloat() - pad)
+                        val sz = Size(n.width.toFloat() + 2 * pad, n.height.toFloat() + 2 * pad)
+                        drawRect(accent, tl, sz, style = Stroke(1.5f / view.k, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(8f / view.k, 6f / view.k))))
+                        val c = Offset((n.x + n.width).toFloat(), (n.y + n.height).toFloat())
+                        drawCircle(paper, 8f / view.k, c)
+                        drawCircle(accent, 8f / view.k, c, style = Stroke(2f / view.k))
+                    }
                 }
                 if (draft.size > 1) drawDraft(tool, draft, colorOf(color), ink, (penSize * view.k).toFloat(), accent, shapeKind)
             }
@@ -331,11 +447,11 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
     }
 
     asking?.let { done ->
-        var text by remember { mutableStateOf("") }
+        var text by remember(done) { mutableStateOf(askText) }
         AlertDialog(
             onDismissRequest = { asking = null },
-            title = { Text(stringResource(if (tool == DrawTool.TEXT) R.string.add_words else R.string.shape_label)) },
-            text = { OutlinedTextField(text, { text = it }, placeholder = { Text(stringResource(if (tool == DrawTool.TEXT) R.string.add_words else R.string.label_optional)) }) },
+            title = { Text(stringResource(if (askWords) R.string.add_words else R.string.shape_label)) },
+            text = { OutlinedTextField(text, { text = it }, placeholder = { Text(stringResource(if (askWords) R.string.add_words else R.string.label_optional)) }) },
             confirmButton = { TextButton(onClick = { asking = null; done(text) }) { Text(stringResource(R.string.ok)) } },
             dismissButton = { TextButton(onClick = { asking = null }) { Text(stringResource(R.string.cancel)) } },
         )
@@ -349,12 +465,14 @@ private fun Toolbar(
     penSize: Double, setPenSize: (Double) -> Unit,
     shapeKind: String, setShape: (String) -> Unit,
     fill: String, setFill: (String) -> Unit,
+    selection: CanvasNode?, onDelete: () -> Unit, onEditWords: () -> Unit,
     canUndo: Boolean, onUndo: () -> Unit, onDone: () -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
         Column(Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+                ToolButton(Icons.Outlined.PanTool, stringResource(R.string.select_move), tool == DrawTool.SELECT) { setTool(DrawTool.SELECT) }
                 ToolButton(Icons.Outlined.Draw, stringResource(R.string.pen), tool == DrawTool.PEN) { setTool(DrawTool.PEN) }
                 ToolButton(Icons.Outlined.BorderColor, stringResource(R.string.highlighter), tool == DrawTool.HIGHLIGHT) { setTool(DrawTool.HIGHLIGHT) }
                 // One button for every shape: a tap lists them.
@@ -392,7 +510,12 @@ private fun Toolbar(
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(start = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Swatch(null, color == "") { setColor("") }
                 PALETTE.forEach { (id, c) -> Swatch(c, color == id) { setColor(id) } }
-                if (tool == DrawTool.SHAPE) {
+                if (selection != null) {
+                    Spacer(Modifier.width(8.dp))
+                    if (selection.ink == null) FillChip(stringResource(R.string.edit_words), false, onEditWords)
+                    FillChip(stringResource(R.string.delete), false, onDelete)
+                }
+                if (tool == DrawTool.SHAPE || selection?.shape?.isNotEmpty() == true) {
                     Spacer(Modifier.width(8.dp))
                     FillChip(stringResource(R.string.fill_none), fill == "none") { setFill("none") }
                     FillChip(stringResource(R.string.fill_light), fill == "") { setFill("") }
@@ -616,6 +739,6 @@ private fun DrawScope.drawDraft(tool: DrawTool, pts: List<Offset>, picked: Color
             if (g != null) drawPath(placePath(g.outline, tl, sz), accent, style = dash) else drawRect(accent, tl, sz, style = dash)
         }
         DrawTool.ERASE -> drawCircle(accent.copy(alpha = 0.3f), 14f * density, z)
-        DrawTool.TEXT -> {}
+        DrawTool.TEXT, DrawTool.SELECT -> {}
     }
 }

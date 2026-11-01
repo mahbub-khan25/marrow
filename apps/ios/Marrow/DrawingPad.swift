@@ -17,7 +17,7 @@ private func drawColor(_ c: String) -> Color? {
 }
 
 enum DrawTool: CaseIterable {
-    case pen, shape, line, arrow, double, highlight, text, erase
+    case select, pen, shape, line, arrow, double, highlight, text, erase
     /// What the engine's strokeNode calls it.
     var stroke: String {
         switch self {
@@ -218,6 +218,19 @@ struct DrawingPad: View {
     @State private var penSize: Double = 4
     @State private var shapeKind = "rect"
     @State private var fill = ""
+    /// The card picked with the select tool (dragged to move, its corner to resize).
+    @State private var selected: String?
+    @State private var moving: Moving?
+
+    private struct Moving {
+        var from: Board
+        var start: CGPoint
+        var target: CanvasNode?
+        var resizing: Bool
+        var moved = false
+    }
+
+    private var selection: CanvasNode? { tool == .select ? board?.nodes.first { $0.id == selected } : nil }
     @State private var frozen: Xform?
     @State private var size: CGSize = .zero
     @State private var draft: [CGPoint] = []
@@ -237,6 +250,14 @@ struct DrawingPad: View {
                     c.translateBy(x: view.tx, y: view.ty)
                     c.scaleBy(x: view.k, y: view.k)
                     drawBoard(&c, b)
+                    if let n = selection {
+                        let pad = 4 / view.k
+                        let r = CGRect(x: n.x, y: n.y, width: n.width, height: n.height).insetBy(dx: -pad, dy: -pad)
+                        c.stroke(Path(r), with: .color(Color.accent), style: StrokeStyle(lineWidth: 1.5 / view.k, dash: [8 / view.k, 6 / view.k]))
+                        let h = CGRect(x: n.x + n.width - 8 / view.k, y: n.y + n.height - 8 / view.k, width: 16 / view.k, height: 16 / view.k)
+                        c.fill(Path(ellipseIn: h), with: .color(Color.paper))
+                        c.stroke(Path(ellipseIn: h), with: .color(Color.accent), lineWidth: 2 / view.k)
+                    }
                     if draft.count > 1 { drawDraft(ctx, draft) }
                 }
                 if missing {
@@ -273,6 +294,7 @@ struct DrawingPad: View {
             if now { freeze() }
         }
         .onChange(of: size) { _, _ in freeze() }
+        .onChange(of: tool) { _, t in if t != .select { selected = nil } }
         .alert(alertTitle, isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } })) {
             TextField(String(localized: "Label (optional)"), text: $words)
             Button("OK") { answer() }
@@ -295,10 +317,12 @@ struct DrawingPad: View {
     private var drag: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
             .onChanged { v in
+                if tool == .select { dragSelected(v); return }
                 if draft.isEmpty { draft = [v.startLocation] }
                 if let last = draft.last, hypot(v.location.x - last.x, v.location.y - last.y) > 1.5 { draft.append(v.location) }
             }
             .onEnded { v in
+                if tool == .select { endDrag(); return }
                 var pts = draft.isEmpty ? [v.startLocation] : draft
                 pts.append(v.location)
                 draft = []
@@ -306,15 +330,90 @@ struct DrawingPad: View {
             }
     }
 
+    /// Select tool: pick what's under the finger (or the picked card's corner), then drag it.
+    private func dragSelected(_ v: DragGesture.Value) {
+        if moving == nil {
+            guard let b = board else { return }
+            let p = view.world(v.startLocation)
+            let tol = 12 / view.k
+            let cur = b.nodes.first { $0.id == selected }
+            var resizing = false
+            if let c = cur { resizing = hypot(p.x - CGFloat(c.x + c.width), p.y - CGFloat(c.y + c.height)) < tol * 1.8 }
+            let target = resizing ? cur : hitNode(b, p, tol)
+            selected = target?.id
+            moving = Moving(from: b, start: p, target: target, resizing: resizing)
+        }
+        guard var m = moving, let t = m.target else { return }
+        let w = view.world(v.location)
+        let dx = Double(w.x - m.start.x), dy = Double(w.y - m.start.y)
+        if !m.moved, hypot(dx, dy) * Double(view.k) < 4 { return }
+        m.moved = true
+        moving = m
+        var b = m.from
+        if let i = b.nodes.firstIndex(where: { $0.id == t.id }) {
+            if m.resizing {
+                b.nodes[i].width = max(16, (t.width + dx).rounded())
+                b.nodes[i].height = max(16, (t.height + dy).rounded())
+            } else {
+                b.nodes[i].x = (t.x + dx).rounded()
+                b.nodes[i].y = (t.y + dy).rounded()
+            }
+        }
+        board = b
+    }
+
+    private func endDrag() {
+        if let m = moving, m.moved, let now = board {
+            past.append(m.from)
+            if past.count > 100 { past.removeFirst() }
+            save(now)
+        }
+        moving = nil
+    }
+
+    /// The topmost card at `p`. Strokes count only near their line, and
+    /// see-through shapes only near their outline, so what's under them can
+    /// still be picked.
+    private func hitNode(_ b: Board, _ p: CGPoint, _ tol: CGFloat) -> CanvasNode? {
+        b.nodes.last { n in
+            let r = CGRect(x: n.x, y: n.y, width: n.width, height: n.height)
+            guard r.insetBy(dx: -tol, dy: -tol).contains(p) else { return false }
+            if let ink = n.ink {
+                return inkPath(ink, in: r).strokedPath(StrokeStyle(lineWidth: CGFloat(ink.size) + tol * 2, lineCap: .round, lineJoin: .round)).contains(p)
+            }
+            if !n.shape.isEmpty, n.fill == "none" {
+                let outline = shapeOf(n.shape).map { placePath($0.outline, in: r) } ?? Path(r)
+                if outline.strokedPath(StrokeStyle(lineWidth: tol * 2)).contains(p) { return true }
+                return !n.text.isEmpty && abs(p.x - r.midX) < r.width / 4 && abs(p.y - r.midY) < r.height / 4
+            }
+            return true
+        }
+    }
+
+    /// After a shape, line, arrow or words: pick it, ready to move (pen and highlighter keep drawing).
+    private func pick(_ n: CanvasNode) {
+        selected = n.id
+        tool = .select
+    }
+
+    private func update(_ id: String, _ f: (inout CanvasNode) -> Void) {
+        change { b in if let i = b.nodes.firstIndex(where: { $0.id == id }) { f(&b.nodes[i]) } }
+    }
+
     private func finish(_ pts: [CGPoint]) {
         let w = pts.map { view.world($0) }
         guard let a = w.first, let z = w.last, let b = board else { return }
         switch tool {
+        case .select: break
         case .pen, .line, .arrow, .double, .highlight:
-            if let n = strokeNode(points: w.flatMap { [Double($0.x), Double($0.y)] }, size: penSize, kind: tool.stroke, color: color, zoom: Double(view.k)) { change { $0.nodes.append(n) } }
+            if let n = strokeNode(points: w.flatMap { [Double($0.x), Double($0.y)] }, size: penSize, kind: tool.stroke, color: color, zoom: Double(view.k)) {
+                change { $0.nodes.append(n) }
+                if tool != .pen, tool != .highlight { pick(n) }
+            }
         case .shape:
             let n = shapeNode(shape: shapeKind, x0: Double(a.x), y0: Double(a.y), x1: Double(z.x), y1: Double(z.y), color: color, fill: fill)
             change { $0.nodes.append(n) }
+            pick(n)
             words = ""
             asking = .label(n.id)
         case .text:
@@ -337,6 +436,7 @@ struct DrawingPad: View {
         case .words(let p):
             let n = textNode(text: t, x: Double(p.x), y: Double(p.y), color: color)
             change { $0.nodes.append(n) }
+            pick(n)
         }
     }
 
@@ -366,6 +466,7 @@ struct DrawingPad: View {
             HStack(spacing: 2) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 2) {
+                        toolButton(.select, "hand.point.up.left", "Select and move")
                         toolButton(.pen, "scribble.variable", "Pen")
                         toolButton(.highlight, "highlighter", "Highlighter")
                         // One button for every shape: a tap lists them.
@@ -402,7 +503,20 @@ struct DrawingPad: View {
                 HStack(spacing: 8) {
                     swatch(nil, "")
                     ForEach(drawPalette, id: \.0) { p in swatch(p.1, p.0) }
-                    if tool == .shape {
+                    if let n = selection {
+                        Divider().frame(height: 20)
+                        if n.ink == nil {
+                            actionChip("Edit words") {
+                                words = n.text
+                                asking = .label(n.id)
+                            }
+                        }
+                        actionChip("Delete") {
+                            change { b in b.nodes.removeAll { $0.id == n.id }; b.edges.removeAll { $0.fromNode == n.id || $0.toNode == n.id } }
+                            selected = nil
+                        }
+                    }
+                    if tool == .shape || selection?.shape.isEmpty == false {
                         Divider().frame(height: 20)
                         fillChip("none", "No fill")
                         fillChip("", "Light")
@@ -439,21 +553,37 @@ struct DrawingPad: View {
         .accessibilityLabel(Text(label))
     }
 
-    private func fillChip(_ f: String, _ label: LocalizedStringKey) -> some View {
-        Button { fill = f } label: {
+    private func actionChip(_ label: LocalizedStringKey, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             Text(label).font(.subheadline)
                 .padding(.horizontal, 10).frame(height: 28)
-                .background(fill == f ? Color.line : Color.clear, in: Capsule())
+                .overlay(Capsule().stroke(Color.line, lineWidth: 1))
+        }
+    }
+
+    private func fillChip(_ f: String, _ label: LocalizedStringKey) -> some View {
+        let on = (selection?.fill ?? fill) == f
+        return Button {
+            fill = f
+            if let n = selection { update(n.id) { $0.fill = f } }
+        } label: {
+            Text(label).font(.subheadline)
+                .padding(.horizontal, 10).frame(height: 28)
+                .background(on ? Color.line : Color.clear, in: Capsule())
                 .overlay(Capsule().stroke(Color.line, lineWidth: 1))
         }
     }
 
     private func swatch(_ c: Color?, _ id: String) -> some View {
-        Button { color = id } label: {
+        let on = (selection?.color ?? color) == id
+        return Button {
+            color = id
+            if let n = selection { update(n.id) { $0.color = id } }
+        } label: {
             ZStack {
                 Circle().fill(c ?? Color.paper).padding(4)
                 if c == nil { Path { p in p.move(to: CGPoint(x: 22, y: 6)); p.addLine(to: CGPoint(x: 6, y: 22)) }.stroke(Color.red, lineWidth: 2) }
-                Circle().stroke(color == id ? Color.ink : Color.line, lineWidth: color == id ? 2 : 1)
+                Circle().stroke(on ? Color.ink : Color.line, lineWidth: on ? 2 : 1)
             }
             .frame(width: 28, height: 28)
         }
@@ -568,7 +698,7 @@ struct DrawingPad: View {
             let p = shapeOf(shapeKind).map { placePath($0.outline, in: r) } ?? Path(r)
             ctx.stroke(p, with: .color(Color.accent), style: dash)
         case .erase: ctx.fill(Path(ellipseIn: CGRect(x: z.x - 14, y: z.y - 14, width: 28, height: 28)), with: .color(Color.accent.opacity(0.3)))
-        case .text: break
+        case .text, .select: break
         }
     }
 }

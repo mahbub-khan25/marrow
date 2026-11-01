@@ -189,6 +189,31 @@ class ScreenshotTest {
         org.junit.Assert.assertEquals("none", saved.nodes[1].fill)
     }
 
+    /** With the select tool, a rectangle can be dragged to a new place. */
+    @Test fun drawingMove() {
+        val path = engine.marrow.createDrawing("test move")
+        val rect = app.marrow.core.shapeNode("rect", 0.0, 0.0, 120.0, 80.0, "", "")
+        engine.marrow.writeCanvas(path, app.marrow.core.Board(listOf(rect), emptyList()), null)
+        compose.setContent {
+            MarrowTheme(Look()) {
+                CompositionLocalProvider(LocalEngine provides engine, LocalNav provides NoNav) {
+                    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                        app.marrow.ui.drawing.DrawingEditor(path, onDone = {}, modifier = Modifier.fillMaxSize().padding(12.dp))
+                    }
+                }
+            }
+        }
+        settle { false }
+        val ctx = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        compose.onNode(androidx.compose.ui.test.hasContentDescription(ctx.getString(R.string.select_move))).performClick()
+        val pad = compose.onNode(androidx.compose.ui.test.hasContentDescription("Drawing"))
+        pad.performTouchInput { swipe(center, center + Offset(0f, 300f), 300) }
+        repeat(10) { Thread.sleep(80); compose.mainClock.advanceTimeBy(200) }
+        val saved = engine.marrow.readCanvas(path).nodes.single()
+        org.junit.Assert.assertEquals(0.0, saved.x, 1.0)
+        org.junit.Assert.assertTrue("moved down: y=${saved.y}", saved.y > 40)
+    }
+
     @Test fun today() = shot("01-today") { TodayScreen(onCapture = {}) }
     @Test fun notes() = shot("02-notes") { BrowserScreen("") }
     @Test fun folder() = shot("03-folder") { BrowserScreen("Projects") }

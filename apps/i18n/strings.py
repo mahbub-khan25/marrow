@@ -49,6 +49,8 @@ STRINGS = [
     ("arrow", "Arrow", "তীর"),
     ("words", "Words", "লেখা"),
     ("eraser", "Eraser", "মুছুন"),
+    ("select_move", "Select and move", "বাছাই ও সরানো"),
+    ("edit_words", "Edit words", "লেখা বদলান"),
     ("shapes", "Shapes", "আকার"),
     ("line", "Line", "রেখা"),
     ("double_arrow", "Double arrow", "দুমুখো তীর"),
