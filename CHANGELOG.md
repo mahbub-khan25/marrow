@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- **Home, your own board:** the start page (and the Today screen on phones
+  and tablets) is now Home, a free-form board that is yours to arrange. Add
+  sticky notes, a task overview for any dates you choose (the next few days,
+  today, between two dates, no date, with filters for tag, folder, note or
+  words), a note or just the part under one heading, lists of notes, a
+  greeting, a quick note box, shortcuts, a calendar, today's note, a
+  countdown, a clock and Rediscover, plus pictures, links and drawings.
+  Every card can be moved, resized and restyled: colour, colour strength,
+  text colour, font, text size, alignment, corners, see-through, and looks
+  like sticky paper, lined or squared paper, taped on, pinned, folded corner,
+  outline or frosted glass. The board itself can have dots, squares, lines,
+  paper, corkboard, a colour or your own picture. Start from a ready-made
+  template, save your board as a `.marrowhome` template file to share, and
+  import templates others made. Home is the `Home.canvas` file in your vault,
+  so it syncs and looks the same on every device. On phones it shows as a
+  list; tap the board button to see it as a board.
 - **Delete a drawing in one step:** a bin button on every drawing (on
   computers it shows when you point at the drawing; on phones and tablets
   it's in the drawing's toolbar). After asking, it takes the drawing out of
