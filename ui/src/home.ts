@@ -30,6 +30,7 @@ import { toggleTaskAt } from "./tasks";
 import { h, icon, isoDay, plainText, trunc } from "./util";
 import { uiLocale } from "./i18n";
 import { prefs } from "./prefs";
+import templatesData from "../../crates/marrow-core/data/home-templates.json";
 
 export const HOME_FILE = "Home.canvas";
 
@@ -219,7 +220,7 @@ export class HomeView {
     if (!exists) {
       const board = starterBoard();
       // A new, nearly empty vault: how to start, and how to bring notes over.
-      if (this.app.noteCount() < 15) board.nodes.push(makeCard("welcome", { x: 0, y: 740 }));
+      if (this.app.noteCount() < 15) board.nodes.push(welcomeCard());
       await api.createFile("", "Home", "canvas", JSON.stringify(board, null, "\t")).catch(() => {});
     }
     try {
@@ -947,90 +948,30 @@ interface Template {
   board: () => CData;
 }
 
-const at = (kind: string, x: number, y: number, w?: number, hgt?: number, extra: Partial<CNode> = {}) =>
-  makeCard(kind, { x, y }, { ...(w ? { width: w } : {}), ...(hgt ? { height: hgt } : {}), ...extra });
+/** The built-in templates and extra starter cards, shared with the phone apps. */
+const SHARED = templatesData as unknown as {
+  templates: { name: string; icon: string; about: string; board: CData }[];
+  extras: Record<string, CNode>;
+};
+
+/** A copy of a stored board with new card ids (so two copies never clash). */
+function fresh(board: CData): CData {
+  return readTemplate(JSON.stringify(board)).board;
+}
 
 /** What a new Home starts with: what the start page had, as cards. */
 export function starterBoard(): CData {
-  const nodes = [
-    at("greeting", 0, 0, 520, 130),
-    at("shortcuts", 0, 140, 560, 64),
-    at("capture", 0, 220, 520, 90),
-    at("tasks", 0, 330, 520, 390),
-    at("notes", 560, 0, 320, 330),
-    at("daily", 560, 350, 320, 370),
-    at("calendar", 920, 0, 300, 300),
-    at("sticky", 920, 330, 300, 200, {
-      text: "This is your Home. Drag cards to move them, pull a corner to resize, and use + Add for more. Customize changes how anything looks.",
-    }),
-  ];
-  if (prefs.resurface) nodes.push(at("rediscover", 920, 560, 300, 240));
-  return { nodes, edges: [], home: { bg: "dots" } };
+  const b = fresh(SHARED.templates[0].board);
+  if (prefs.resurface) b.nodes.push(...fresh({ nodes: [SHARED.extras.rediscover], edges: [] }).nodes);
+  return b;
 }
 
-const TEMPLATES: Template[] = [
-  { name: "Starter", icon: "house", about: "Greeting, tasks for the week, today's note, recent notes and a calendar.", board: starterBoard },
-  {
-    name: "Week planner",
-    icon: "calendar-check",
-    about: "Today, the next 7 days and later on, side by side, with a few stickies.",
-    board: () => ({
-      nodes: [
-        at("greeting", 0, 0, 940, 110, { cfg: { name: "", date: true, stats: false } }),
-        at("tasks", 0, 130, 300, 460, { cfg: { ...TASKS_DEFAULT, title: "Today", range: "today", overdue: true } }),
-        at("tasks", 320, 130, 300, 460, { cfg: { ...TASKS_DEFAULT, title: "This week", range: "days", days: 7, overdue: false } }),
-        at("tasks", 640, 130, 300, 460, { cfg: { ...TASKS_DEFAULT, title: "Someday", range: "none", undated: true, overdue: false, group: false } }),
-        at("capture", 0, 610, 620, 90, { cfg: { target: "daily", path: "", task: true } }),
-        at("sticky", 640, 610, 300, 160, { text: "Top 3 this week:\n1.\n2.\n3.", style: { bg: "#ffd84d", tint: 45, look: "tape" } }),
-        at("calendar", 960, 130, 300, 300),
-        at("sticky", 960, 450, 300, 160, { text: "Notes to self", style: { bg: "#e64980", tint: 25, look: "pin" } }),
-      ],
-      edges: [],
-      home: { bg: "grid" },
-    }),
-  },
-  {
-    name: "Daily life",
-    icon: "sun-horizon",
-    about: "A calm board for every day: clock, today's note, habits on stickies and a countdown.",
-    board: () => ({
-      nodes: [
-        at("clock", 0, 0, 260, 120, { style: { look: "glass" } }),
-        at("greeting", 280, 0, 460, 120, { cfg: { name: "", date: true, stats: false } }),
-        at("daily", 0, 140, 380, 420),
-        at("tasks", 400, 140, 340, 280, { cfg: { ...TASKS_DEFAULT, title: "Today", range: "today", overdue: true } }),
-        at("countdown", 400, 440, 160, 120, { cfg: { title: "Next trip", date: "" }, style: { bg: "#0b8cb5", tint: 20 } }),
-        at("sticky", 580, 440, 160, 120, { text: "Water 💧\nWalk 🚶\nRead 📖", style: { bg: "#2f9e44", tint: 25, look: "lined" } }),
-        at("capture", 0, 580, 740, 90),
-      ],
-      edges: [],
-      home: { bg: "paper" },
-    }),
-  },
-  {
-    name: "Study",
-    icon: "graduation-cap",
-    about: "Deadlines, course notes by tag, and a corkboard for reminders.",
-    board: () => ({
-      nodes: [
-        at("tasks", 0, 0, 360, 420, { cfg: { ...TASKS_DEFAULT, title: "Deadlines (30 days)", range: "days", days: 30, overdue: true } }),
-        at("notes", 380, 0, 300, 200, { cfg: { title: "Course notes", kind: "tag", value: "#course", limit: 8 } }),
-        at("notes", 380, 220, 300, 200, { cfg: { title: "Recently edited", kind: "recent", value: "", limit: 6 } }),
-        at("countdown", 700, 0, 240, 140, { cfg: { title: "Exams", date: "" }, style: { bg: "#e03e3e", tint: 20 } }),
-        at("sticky", 700, 160, 240, 260, { text: "Formulas to remember", style: { bg: "#ffd84d", tint: 45, look: "grid" } }),
-        at("capture", 0, 440, 680, 90, { cfg: { target: "daily", path: "", task: true } }),
-      ],
-      edges: [],
-      home: { bg: "cork" },
-    }),
-  },
-  {
-    name: "Clean",
-    icon: "square",
-    about: "Just a greeting and a quick-note box. Add the rest yourself.",
-    board: () => ({ nodes: [at("greeting", 0, 0, 520, 130), at("capture", 0, 150, 520, 90)], edges: [], home: { bg: "plain" } }),
-  },
-];
+/** The "Getting started" card a new, nearly empty vault gets. */
+function welcomeCard(): CNode {
+  return fresh({ nodes: [SHARED.extras.welcome], edges: [] }).nodes[0];
+}
+
+export const TEMPLATES: Template[] = SHARED.templates.map((t, i) => ({ name: t.name, icon: t.icon, about: t.about, board: () => (i === 0 ? starterBoard() : fresh(t.board)) }));
 
 /** A board as a template file. Sticky notes keep their words only if `words`. */
 export function writeTemplate(board: CData, name: string, words: boolean): string {

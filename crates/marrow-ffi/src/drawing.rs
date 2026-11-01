@@ -29,7 +29,7 @@ pub struct DrawingRef {
     pub height: u32,
 }
 
-fn new_id() -> String {
+pub(crate) fn new_id() -> String {
     static N: AtomicU64 = AtomicU64::new(0);
     let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     let seed = format!("{t}-{}-{:p}", N.fetch_add(1, Ordering::Relaxed), &N);
@@ -329,7 +329,7 @@ mod tests {
         assert_eq!((t.width, t.height, t.shape.as_str(), t.fill.as_str()), (160.0, 100.0, "rect", ""));
         assert_eq!(shape_node("star".into(), 0.0, 0.0, 50.0, 50.0, "".into(), "solid".into()).shape, "star");
         // They save as the desktop app writes them.
-        let board = crate::canvas::Board { nodes: vec![n, s, a, hl_clone()], edges: vec![] };
+        let board = crate::canvas::Board { nodes: vec![n, s, a, hl_clone()], edges: vec![], extra: String::new() };
         let out = crate::canvas::canvas_json(&board);
         assert!(out.contains("\"ink\"") && out.contains("\"shape\": \"ellipse\"") && out.contains("\"fill\": \"none\"") && out.contains("\"arrowStart\": true") && out.contains("Drawing —"));
         // Read back the same (drawings also say "open in Marrow" for other apps).

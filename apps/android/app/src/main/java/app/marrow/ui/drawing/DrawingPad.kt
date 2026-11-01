@@ -652,7 +652,7 @@ internal fun DrawScope.drawShape(g: ShapeGeometry?, fill: String, c: Color?, ink
 private fun mix(c: Color, bg: Color, a: Float) = Color(c.red * a + bg.red * (1 - a), c.green * a + bg.green * (1 - a), c.blue * a + bg.blue * (1 - a), 1f)
 
 /** Draws the cards, in world units (1 = 1 dp at 100%). */
-private fun DrawScope.drawBoard(b: Board, measurer: TextMeasurer, ink: Color, paper: Color) {
+internal fun DrawScope.drawBoard(b: Board, measurer: TextMeasurer, ink: Color, paper: Color) {
     val byId = b.nodes.associateBy { it.id }
     b.edges.forEach { e ->
         val a = byId[e.fromNode] ?: return@forEach

@@ -193,7 +193,7 @@ class ScreenshotTest {
     @Test fun drawingMove() {
         val path = engine.marrow.createDrawing("test move")
         val rect = app.marrow.core.shapeNode("rect", 0.0, 0.0, 120.0, 80.0, "", "")
-        engine.marrow.writeCanvas(path, app.marrow.core.Board(listOf(rect), emptyList()), null)
+        engine.marrow.writeCanvas(path, app.marrow.core.Board(listOf(rect), emptyList(), ""), null)
         compose.setContent {
             MarrowTheme(Look()) {
                 CompositionLocalProvider(LocalEngine provides engine, LocalNav provides NoNav) {
@@ -227,6 +227,28 @@ class ScreenshotTest {
         settle { !engine.marrow.readNote(note).contains(".canvas") && runCatching { engine.marrow.readCanvas("Attachments/Drawing app screens.canvas") }.isFailure }
         org.junit.Assert.assertFalse(engine.marrow.readNote(note).contains("Drawing app screens.canvas"))
         org.junit.Assert.assertTrue(runCatching { engine.marrow.readCanvas("Attachments/Drawing app screens.canvas") }.isFailure)
+    }
+
+    /** Home: a new vault's board, made from the starter template and saved as Home.canvas. */
+    @Test fun home() {
+        shot("29-home") { app.marrow.ui.home.HomeScreen(onCapture = {}) }
+        org.junit.Assert.assertTrue(engine.marrow.readCanvas("Home.canvas").nodes.size >= 8)
+    }
+    @Config(qualifiers = "w1280dp-h800dp-mdpi")
+    @Test fun homeWide() = shot("30-home-tablet") { app.marrow.ui.home.HomeScreen(onCapture = {}) }
+
+    /** Editing Home: the board shows, and a card dragged to a new place stays there. */
+    @Test fun homeEdit() {
+        shot("31-home-edit") { app.marrow.ui.home.HomeScreen(onCapture = {}) }
+        val ctx = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        compose.onAllNodesWithText(ctx.getString(R.string.home_edit)).onFirst().performClick()
+        settle { false }
+        val before = engine.marrow.readCanvas("Home.canvas").nodes.first { it.extra.contains("\"tasks\"") }
+        compose.onAllNodes(androidx.compose.ui.test.hasContentDescription("tasks")).onFirst().performTouchInput { swipe(center, center + Offset(-200f, 300f), 400) }
+        repeat(10) { Thread.sleep(80); compose.mainClock.advanceTimeBy(200) }
+        compose.onRoot().captureRoboImage(File(out, "31-home-edit.png").path)
+        val after = engine.marrow.readCanvas("Home.canvas").nodes.first { it.id == before.id }
+        org.junit.Assert.assertTrue("moved: ${before.x},${before.y} -> ${after.x},${after.y}", after.y > before.y)
     }
 
     @Test fun today() = shot("01-today") { TodayScreen(onCapture = {}) }

@@ -43,11 +43,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.CircularProgressIndicator
@@ -149,7 +151,7 @@ sealed interface Incoming {
 private data class Tab(val route: Any, val label: Int, val icon: ImageVector, val selected: ImageVector)
 
 private val TABS = listOf(
-    Tab(TodayRoute, R.string.today, Icons.Outlined.WbSunny, Icons.Filled.WbSunny),
+    Tab(TodayRoute, R.string.home, Icons.Outlined.Home, Icons.Filled.Home),
     Tab(NotesRoute, R.string.notes, Icons.Outlined.Folder, Icons.Filled.Folder),
     Tab(AskRoute, R.string.ask, Icons.Outlined.AutoAwesome, Icons.Filled.AutoAwesome),
     Tab(TasksRoute, R.string.tasks, Icons.Outlined.CheckCircle, Icons.Filled.CheckCircle),
@@ -349,7 +351,7 @@ private fun Main(engine: Engine, incoming: Incoming?, onHandled: () -> Unit) {
                         enterTransition = { fadeIn() },
                         exitTransition = { fadeOut() },
                     ) {
-                        composable<TodayRoute> { TodayScreen(onCapture = { captureOpen = true }) }
+                        composable<TodayRoute> { app.marrow.ui.home.HomeScreen(onCapture = { captureOpen = true }) }
                         composable<NotesRoute> { BrowserScreen("") }
                         composable<AskRoute> { AskScreen() }
                         composable<TasksRoute> { TasksScreen() }

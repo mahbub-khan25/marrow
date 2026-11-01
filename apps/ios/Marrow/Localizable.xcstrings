@@ -260,6 +260,23 @@
         }
       }
     },
+    "24-hour clock": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "24-hour clock"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "২৪ ঘণ্টার ঘড়ি"
+          }
+        }
+      }
+    },
     "A new folder for this vault": {
       "extractionState": "manual",
       "localizations": {
@@ -307,6 +324,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "নতুন খালি ফোল্ডার: এই ভল্টের সবকিছু সেখানে কপি হবে।"
+          }
+        }
+      }
+    },
+    "A note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A note"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "একটি নোট"
+          }
+        }
+      }
+    },
+    "A note I choose": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A note I choose"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আমার বাছা একটি নোট"
           }
         }
       }
@@ -447,6 +498,23 @@
         }
       }
     },
+    "Add": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "যোগ করুন"
+          }
+        }
+      }
+    },
     "Add a photo": {
       "extractionState": "manual",
       "localizations": {
@@ -481,6 +549,23 @@
         }
       }
     },
+    "Add a task…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a task…"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "একটি কাজ যোগ করুন…"
+          }
+        }
+      }
+    },
     "Add an AI": {
       "extractionState": "manual",
       "localizations": {
@@ -494,6 +579,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "একটি AI যোগ করুন"
+          }
+        }
+      }
+    },
+    "Add as a task": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add as a task"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কাজ হিসেবে যোগ করুন"
+          }
+        }
+      }
+    },
+    "Add next to it": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add next to it"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "পাশে যোগ করুন"
           }
         }
       }
@@ -753,6 +872,23 @@
         }
       }
     },
+    "Any date": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Any date"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "যেকোনো তারিখ"
+          }
+        }
+      }
+    },
     "App": {
       "extractionState": "manual",
       "localizations": {
@@ -766,6 +902,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "অ্যাপ"
+          }
+        }
+      }
+    },
+    "App font": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App font"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "অ্যাপের ফন্ট"
           }
         }
       }
@@ -867,7 +1020,7 @@
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "নোটকে জিজ্ঞেস করুন"
+            "value": "আপনার নোটকে জিজ্ঞাসা করুন"
           }
         }
       }
@@ -957,6 +1110,57 @@
         }
       }
     },
+    "Background": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "পটভূমি"
+          }
+        }
+      }
+    },
+    "Background colour": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background colour"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "পটভূমির রং"
+          }
+        }
+      }
+    },
+    "Background picture": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background picture"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "পটভূমির ছবি"
+          }
+        }
+      }
+    },
     "Best: an app password made for Marrow in your server's security settings.": {
       "extractionState": "manual",
       "localizations": {
@@ -970,6 +1174,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "সবচেয়ে ভালো: সার্ভারের নিরাপত্তা সেটিংসে ম্যারোর জন্য বানানো একটি অ্যাপ পাসওয়ার্ড।"
+          }
+        }
+      }
+    },
+    "Between two dates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Between two dates"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "দুই তারিখের মধ্যে"
+          }
+        }
+      }
+    },
+    "Board": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Board"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "বোর্ড"
           }
         }
       }
@@ -1093,6 +1331,23 @@
         }
       }
     },
+    "Centre": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Centre"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "মাঝে"
+          }
+        }
+      }
+    },
     "Changed since": {
       "extractionState": "manual",
       "localizations": {
@@ -1140,6 +1395,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "ফাইল বেছে নিন"
+          }
+        }
+      }
+    },
+    "Choose…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose…"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "বাছুন…"
           }
         }
       }
@@ -1195,6 +1467,23 @@
         }
       }
     },
+    "Clock": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clock"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ঘড়ি"
+          }
+        }
+      }
+    },
     "Cloud": {
       "extractionState": "manual",
       "localizations": {
@@ -1242,6 +1531,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "রং"
+          }
+        }
+      }
+    },
+    "Colour strength": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Colour strength"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "রঙের গাঢ়তা"
           }
         }
       }
@@ -1365,6 +1671,57 @@
         }
       }
     },
+    "Corkboard": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corkboard"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কর্কবোর্ড"
+          }
+        }
+      }
+    },
+    "Corners": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corners"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কোণ"
+          }
+        }
+      }
+    },
+    "Countdown": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Countdown"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কাউন্টডাউন"
+          }
+        }
+      }
+    },
     "Create": {
       "extractionState": "manual",
       "localizations": {
@@ -1378,6 +1735,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "তৈরি করুন"
+          }
+        }
+      }
+    },
+    "Customize": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Customize"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সাজান"
           }
         }
       }
@@ -1463,6 +1837,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "গাঢ়"
+          }
+        }
+      }
+    },
+    "Date (YYYY-MM-DD)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date (YYYY-MM-DD)"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "তারিখ (YYYY-MM-DD)"
           }
         }
       }
@@ -1620,6 +2011,23 @@
         }
       }
     },
+    "Done tasks": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done tasks"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সম্পন্ন কাজ"
+          }
+        }
+      }
+    },
     "Done: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -1637,6 +2045,23 @@
         }
       }
     },
+    "Dots": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dots"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "বিন্দু"
+          }
+        }
+      }
+    },
     "Double arrow": {
       "extractionState": "manual",
       "localizations": {
@@ -1650,6 +2075,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "দুমুখো তীর"
+          }
+        }
+      }
+    },
+    "Drag cards to move them, drag the corner to resize, tap one to change it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag cards to move them, drag the corner to resize, tap one to change it."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কার্ড টেনে সরান, কোণ টেনে আকার বদলান, বদলাতে একটিতে ট্যাপ করুন।"
           }
         }
       }
@@ -1717,7 +2159,7 @@
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "সম্পাদনা"
+            "value": "সাজান"
           }
         }
       }
@@ -1926,6 +2368,40 @@
         }
       }
     },
+    "Folded corner": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folded corner"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ভাঁজ করা কোণ"
+          }
+        }
+      }
+    },
+    "Folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folder"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ফোল্ডার"
+          }
+        }
+      }
+    },
     "Folder name": {
       "extractionState": "manual",
       "localizations": {
@@ -1939,6 +2415,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "ফোল্ডারের নাম"
+          }
+        }
+      }
+    },
+    "Font": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Font"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ফন্ট"
           }
         }
       }
@@ -1990,6 +2483,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "পাসওয়ার্ড ভুলে যান"
+          }
+        }
+      }
+    },
+    "From (YYYY-MM-DD)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From (YYYY-MM-DD)"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "থেকে (YYYY-MM-DD)"
           }
         }
       }
@@ -2057,7 +2567,7 @@
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "আপনার সংগ্রহ থেকে"
+            "value": "আপনার সংরক্ষণ থেকে"
           }
         }
       }
@@ -2075,6 +2585,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "আপনার নোট থেকে"
+          }
+        }
+      }
+    },
+    "Front": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Front"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সামনে"
+          }
+        }
+      }
+    },
+    "Frosted glass": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frosted glass"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ঘষা কাচ"
           }
         }
       }
@@ -2113,6 +2657,74 @@
         }
       }
     },
+    "Getting started": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Getting started"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "শুরু করা"
+          }
+        }
+      }
+    },
+    "Good afternoon": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Good afternoon"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "শুভ অপরাহ্ন"
+          }
+        }
+      }
+    },
+    "Good evening": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Good evening"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "শুভ সন্ধ্যা"
+          }
+        }
+      }
+    },
+    "Good morning": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Good morning"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "শুভ সকাল"
+          }
+        }
+      }
+    },
     "Graph": {
       "extractionState": "manual",
       "localizations": {
@@ -2126,6 +2738,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "গ্রাফ"
+          }
+        }
+      }
+    },
+    "Greeting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Greeting"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "শুভেচ্ছা"
+          }
+        }
+      }
+    },
+    "Group by day": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group by day"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "দিন অনুযায়ী সাজান"
+          }
+        }
+      }
+    },
+    "Handwritten": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Handwritten"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "হাতের লেখা"
           }
         }
       }
@@ -2232,6 +2895,91 @@
         }
       }
     },
+    "Home": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Home"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "হোম"
+          }
+        }
+      }
+    },
+    "How many": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How many"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কতগুলো"
+          }
+        }
+      }
+    },
+    "How many days": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How many days"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কত দিন"
+          }
+        }
+      }
+    },
+    "Huge": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Huge"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "অনেক বড়"
+          }
+        }
+      }
+    },
+    "Import a template…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import a template…"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "টেমপ্লেট আনুন…"
+          }
+        }
+      }
+    },
     "Import notes": {
       "extractionState": "manual",
       "localizations": {
@@ -2296,6 +3044,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Notion-এ: Settings → Export all workspace content, Markdown & CSV হিসেবে। যে .zip পাবেন সেটি বেছে নিন।"
+          }
+        }
+      }
+    },
+    "In a folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In a folder"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "একটি ফোল্ডারে"
           }
         }
       }
@@ -2415,6 +3180,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "এইমাত্র"
+          }
+        }
+      }
+    },
+    "Keep the words on sticky notes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep the words on sticky notes"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "স্টিকি নোটের লেখা রাখুন"
           }
         }
       }
@@ -2589,6 +3371,23 @@
         }
       }
     },
+    "Left": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Left"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "বাঁয়ে"
+          }
+        }
+      }
+    },
     "Light": {
       "extractionState": "manual",
       "localizations": {
@@ -2619,6 +3418,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "রেখা"
+          }
+        }
+      }
+    },
+    "Lined paper": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lined paper"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "রুলটানা কাগজ"
+          }
+        }
+      }
+    },
+    "Lines": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lines"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "রেখা"
+          }
+        }
+      }
+    },
+    "Link": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Link"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "লিংক"
           }
         }
       }
@@ -2670,6 +3520,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "নোটে লিংক"
+          }
+        }
+      }
+    },
+    "Link: type [[ and part of a note's name to connect two notes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Link: type [[ and part of a note's name to connect two notes."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "লিংক: দুটি নোট জুড়তে [[ আর নোটের নামের অংশ লিখুন।"
           }
         }
       }
@@ -2790,6 +3657,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "তালিকা"
+          }
+        }
+      }
+    },
+    "List of notes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "List of notes"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "নোটের তালিকা"
           }
         }
       }
@@ -2965,6 +3849,40 @@
         }
       }
     },
+    "Look": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Look"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "চেহারা"
+          }
+        }
+      }
+    },
+    "Make Home yours: tap Edit to move, resize and change cards, or add new ones.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make Home yours: tap Edit to move, resize and change cards, or add new ones."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "হোম নিজের মতো করুন: কার্ড সরাতে, আকার বদলাতে, বদলাতে বা নতুন যোগ করতে সাজান-এ ট্যাপ করুন।"
+          }
+        }
+      }
+    },
     "Markdown, text and web pages": {
       "extractionState": "manual",
       "localizations": {
@@ -3114,6 +4032,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "ম্যারো আপনার বেছে নেওয়া AI-এর সাথে কাজ করে। আপনার কী এই ফোনের নিরাপদ স্টোরেজেই থাকে। আপনি কিছু না জিজ্ঞেস করা পর্যন্ত কিছুই পাঠানো হয় না।"
+          }
+        }
+      }
+    },
+    "Matching a search": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matching a search"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "খোঁজের সঙ্গে মেলে"
           }
         }
       }
@@ -3301,6 +4236,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "নাম"
+          }
+        }
+      }
+    },
+    "Name for the template": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name for the template"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "টেমপ্লেটের নাম"
           }
         }
       }
@@ -3509,6 +4461,40 @@
         }
       }
     },
+    "No background": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No background"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "পটভূমি নেই"
+          }
+        }
+      }
+    },
+    "No colour": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No colour"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "রং নেই"
+          }
+        }
+      }
+    },
     "No conflicting copies": {
       "extractionState": "manual",
       "localizations": {
@@ -3539,6 +4525,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "তারিখ নেই"
+          }
+        }
+      }
+    },
+    "No date only": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No date only"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "শুধু তারিখহীন"
           }
         }
       }
@@ -3594,6 +4597,23 @@
         }
       }
     },
+    "No note for today yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No note for today yet."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আজকের জন্য এখনো কোনো নোট নেই।"
+          }
+        }
+      }
+    },
     "No notes carry this tag any more.": {
       "extractionState": "manual",
       "localizations": {
@@ -3611,6 +4631,23 @@
         }
       }
     },
+    "No notes here yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No notes here yet."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "এখানে এখনো কোনো নোট নেই।"
+          }
+        }
+      }
+    },
     "No other note links here yet.": {
       "extractionState": "manual",
       "localizations": {
@@ -3624,6 +4661,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "এখনো অন্য কোনো নোট এখানে লিংক করেনি।"
+          }
+        }
+      }
+    },
+    "No such heading in this note.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No such heading in this note."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "এই নোটে এমন শিরোনাম নেই।"
           }
         }
       }
@@ -3658,6 +4712,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "কোনোটি নয়"
+          }
+        }
+      }
+    },
+    "Normal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Normal"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সাধারণ"
           }
         }
       }
@@ -3709,6 +4780,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "নোট"
+          }
+        }
+      }
+    },
+    "Note (its path, like Projects/Plan.md)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note (its path, like Projects/Plan.md)"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "নোট (তার পথ, যেমন Projects/Plan.md)"
           }
         }
       }
@@ -3917,6 +5005,40 @@
         }
       }
     },
+    "Nothing to do here. 🎉": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to do here. 🎉"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "এখানে করার কিছু নেই। 🎉"
+          }
+        }
+      }
+    },
+    "Nothing to show yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to show yet."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "দেখানোর মতো এখনো কিছু নেই।"
+          }
+        }
+      }
+    },
     "Notion": {
       "extractionState": "manual",
       "localizations": {
@@ -3985,6 +5107,23 @@
         }
       }
     },
+    "Older notes and earlier days show up here as your vault grows.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Older notes and earlier days show up here as your vault grows."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ভল্ট বড় হলে পুরোনো নোট আর আগের দিনগুলো এখানে দেখা যাবে।"
+          }
+        }
+      }
+    },
     "On this day": {
       "extractionState": "manual",
       "localizations": {
@@ -3998,6 +5137,91 @@
           "stringUnit": {
             "state": "translated",
             "value": "এই দিনে"
+          }
+        }
+      }
+    },
+    "Only in folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only in folder"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "শুধু এই ফোল্ডারে"
+          }
+        }
+      }
+    },
+    "Only in note (its path)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only in note (its path)"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "শুধু এই নোটে (তার পথ)"
+          }
+        }
+      }
+    },
+    "Only the part under heading": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only the part under heading"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "শুধু এই শিরোনামের নিচের অংশ"
+          }
+        }
+      }
+    },
+    "Only with tag": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only with tag"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "শুধু এই ট্যাগসহ"
+          }
+        }
+      }
+    },
+    "Only with words": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only with words"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "শুধু এই শব্দসহ"
           }
         }
       }
@@ -4201,7 +5425,7 @@
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "রূপরেখা"
+            "value": "শুধু রেখা"
           }
         }
       }
@@ -4218,7 +5442,41 @@
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "সময় পেরিয়েছে"
+            "value": "সময় পেরিয়ে গেছে"
+          }
+        }
+      }
+    },
+    "Overdue too": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Overdue too"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সময় পেরোনোগুলোও"
+          }
+        }
+      }
+    },
+    "Paper": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paper"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কাগজ"
           }
         }
       }
@@ -4376,6 +5634,23 @@
         }
       }
     },
+    "Pick a date in Customize": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a date in Customize"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সাজান থেকে একটি তারিখ বাছুন"
+          }
+        }
+      }
+    },
     "Pick a folder in the phone's own storage.": {
       "extractionState": "manual",
       "localizations": {
@@ -4393,6 +5668,23 @@
         }
       }
     },
+    "Pick a note in Customize.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a note in Customize."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সাজান থেকে একটি নোট বাছুন।"
+          }
+        }
+      }
+    },
     "Pick a time": {
       "extractionState": "manual",
       "localizations": {
@@ -4406,6 +5698,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "সময় বেছে নিন"
+          }
+        }
+      }
+    },
+    "Picture": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picture"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ছবি"
+          }
+        }
+      }
+    },
+    "Pinned": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pinned"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "পিন লাগানো"
+          }
+        }
+      }
+    },
+    "Plain": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plain"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সাধারণ"
           }
         }
       }
@@ -4461,6 +5804,23 @@
         }
       }
     },
+    "Quick capture": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quick capture"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "চটজলদি টুকে রাখা"
+          }
+        }
+      }
+    },
     "Quick note": {
       "extractionState": "manual",
       "localizations": {
@@ -4473,7 +5833,7 @@
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "দ্রুত নোট"
+            "value": "চটজলদি নোট"
           }
         }
       }
@@ -4546,6 +5906,23 @@
         }
       }
     },
+    "Recently edited": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recently edited"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সম্প্রতি সম্পাদিত"
+          }
+        }
+      }
+    },
     "Rectangle": {
       "extractionState": "manual",
       "localizations": {
@@ -4559,6 +5936,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "আয়তক্ষেত্র"
+          }
+        }
+      }
+    },
+    "Rediscover": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rediscover"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আবার দেখুন"
           }
         }
       }
@@ -4750,6 +6144,23 @@
         }
       }
     },
+    "Replace": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replace"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "বদলে দিন"
+          }
+        }
+      }
+    },
     "Replace the note": {
       "extractionState": "manual",
       "localizations": {
@@ -4763,6 +6174,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "নোটটি বদলে দিন"
+          }
+        }
+      }
+    },
+    "Replace your board with it, or put it next to what's there. Undo brings your board back.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replace your board with it, or put it next to what's there. Undo brings your board back."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আপনার বোর্ড এটি দিয়ে বদলে দিন, অথবা যা আছে তার পাশে রাখুন। আগের অবস্থায় গেলে আপনার বোর্ড ফিরে আসে।"
           }
         }
       }
@@ -4835,6 +6263,23 @@
         }
       }
     },
+    "Right": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Right"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ডানে"
+          }
+        }
+      }
+    },
     "Rounded rectangle": {
       "extractionState": "manual",
       "localizations": {
@@ -4899,6 +6344,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "পুরো পেজ রাখুন"
+          }
+        }
+      }
+    },
+    "Save this board as a template…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save this board as a template…"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "এই বোর্ড টেমপ্লেট হিসেবে রাখুন…"
           }
         }
       }
@@ -4971,6 +6433,23 @@
         }
       }
     },
+    "Search for": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search for"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কী খুঁজবেন"
+          }
+        }
+      }
+    },
     "Search your notes": {
       "extractionState": "manual",
       "localizations": {
@@ -5018,6 +6497,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "কপিটি দেখুন"
+          }
+        }
+      }
+    },
+    "See-through": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See-through"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "স্বচ্ছতা"
           }
         }
       }
@@ -5141,6 +6637,57 @@
         }
       }
     },
+    "Shortcuts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shortcuts"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "শর্টকাট"
+          }
+        }
+      }
+    },
+    "Show as a board": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show as a board"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "বোর্ড হিসেবে দেখান"
+          }
+        }
+      }
+    },
+    "Show as a list": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show as a list"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "তালিকা হিসেবে দেখান"
+          }
+        }
+      }
+    },
     "Show done": {
       "extractionState": "manual",
       "localizations": {
@@ -5175,6 +6722,40 @@
         }
       }
     },
+    "Show note and link counts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show note and link counts"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "নোট ও লিংকের সংখ্যা দেখান"
+          }
+        }
+      }
+    },
+    "Show the date": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the date"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "তারিখ দেখান"
+          }
+        }
+      }
+    },
     "Show the sidebar": {
       "extractionState": "manual",
       "localizations": {
@@ -5188,6 +6769,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "সাইডবার দেখান"
+          }
+        }
+      }
+    },
+    "Show which note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show which note"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কোন নোট তা দেখান"
           }
         }
       }
@@ -5413,6 +7011,40 @@
         }
       }
     },
+    "Squared paper": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Squared paper"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ছক কাগজ"
+          }
+        }
+      }
+    },
+    "Squares": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Squares"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ছক"
+          }
+        }
+      }
+    },
     "Star": {
       "extractionState": "manual",
       "localizations": {
@@ -5460,6 +7092,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "নতুন একটি শুরু করুন, বা এই ফোনের একটি ফোল্ডার ব্যবহার করুন"
+          }
+        }
+      }
+    },
+    "Start from a template": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start from a template"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "একটি টেমপ্লেট দিয়ে শুরু করুন"
           }
         }
       }
@@ -5532,6 +7181,40 @@
         }
       }
     },
+    "Sticky note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sticky note"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "স্টিকি নোট"
+          }
+        }
+      }
+    },
+    "Sticky paper": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sticky paper"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "স্টিকি কাগজ"
+          }
+        }
+      }
+    },
     "Stop": {
       "extractionState": "manual",
       "localizations": {
@@ -5545,6 +7228,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "থামান"
+          }
+        }
+      }
+    },
+    "Style": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Style"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ধরন"
           }
         }
       }
@@ -5787,6 +7487,23 @@
         }
       }
     },
+    "Taped on": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taped on"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "টেপ লাগানো"
+          }
+        }
+      }
+    },
     "Task": {
       "extractionState": "manual",
       "localizations": {
@@ -5817,6 +7534,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "কাজ"
+          }
+        }
+      }
+    },
+    "Tasks with no date": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tasks with no date"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "তারিখহীন কাজ"
+          }
+        }
+      }
+    },
+    "Template saved. Share the file with anyone; they import it from Templates.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Template saved. Share the file with anyone; they import it from Templates."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "টেমপ্লেট রাখা হয়েছে। ফাইলটি যে কাউকে দিন; তাঁরা টেমপ্লেট থেকে এটি আনবেন।"
           }
         }
       }
@@ -5872,6 +7623,57 @@
         }
       }
     },
+    "Text alignment": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text alignment"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "লেখার সারিবদ্ধতা"
+          }
+        }
+      }
+    },
+    "Text card": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text card"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "লেখার কার্ড"
+          }
+        }
+      }
+    },
+    "Text colour": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text colour"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "লেখার রং"
+          }
+        }
+      }
+    },
     "Text size": {
       "extractionState": "manual",
       "localizations": {
@@ -5885,6 +7687,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "লেখার আকার"
+          }
+        }
+      }
+    },
+    "That file isn't a Marrow Home template.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That file isn't a Marrow Home template."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "এই ফাইলটি ম্যারো হোম টেমপ্লেট নয়।"
           }
         }
       }
@@ -5991,6 +7810,23 @@
         }
       }
     },
+    "The next few days": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The next few days"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আগামী কয়েক দিন"
+          }
+        }
+      }
+    },
     "The note as it is now is kept as a version too, so you can switch back.": {
       "extractionState": "manual",
       "localizations": {
@@ -6089,6 +7925,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "ভাবছে…"
+          }
+        }
+      }
+    },
+    "This card needs a newer Marrow.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This card needs a newer Marrow."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "এই কার্ডের জন্য নতুন ম্যারো লাগবে।"
           }
         }
       }
@@ -6246,6 +8099,23 @@
         }
       }
     },
+    "This note was moved or deleted.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This note was moved or deleted."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "এই নোটটি সরানো বা মুছে ফেলা হয়েছে।"
+          }
+        }
+      }
+    },
     "This phone has no voice typing.": {
       "extractionState": "manual",
       "localizations": {
@@ -6297,6 +8167,40 @@
         }
       }
     },
+    "Title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "শিরোনাম"
+          }
+        }
+      }
+    },
+    "To (YYYY-MM-DD)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To (YYYY-MM-DD)"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "পর্যন্ত (YYYY-MM-DD)"
+          }
+        }
+      }
+    },
     "Today": {
       "extractionState": "manual",
       "localizations": {
@@ -6310,6 +8214,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "আজ"
+          }
+        }
+      }
+    },
+    "Today!": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today!"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আজ!"
           }
         }
       }
@@ -6501,6 +8422,23 @@
         }
       }
     },
+    "Typewriter": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Typewriter"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "টাইপরাইটার"
+          }
+        }
+      }
+    },
     "Unchanged": {
       "extractionState": "manual",
       "localizations": {
@@ -6616,6 +8554,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "অন্য অ্যাকাউন্ট ব্যবহার করুন"
+          }
+        }
+      }
+    },
+    "Use “%@”?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use “%1$@”?"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” ব্যবহার করবেন?"
           }
         }
       }
@@ -6739,6 +8694,23 @@
         }
       }
     },
+    "What for": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What for"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কিসের জন্য"
+          }
+        }
+      }
+    },
     "What needs doing?": {
       "extractionState": "manual",
       "localizations": {
@@ -6785,7 +8757,7 @@
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "মনে কী আছে?"
+            "value": "কী ভাবছেন?"
           }
         }
       }
@@ -6837,6 +8809,74 @@
           "stringUnit": {
             "state": "translated",
             "value": "সিঙ্কের আগেই দুই ডিভাইসে নোট বদলালে সিঙ্ক অ্যাপ দুটোকেই কপি হিসেবে রাখতে পারে। একত্র করলে কপির বদলগুলো নোটে যায় আর কপিটি ট্র্যাশে যায়।"
+          }
+        }
+      }
+    },
+    "Where it goes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where it goes"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কোথায় যাবে"
+          }
+        }
+      }
+    },
+    "Which dates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which dates"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কোন তারিখ"
+          }
+        }
+      }
+    },
+    "Which notes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which notes"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কোন নোট"
+          }
+        }
+      }
+    },
+    "With a tag": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With a tag"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "একটি ট্যাগসহ"
           }
         }
       }
@@ -6926,6 +8966,23 @@
         }
       }
     },
+    "Write: tap + in Notes and start typing. Everything saves by itself.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Write: tap + in Notes and start typing. Everything saves by itself."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "লিখুন: নোট-এ + ট্যাপ করে লিখতে শুরু করুন। সব নিজে থেকেই রাখা হয়।"
+          }
+        }
+      }
+    },
     "Your AIs (the marked one is used)": {
       "extractionState": "manual",
       "localizations": {
@@ -6956,6 +9013,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "আপনার iPhone, iPad ও Mac, আপনার iCloud স্টোরেজে"
+          }
+        }
+      }
+    },
+    "Your name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your name"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আপনার নাম"
           }
         }
       }
@@ -7028,6 +9102,40 @@
         }
       }
     },
+    "days ago": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "days ago"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "দিন আগে"
+          }
+        }
+      }
+    },
+    "days to go": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "days to go"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "দিন বাকি"
+          }
+        }
+      }
+    },
     "encrypted": {
       "extractionState": "manual",
       "localizations": {
@@ -7075,6 +9183,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "কী নেই"
+          }
+        }
+      }
+    },
+    "“%@” is on your Home.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” is on your Home."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” এখন আপনার হোমে।"
           }
         }
       }

@@ -1,0 +1,642 @@
+{
+	"_note": "Marrow Home: built-in templates (the first is the starter board) and the extra cards a new Home may get. Read by ui/src/home.ts and the engine (marrow-ffi home.rs).",
+	"templates": [
+		{
+			"name": "Starter",
+			"icon": "house",
+			"about": "Greeting, tasks for the week, today's note, recent notes and a calendar.",
+			"board": {
+				"nodes": [
+					{
+						"id": "t1",
+						"type": "text",
+						"x": 0,
+						"y": 0,
+						"width": 520,
+						"height": 130,
+						"widget": "greeting",
+						"cfg": {
+							"name": "",
+							"date": true,
+							"stats": true
+						},
+						"style": {
+							"look": "none"
+						},
+						"text": "👋 Greeting (Marrow Home card)"
+					},
+					{
+						"id": "t2",
+						"type": "text",
+						"x": 0,
+						"y": 140,
+						"width": 560,
+						"height": 64,
+						"widget": "shortcuts",
+						"cfg": {
+							"items": [
+								"new",
+								"today",
+								"search",
+								"ask"
+							]
+						},
+						"style": {
+							"look": "none"
+						},
+						"text": "🔘 Shortcuts (Marrow Home card)"
+					},
+					{
+						"id": "t3",
+						"type": "text",
+						"x": 0,
+						"y": 220,
+						"width": 520,
+						"height": 90,
+						"widget": "capture",
+						"cfg": {
+							"target": "daily",
+							"path": "",
+							"task": false
+						},
+						"text": "⚡ Quick note (Marrow Home card)"
+					},
+					{
+						"id": "t4",
+						"type": "text",
+						"x": 0,
+						"y": 330,
+						"width": 520,
+						"height": 390,
+						"widget": "tasks",
+						"cfg": {
+							"title": "Next 7 days",
+							"range": "days",
+							"days": 7,
+							"from": "",
+							"to": "",
+							"overdue": true,
+							"undated": false,
+							"done": false,
+							"tag": "",
+							"folder": "",
+							"note": "",
+							"text": "",
+							"group": true,
+							"showNote": true
+						},
+						"text": "☑ Next 7 days (Marrow Home card)"
+					},
+					{
+						"id": "t5",
+						"type": "text",
+						"x": 560,
+						"y": 0,
+						"width": 320,
+						"height": 330,
+						"widget": "notes",
+						"cfg": {
+							"title": "Recently edited",
+							"kind": "recent",
+							"value": "",
+							"limit": 8
+						},
+						"text": "📚 Recently edited (Marrow Home card)"
+					},
+					{
+						"id": "t6",
+						"type": "text",
+						"x": 560,
+						"y": 350,
+						"width": 320,
+						"height": 370,
+						"widget": "daily",
+						"cfg": {},
+						"text": "☀ Today's note (Marrow Home card)"
+					},
+					{
+						"id": "t7",
+						"type": "text",
+						"x": 920,
+						"y": 0,
+						"width": 300,
+						"height": 300,
+						"widget": "calendar",
+						"cfg": {},
+						"text": "📅 Calendar (Marrow Home card)"
+					},
+					{
+						"id": "t8",
+						"type": "text",
+						"x": 920,
+						"y": 330,
+						"width": 300,
+						"height": 200,
+						"widget": "sticky",
+						"cfg": {},
+						"style": {
+							"bg": "#ffd84d",
+							"tint": 45,
+							"look": "paper"
+						},
+						"text": "This is your Home. Drag cards to move them, pull a corner to resize, and use + Add for more. Customize changes how anything looks."
+					}
+				],
+				"edges": [],
+				"home": {
+					"bg": "dots"
+				}
+			}
+		},
+		{
+			"name": "Week planner",
+			"icon": "calendar-check",
+			"about": "Today, the next 7 days and later on, side by side, with a few stickies.",
+			"board": {
+				"nodes": [
+					{
+						"id": "t9",
+						"type": "text",
+						"x": 0,
+						"y": 0,
+						"width": 940,
+						"height": 110,
+						"widget": "greeting",
+						"cfg": {
+							"name": "",
+							"date": true,
+							"stats": false
+						},
+						"style": {
+							"look": "none"
+						},
+						"text": "👋 Greeting (Marrow Home card)"
+					},
+					{
+						"id": "t10",
+						"type": "text",
+						"x": 0,
+						"y": 130,
+						"width": 300,
+						"height": 460,
+						"widget": "tasks",
+						"cfg": {
+							"title": "Today",
+							"range": "today",
+							"days": 7,
+							"from": "",
+							"to": "",
+							"overdue": true,
+							"undated": false,
+							"done": false,
+							"tag": "",
+							"folder": "",
+							"note": "",
+							"text": "",
+							"group": true,
+							"showNote": true
+						},
+						"text": "☑ Today (Marrow Home card)"
+					},
+					{
+						"id": "t11",
+						"type": "text",
+						"x": 320,
+						"y": 130,
+						"width": 300,
+						"height": 460,
+						"widget": "tasks",
+						"cfg": {
+							"title": "This week",
+							"range": "days",
+							"days": 7,
+							"from": "",
+							"to": "",
+							"overdue": false,
+							"undated": false,
+							"done": false,
+							"tag": "",
+							"folder": "",
+							"note": "",
+							"text": "",
+							"group": true,
+							"showNote": true
+						},
+						"text": "☑ This week (Marrow Home card)"
+					},
+					{
+						"id": "t12",
+						"type": "text",
+						"x": 640,
+						"y": 130,
+						"width": 300,
+						"height": 460,
+						"widget": "tasks",
+						"cfg": {
+							"title": "Someday",
+							"range": "none",
+							"days": 7,
+							"from": "",
+							"to": "",
+							"overdue": false,
+							"undated": true,
+							"done": false,
+							"tag": "",
+							"folder": "",
+							"note": "",
+							"text": "",
+							"group": false,
+							"showNote": true
+						},
+						"text": "☑ Someday (Marrow Home card)"
+					},
+					{
+						"id": "t13",
+						"type": "text",
+						"x": 0,
+						"y": 610,
+						"width": 620,
+						"height": 90,
+						"widget": "capture",
+						"cfg": {
+							"target": "daily",
+							"path": "",
+							"task": true
+						},
+						"text": "⚡ Quick note (Marrow Home card)"
+					},
+					{
+						"id": "t14",
+						"type": "text",
+						"x": 640,
+						"y": 610,
+						"width": 300,
+						"height": 160,
+						"widget": "sticky",
+						"cfg": {},
+						"style": {
+							"bg": "#ffd84d",
+							"tint": 45,
+							"look": "tape"
+						},
+						"text": "Top 3 this week:\n1.\n2.\n3."
+					},
+					{
+						"id": "t15",
+						"type": "text",
+						"x": 960,
+						"y": 130,
+						"width": 300,
+						"height": 300,
+						"widget": "calendar",
+						"cfg": {},
+						"text": "📅 Calendar (Marrow Home card)"
+					},
+					{
+						"id": "t16",
+						"type": "text",
+						"x": 960,
+						"y": 450,
+						"width": 300,
+						"height": 160,
+						"widget": "sticky",
+						"cfg": {},
+						"style": {
+							"bg": "#e64980",
+							"tint": 25,
+							"look": "pin"
+						},
+						"text": "Notes to self"
+					}
+				],
+				"edges": [],
+				"home": {
+					"bg": "grid"
+				}
+			}
+		},
+		{
+			"name": "Daily life",
+			"icon": "sun-horizon",
+			"about": "A calm board for every day: clock, today's note, habits on stickies and a countdown.",
+			"board": {
+				"nodes": [
+					{
+						"id": "t17",
+						"type": "text",
+						"x": 0,
+						"y": 0,
+						"width": 260,
+						"height": 120,
+						"widget": "clock",
+						"cfg": {
+							"h24": false
+						},
+						"style": {
+							"look": "glass"
+						},
+						"text": "🕒 Clock (Marrow Home card)"
+					},
+					{
+						"id": "t18",
+						"type": "text",
+						"x": 280,
+						"y": 0,
+						"width": 460,
+						"height": 120,
+						"widget": "greeting",
+						"cfg": {
+							"name": "",
+							"date": true,
+							"stats": false
+						},
+						"style": {
+							"look": "none"
+						},
+						"text": "👋 Greeting (Marrow Home card)"
+					},
+					{
+						"id": "t19",
+						"type": "text",
+						"x": 0,
+						"y": 140,
+						"width": 380,
+						"height": 420,
+						"widget": "daily",
+						"cfg": {},
+						"text": "☀ Today's note (Marrow Home card)"
+					},
+					{
+						"id": "t20",
+						"type": "text",
+						"x": 400,
+						"y": 140,
+						"width": 340,
+						"height": 280,
+						"widget": "tasks",
+						"cfg": {
+							"title": "Today",
+							"range": "today",
+							"days": 7,
+							"from": "",
+							"to": "",
+							"overdue": true,
+							"undated": false,
+							"done": false,
+							"tag": "",
+							"folder": "",
+							"note": "",
+							"text": "",
+							"group": true,
+							"showNote": true
+						},
+						"text": "☑ Today (Marrow Home card)"
+					},
+					{
+						"id": "t21",
+						"type": "text",
+						"x": 400,
+						"y": 440,
+						"width": 160,
+						"height": 120,
+						"widget": "countdown",
+						"cfg": {
+							"title": "Next trip",
+							"date": ""
+						},
+						"style": {
+							"bg": "#0b8cb5",
+							"tint": 20
+						},
+						"text": "⏳ Next trip  (Marrow Home card)"
+					},
+					{
+						"id": "t22",
+						"type": "text",
+						"x": 580,
+						"y": 440,
+						"width": 160,
+						"height": 120,
+						"widget": "sticky",
+						"cfg": {},
+						"style": {
+							"bg": "#2f9e44",
+							"tint": 25,
+							"look": "lined"
+						},
+						"text": "Water 💧\nWalk 🚶\nRead 📖"
+					},
+					{
+						"id": "t23",
+						"type": "text",
+						"x": 0,
+						"y": 580,
+						"width": 740,
+						"height": 90,
+						"widget": "capture",
+						"cfg": {
+							"target": "daily",
+							"path": "",
+							"task": false
+						},
+						"text": "⚡ Quick note (Marrow Home card)"
+					}
+				],
+				"edges": [],
+				"home": {
+					"bg": "paper"
+				}
+			}
+		},
+		{
+			"name": "Study",
+			"icon": "graduation-cap",
+			"about": "Deadlines, course notes by tag, and a corkboard for reminders.",
+			"board": {
+				"nodes": [
+					{
+						"id": "t24",
+						"type": "text",
+						"x": 0,
+						"y": 0,
+						"width": 360,
+						"height": 420,
+						"widget": "tasks",
+						"cfg": {
+							"title": "Deadlines (30 days)",
+							"range": "days",
+							"days": 30,
+							"from": "",
+							"to": "",
+							"overdue": true,
+							"undated": false,
+							"done": false,
+							"tag": "",
+							"folder": "",
+							"note": "",
+							"text": "",
+							"group": true,
+							"showNote": true
+						},
+						"text": "☑ Deadlines (30 days) (Marrow Home card)"
+					},
+					{
+						"id": "t25",
+						"type": "text",
+						"x": 380,
+						"y": 0,
+						"width": 300,
+						"height": 200,
+						"widget": "notes",
+						"cfg": {
+							"title": "Course notes",
+							"kind": "tag",
+							"value": "#course",
+							"limit": 8
+						},
+						"text": "📚 Course notes (Marrow Home card)"
+					},
+					{
+						"id": "t26",
+						"type": "text",
+						"x": 380,
+						"y": 220,
+						"width": 300,
+						"height": 200,
+						"widget": "notes",
+						"cfg": {
+							"title": "Recently edited",
+							"kind": "recent",
+							"value": "",
+							"limit": 6
+						},
+						"text": "📚 Recently edited (Marrow Home card)"
+					},
+					{
+						"id": "t27",
+						"type": "text",
+						"x": 700,
+						"y": 0,
+						"width": 240,
+						"height": 140,
+						"widget": "countdown",
+						"cfg": {
+							"title": "Exams",
+							"date": ""
+						},
+						"style": {
+							"bg": "#e03e3e",
+							"tint": 20
+						},
+						"text": "⏳ Exams  (Marrow Home card)"
+					},
+					{
+						"id": "t28",
+						"type": "text",
+						"x": 700,
+						"y": 160,
+						"width": 240,
+						"height": 260,
+						"widget": "sticky",
+						"cfg": {},
+						"style": {
+							"bg": "#ffd84d",
+							"tint": 45,
+							"look": "grid"
+						},
+						"text": "Formulas to remember"
+					},
+					{
+						"id": "t29",
+						"type": "text",
+						"x": 0,
+						"y": 440,
+						"width": 680,
+						"height": 90,
+						"widget": "capture",
+						"cfg": {
+							"target": "daily",
+							"path": "",
+							"task": true
+						},
+						"text": "⚡ Quick note (Marrow Home card)"
+					}
+				],
+				"edges": [],
+				"home": {
+					"bg": "cork"
+				}
+			}
+		},
+		{
+			"name": "Clean",
+			"icon": "square",
+			"about": "Just a greeting and a quick-note box. Add the rest yourself.",
+			"board": {
+				"nodes": [
+					{
+						"id": "t30",
+						"type": "text",
+						"x": 0,
+						"y": 0,
+						"width": 520,
+						"height": 130,
+						"widget": "greeting",
+						"cfg": {
+							"name": "",
+							"date": true,
+							"stats": true
+						},
+						"style": {
+							"look": "none"
+						},
+						"text": "👋 Greeting (Marrow Home card)"
+					},
+					{
+						"id": "t31",
+						"type": "text",
+						"x": 0,
+						"y": 150,
+						"width": 520,
+						"height": 90,
+						"widget": "capture",
+						"cfg": {
+							"target": "daily",
+							"path": "",
+							"task": false
+						},
+						"text": "⚡ Quick note (Marrow Home card)"
+					}
+				],
+				"edges": [],
+				"home": {
+					"bg": "plain"
+				}
+			}
+		}
+	],
+	"extras": {
+		"welcome": {
+			"id": "welcome",
+			"type": "text",
+			"x": 0,
+			"y": 740,
+			"width": 520,
+			"height": 300,
+			"widget": "welcome",
+			"cfg": {},
+			"text": "👋 Getting started (Marrow Home card)"
+		},
+		"rediscover": {
+			"id": "rediscover",
+			"type": "text",
+			"x": 920,
+			"y": 560,
+			"width": 300,
+			"height": 240,
+			"widget": "rediscover",
+			"cfg": {},
+			"text": "🔁 Rediscover (Marrow Home card)"
+		}
+	}
+}

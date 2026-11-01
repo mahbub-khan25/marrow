@@ -34,6 +34,7 @@ mod drawing;
 mod files;
 mod graph;
 mod history;
+mod home;
 mod locks;
 mod notes;
 pub(crate) mod render;

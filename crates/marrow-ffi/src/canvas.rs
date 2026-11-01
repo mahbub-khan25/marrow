@@ -68,6 +68,9 @@ pub struct CanvasEdge {
 pub struct Board {
     pub nodes: Vec<CanvasNode>,
     pub edges: Vec<CanvasEdge>,
+    /// The file's other top-level fields as JSON (the Home board's own
+    /// settings, other apps' data), kept as they are.
+    pub extra: String,
 }
 
 const NODE_KEYS: &[&str] = &["id", "type", "x", "y", "width", "height", "text", "file", "url", "label", "color", "shape", "fill", "ink"];
@@ -108,10 +111,11 @@ fn num(x: f64) -> Value {
 
 pub fn parse_canvas(text: &str) -> Result<Board> {
     if text.trim().is_empty() {
-        return Ok(Board { nodes: vec![], edges: vec![] });
+        return Ok(Board { nodes: vec![], edges: vec![], extra: String::new() });
     }
     let v: Value = serde_json::from_str(text).map_err(|e| fail(format!("This canvas file can't be read: {e}")))?;
-    let mut c = Board { nodes: vec![], edges: vec![] };
+    let top = v.as_object().map(|o| extra(o, &["nodes", "edges"])).unwrap_or_default();
+    let mut c = Board { nodes: vec![], edges: vec![], extra: top };
     for o in v.get("nodes").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_object) {
         let ink = o.get("ink").and_then(Value::as_object).and_then(|i| {
             let pts: Vec<f64> = i.get("points")?.as_str()?.split_whitespace().filter_map(|p| p.split_once(',')).filter_map(|(x, y)| Some([x.parse().ok()?, y.parse().ok()?])).flatten().collect();
@@ -207,7 +211,11 @@ pub fn canvas_json(c: &Board) -> String {
             Value::Object(o)
         })
         .collect();
-    serde_json::to_string_pretty(&json!({ "nodes": nodes, "edges": edges })).unwrap_or_default()
+    let mut top = Map::new();
+    top.insert("nodes".into(), nodes.into());
+    top.insert("edges".into(), edges.into());
+    top.extend(rest(&c.extra));
+    serde_json::to_string_pretty(&Value::Object(top)).unwrap_or_default()
 }
 
 #[uniffi::export]
@@ -253,7 +261,7 @@ mod tests {
         let t = r#"{"nodes":[{"id":"a","type":"text","text":"Hi","x":0,"y":10,"width":200,"height":80,"color":"4","styleAttributes":{"x":1}},
             {"id":"b","type":"file","file":"Note.md","x":300,"y":0,"width":250,"height":120},
             {"id":"c","type":"text","text":"✏️","x":0,"y":0,"width":10,"height":10,"ink":{"w":10,"h":10,"size":3,"points":"1,2 3.5,4"}}],
-            "edges":[{"id":"e","fromNode":"a","toNode":"b","toSide":"left","toEnd":"arrow"}]}"#;
+            "edges":[{"id":"e","fromNode":"a","toNode":"b","toSide":"left","toEnd":"arrow"}], "home": {"bg": "cork"}}"#;
         let c = parse_canvas(t).unwrap();
         assert_eq!(c.nodes[0].color, "4");
         assert_eq!(c.nodes[1].file, "Note.md");
@@ -263,6 +271,7 @@ mod tests {
         assert_eq!(again, c);
         let out = canvas_json(&c);
         assert!(out.contains("styleAttributes") && out.contains("\"toEnd\": \"arrow\""));
+        assert!(out.contains("\"home\"") && out.contains("cork"), "the board's own settings are kept");
         assert_eq!(parse_canvas("").unwrap().nodes.len(), 0);
     }
 }
