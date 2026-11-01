@@ -25,6 +25,7 @@
     <div id="app" class="shell" hidden>
       <nav class="rail" aria-label="Views">
         <span class="logo-mark" title="Marrow"><img src="./src/assets/logo-mark.svg" alt="Marrow" /></span>
+        <button class="rail-btn" id="rail-home" title="Home" aria-pressed="false"><i class="ph-duotone ph-house"></i><span class="rl">Home</span></button>
         <button class="rail-btn" id="rail-files" title="Files" aria-pressed="true"><i class="ph-duotone ph-files"></i><span class="rl">Files</span></button>
         <button class="rail-btn" id="rail-search" title="Search" aria-pressed="false"><i class="ph-duotone ph-magnifying-glass"></i><span class="rl">Search</span></button>
         <button class="rail-btn" id="rail-tags" title="Tags" aria-pressed="false"><i class="ph-duotone ph-hash"></i><span class="rl">Tags</span></button>
@@ -101,30 +102,7 @@
         </div>
         <div id="banner" role="status" hidden></div>
         <div id="stage" class="stage">
-          <div id="start" class="start" hidden>
-            <div class="start-inner">
-              <p id="start-greeting" class="start-greeting"></p>
-              <h1 id="start-date" class="start-date"></h1>
-              <p id="start-kicker" class="start-kicker"></p>
-              <div class="start-actions">
-                <button id="start-new" class="btn btn-primary"><i class="ph-duotone ph-note-pencil"></i>New note<span class="hint" data-kbd="N"></span></button>
-                <button id="start-today" class="btn btn-secondary"><i class="ph-duotone ph-calendar-blank"></i>Today’s note<span class="hint" data-kbd="D"></span></button>
-                <button id="start-ask" class="btn btn-secondary"><i class="ph-duotone ph-sparkle"></i>Ask your notes<span class="hint" data-kbd="shift+J"></span></button>
-                <button id="start-search" class="btn btn-secondary"><i class="ph-duotone ph-magnifying-glass"></i>Search<span class="hint" data-kbd="K"></span></button>
-              </div>
-              <section id="start-guide" class="start-guide" hidden>
-                <h2 class="start-sec">Getting started</h2>
-                <ol class="steps">
-                  <li class="step"><span class="n">1</span><div><div class="h">Write</div><div class="d">Choose New note and start typing. Everything saves by itself.</div></div></li>
-                  <li class="step"><span class="n">2</span><div><div class="h">Link</div><div class="d">Type [[ and part of a note's name to connect two notes.</div></div></li>
-                  <li class="step"><span class="n">3</span><div><div class="h">Find</div><div class="d">Search finds any note in a moment. The graph shows how notes connect.</div></div></li>
-                </ol>
-              </section>
-              <div id="switch-from" class="resurface"></div>
-              <div id="resurface" class="resurface"></div>
-              <div id="recent" class="recent"></div>
-            </div>
-          </div>
+          <div id="start" class="start" hidden></div>
 
           <div id="panes" class="panes" hidden>
             <div id="pane-primary" class="pane"></div>

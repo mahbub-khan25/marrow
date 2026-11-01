@@ -23,7 +23,7 @@ import { h, icon, plainText, trunc } from "./util";
 
 type Side = "top" | "right" | "bottom" | "left";
 
-interface CNode {
+export interface CNode {
   id: string;
   type: "text" | "file" | "link" | "group" | string;
   x: number;
@@ -41,6 +41,12 @@ interface CNode {
   fill?: "none" | "solid";
   /** Marrow: a pen stroke or a free arrow. */
   ink?: Ink;
+  /** Marrow Home: a live card (tasks, sticky note…) drawn by the Home board. */
+  widget?: string;
+  /** Marrow Home: the card's settings. */
+  cfg?: Record<string, unknown>;
+  /** Marrow Home: how the card looks (see home.ts). */
+  style?: Record<string, unknown>;
   [k: string]: unknown;
 }
 
@@ -76,7 +82,7 @@ interface CEdge {
   [k: string]: unknown;
 }
 
-interface CData {
+export interface CData {
   nodes: CNode[];
   edges: CEdge[];
   [k: string]: unknown;
@@ -94,6 +100,20 @@ export interface CanvasOptions {
    * Ctrl+wheel), and the tools show while it's being used.
    */
   inline?: boolean;
+  /** The Home board: it draws its own live cards and looks. */
+  home?: HomeHooks;
+}
+
+/** What the Home board adds to a canvas. */
+export interface HomeHooks {
+  /** Fills a live card (`n.widget`). `changed` saves after the card changed `n`. */
+  render(n: CNode, el: HTMLElement, changed: () => void): void;
+  /** Gives any card its look (`n.style`). */
+  style(n: CNode, el: HTMLElement): void;
+  /** The cards picked changed. */
+  onSelect?(ids: string[]): void;
+  /** Anything on the board changed (moved, resized, added, undone…). */
+  onChange?(): void;
 }
 
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
@@ -192,9 +212,10 @@ export class CanvasView {
     this.nameEl = h("div.name");
     this.zoomLabel = h("span");
     host.classList.toggle("is-inline", !!opts.inline);
+    host.classList.toggle("is-home", !!opts.home);
     host.append(
       this.world,
-      opts.inline
+      opts.inline || opts.home
         ? ""
         : h(
             "div.canvas-over",
@@ -277,6 +298,7 @@ export class CanvasView {
   private changed() {
     this.record();
     this.scheduleSave();
+    this.opts.home?.onChange?.();
   }
 
   /** Counts edits, so a conflict can tell whether more were made meanwhile. */
@@ -337,6 +359,8 @@ export class CanvasView {
     this.selectedEdge = null;
     this.renderAll();
     this.scheduleSave();
+    this.opts.home?.onSelect?.([]);
+    this.opts.home?.onChange?.();
   }
 
   /**
@@ -456,7 +480,11 @@ export class CanvasView {
 
   private card(n: CNode): HTMLElement {
     let el: HTMLElement;
-    if (isInk(n)) {
+    if (n.widget && this.opts.home) {
+      el = h("div.card.card-widget");
+      el.dataset.widget = n.widget;
+      this.opts.home.render(n, el, () => this.changed());
+    } else if (isInk(n)) {
       el = this.inkCard(n);
     } else if (isShape(n)) {
       el = this.shapeCard(n);
@@ -515,7 +543,8 @@ export class CanvasView {
     const c = colorOf(n.color);
     if (c) el.style.setProperty("--c", c);
     el.classList.toggle("has-color", !!c);
-    if (n.type !== "group" && !isInk(n)) el.append(h("div.card-handle", { title: "Drag to another card to connect" }));
+    this.opts.home?.style(n, el);
+    if (n.type !== "group" && !isInk(n) && !this.opts.home) el.append(h("div.card-handle", { title: "Drag to another card to connect" }));
     el.append(h("div.card-resize"));
     el.classList.toggle("is-selected", this.selected.has(n.id));
     this.cards.set(n.id, el);
@@ -916,6 +945,92 @@ export class CanvasView {
     for (const [id, el] of this.cards) el.classList.toggle("is-selected", this.selected.has(id));
     this.renderEdges();
     this.syncToolbar();
+    this.opts.home?.onSelect?.([...this.selected]);
+  }
+
+  // ------------------------------------------------- for the Home board
+
+  /** Every card (live objects: change them, then call `patched`). */
+  get nodes(): CNode[] {
+    return this.data.nodes;
+  }
+
+  /** The board's own settings (`home` in the file). */
+  get board(): Record<string, unknown> {
+    return (this.data.home ??= {}) as Record<string, unknown>;
+  }
+
+  get selection(): string[] {
+    return [...this.selected];
+  }
+
+  /** Puts a card on the board, centred where the view is unless it has a place. */
+  addCard(n: CNode, pick = true) {
+    if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) {
+      const r = this.host.getBoundingClientRect();
+      const c = this.toWorld(r.left + r.width / 2, r.top + r.height / 2);
+      n.x = Math.round(c.x - n.width / 2);
+      n.y = Math.round(c.y - n.height / 2);
+    }
+    this.data.nodes.push(n);
+    this.world.append(this.card(n));
+    if (pick) this.select([n.id]);
+    this.changed();
+  }
+
+  /** A card's settings changed: draw it again and save. */
+  patched(id: string, save = true) {
+    const n = this.node(id);
+    const old = this.cards.get(id);
+    if (!n || !old) return;
+    const el = this.card(n);
+    old.replaceWith(el);
+    if (save) this.changed();
+  }
+
+  /** Draws every live card again (tasks or notes changed). */
+  refreshLive() {
+    for (const n of this.data.nodes) if (n.widget) this.patched(n.id, false);
+  }
+
+  /** Brings a card to the front (or sends it to the back). */
+  reorder(id: string, front: boolean) {
+    const i = this.data.nodes.findIndex((n) => n.id === id);
+    if (i < 0) return;
+    const [n] = this.data.nodes.splice(i, 1);
+    if (front) this.data.nodes.push(n);
+    else this.data.nodes.unshift(n);
+    this.renderAll();
+    this.changed();
+  }
+
+  removeCards(ids: string[]) {
+    this.select(ids);
+    this.deleteSelection();
+  }
+
+  /** The whole board replaced (a template): one undo step brings it back. */
+  replaceAll(data: CData) {
+    this.data = data;
+    this.selected.clear();
+    this.renderAll();
+    this.changed();
+    requestAnimationFrame(() => this.fit());
+  }
+
+  /** The board as it would be saved. */
+  snapshot(): CData {
+    return JSON.parse(this.serialize()) as CData;
+  }
+
+  /** Saves after the board's own settings changed. */
+  touch() {
+    this.changed();
+  }
+
+  /** The board's background was changed: the dots/grid follow the view. */
+  redrawView() {
+    this.applyView();
   }
 
   private selectEdge(id: string) {
@@ -1048,6 +1163,7 @@ export class CanvasView {
         this.cards.delete(id);
       }
       this.selected.clear();
+      this.opts.home?.onSelect?.([]);
     } else return;
     this.renderEdges();
     this.changed();
@@ -1078,6 +1194,13 @@ export class CanvasView {
           host.setPointerCapture(e.pointerId);
         }
         e.preventDefault();
+        return;
+      }
+      // Live parts of a Home card (a checkbox, a text box, a link) are used, not dragged.
+      const live = t.closest<HTMLElement>("[data-live]") ?? (t.closest(".card-widget") ? t.closest<HTMLElement>("button, input, textarea, select, a, label") : null);
+      if (live) {
+        const id = live.closest<HTMLElement>(".card")?.dataset.id;
+        if (id && !this.selected.has(id)) this.select([id]);
         return;
       }
       const cardEl = t.closest<HTMLElement>(".card");
@@ -1148,7 +1271,7 @@ export class CanvasView {
         this.renderEdges();
       } else if (d.kind === "resize") {
         const n = this.node(d.id)!;
-        const [minW, minH] = isInk(n) ? [8, 8] : isShape(n) ? [40, 30] : [140, 70];
+        const [minW, minH] = isInk(n) ? [8, 8] : isShape(n) ? [40, 30] : n.widget ? [90, 50] : [140, 70];
         n.width = Math.max(minW, Math.round(d.w + dx / this.k));
         n.height = Math.max(minH, Math.round(d.h + dy / this.k));
         this.place(this.cards.get(d.id)!, n);
@@ -1198,7 +1321,7 @@ export class CanvasView {
     host.addEventListener(
       "wheel",
       (e) => {
-        if ((e.target as HTMLElement).closest("textarea") && !e.ctrlKey) return;
+        if ((e.target as HTMLElement).closest("textarea, [data-scroll]") && !e.ctrlKey) return;
         // In a note, the wheel scrolls the page; Ctrl+wheel zooms the drawing.
         if (this.opts.inline && !(e.ctrlKey || e.metaKey)) return;
         e.preventDefault();
@@ -1216,7 +1339,7 @@ export class CanvasView {
     host.addEventListener("dblclick", (e) => {
       // Pointer capture retargets clicks to the host; look at what's really there.
       const t = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null) ?? (e.target as HTMLElement);
-      if (t.closest(".canvas-tools, .canvas-zoom, input, textarea, [contenteditable='true'], [contenteditable='plaintext-only']")) return;
+      if (t.closest(".canvas-tools, .canvas-zoom, input, textarea, [contenteditable='true'], [contenteditable='plaintext-only'], [data-live], .card-widget")) return;
       if (this.tool !== "select") return;
       const edgeId = (t.closest("[data-edge]") as HTMLElement | null)?.dataset.edge;
       if (edgeId) {

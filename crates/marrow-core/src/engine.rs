@@ -21,6 +21,7 @@ use crate::path::VaultPath;
 use crate::vault::{Entry, EntryKind, Vault, VaultEvent};
 
 mod graph;
+mod home;
 mod rename;
 mod mentions;
 pub mod recall;
@@ -28,6 +29,7 @@ mod search;
 mod tasks;
 
 pub use graph::{GraphData, GraphEdge, GraphNode, GraphNodeKind, GraphOptions};
+pub use home::{add_days, note_section, TaskFilter};
 pub use rename::RenameReport;
 pub use mentions::Mention;
 pub use tasks::{remind_of, set_remind, task_text_of, TaskItem, REMIND};

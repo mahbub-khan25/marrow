@@ -914,6 +914,18 @@ pub fn tasks(state: State<AppState>, include_done: bool) -> CmdResult<Vec<marrow
     with_engine(&state, |e| Ok(e.tasks(include_done)))
 }
 
+/// The tasks a Home task card shows (see `TaskFilter`), on day `today`.
+#[tauri::command(async)]
+pub fn task_view(state: State<AppState>, today: String, filter: marrow_core::engine::TaskFilter) -> CmdResult<Vec<marrow_core::engine::TaskItem>> {
+    with_engine(&state, |e| Ok(e.task_view(&today, &filter)))
+}
+
+/// The part of a note under one heading (for a Home note card).
+#[tauri::command]
+pub fn note_section(text: String, heading: String) -> Option<String> {
+    marrow_core::engine::note_section(&text, &heading)
+}
+
 // --------------------------------------------------------- version history
 
 /// Earlier versions of a note, newest first.

@@ -2650,3 +2650,217 @@ body.block-dragging, body.block-dragging * { cursor: grabbing !important; user-s
 .cv-fills { display: none; align-items: center; }
 .canvas-tools.is-shape .cv-fills { display: flex; }
 .cv-fill { width: 30px; height: 30px; font-size: 16px; }
+
+/* ------------------------------------------------------------------ home */
+
+/* The Home board fills the stage; the old start page's scroll isn't needed. */
+.start:has(> .home) { overflow: hidden; height: 100%; }
+.home { position: relative; height: 100%; }
+.home-board { position: absolute; inset: 0; --home-bg: var(--color-bg); background-color: var(--home-bg); }
+.home-board[data-bg="grid"] {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-text) 9%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-text) 9%, transparent) 1px, transparent 1px);
+}
+.home-board[data-bg="lines"] { background-image: linear-gradient(color-mix(in srgb, var(--color-text) 10%, transparent) 1px, transparent 1px); }
+.home-board[data-bg="paper"] { --home-bg: color-mix(in srgb, #f3e9d2 70%, var(--color-bg)); background-image: radial-gradient(color-mix(in srgb, #8a6d3b 10%, transparent) 1px, transparent 1.6px); }
+.home-board[data-bg="cork"] {
+  --home-bg: #c9a46b;
+  background-image: radial-gradient(#00000022 1px, transparent 1.6px), radial-gradient(#ffffff22 1px, transparent 1.4px);
+  background-size: 9px 9px, 13px 13px !important;
+}
+.home-board[data-bg="plain"] { background-image: none; }
+.home-board.has-image { background-image: var(--home-image) !important; background-size: cover !important; background-position: center !important; }
+.canvas-view.is-home .canvas-tools { left: 16px; bottom: 16px; }
+
+/* The buttons at the top: Add, Customize, Templates. */
+.home-bar { position: absolute; top: 14px; right: 16px; z-index: 6; display: flex; gap: 6px; }
+.home-btn {
+  display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px;
+  border: 0; border-radius: var(--radius-md); background: var(--color-bg); box-shadow: var(--shadow-sm);
+  color: var(--color-text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.home-btn:hover { color: var(--color-accent-700); }
+.home-btn i { font-size: 17px; }
+
+.home-pop {
+  position: absolute; top: 58px; right: 16px; z-index: 8; width: 300px; max-height: calc(100% - 80px); overflow: auto;
+  padding: 8px; border-radius: var(--radius-lg); background: var(--color-bg); box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.home-pop.home-add { display: grid; grid-template-columns: 1fr 1fr; }
+.home-pop.home-add .home-tip { grid-column: 1 / -1; }
+.home-pop button {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 0; border-radius: var(--radius-md);
+  background: none; color: var(--color-text); font: inherit; font-size: 14px; text-align: left; cursor: pointer;
+}
+.home-pop button:hover { background: var(--hover); }
+.home-pop button i { font-size: 18px; color: var(--color-accent); flex: none; }
+.home-pop button span { display: flex; flex-direction: column; }
+.home-pop button small { color: var(--ink-65); font-size: 12px; line-height: 1.35; }
+.home-pop hr { border: 0; border-top: 1px solid var(--color-divider); margin: 6px 4px; }
+.home-pop .smallcaps { padding: 6px 10px 2px; }
+.home-tip { margin: 6px 10px 2px; font-size: 12px; color: var(--ink-65); }
+
+/* Customize: on the right, for the card picked (or the board). */
+.home-panel {
+  position: absolute; top: 58px; right: 16px; bottom: 16px; z-index: 7; width: 300px; overflow: auto;
+  padding: 16px 16px 20px; border-radius: var(--radius-lg); background: var(--color-bg); box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.home-panel h3 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 16px; }
+.home-panel h3 i { color: var(--color-accent); }
+.home-panel h4 { margin: 6px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-65); }
+.home-panel-x { position: absolute; top: 10px; right: 10px; border: 0; background: none; color: var(--ink-65); font-size: 18px; cursor: pointer; }
+.home-panel-tip { margin: 0; font-size: 13px; color: var(--ink-65); line-height: 1.45; }
+.home-field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+.home-label { font-weight: 600; color: var(--ink-78); }
+.home-field .input, .home-combo .input { width: 100%; height: 34px; font-size: 14px; }
+.home-combo { display: block; }
+.home-checks { display: flex; flex-direction: column; gap: 6px; }
+.home-check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.home-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.home-actions .btn { height: 32px; padding: 0 10px; font-size: 13px; }
+.home-remove { color: var(--color-accent-2-700, #c33); }
+.home-seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.home-seg button {
+  padding: 5px 9px; border: 1px solid var(--color-divider); border-radius: 99px; background: none;
+  color: var(--color-text); font: inherit; font-size: 13px; cursor: pointer;
+}
+.home-seg button.is-on { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-bg); }
+.home-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.home-swatch { width: 24px; height: 24px; border-radius: 50%; border: 1px solid #0002; background: var(--sw); cursor: pointer; padding: 0; }
+.home-swatch.is-none { background: linear-gradient(135deg, var(--color-bg) 45%, #c33 45%, #c33 55%, var(--color-bg) 55%); }
+.home-swatch.is-on { outline: 2px solid var(--color-text); outline-offset: 2px; }
+.home-color { width: 30px; height: 26px; padding: 0; border: 0; background: none; cursor: pointer; }
+
+/* ------------------------------------------------- live cards and looks */
+
+.card-widget, .is-home .card {
+  --w-bg: transparent; --w-tint: 18%; --w-radius: 12px;
+  --w-paper: color-mix(in srgb, var(--w-bg) var(--w-tint), var(--color-bg));
+  --w-fg: var(--color-text);
+  color: var(--w-fg); border-radius: var(--w-radius);
+}
+.card-widget {
+  padding: 12px 14px; overflow: hidden; gap: 8px;
+  background: var(--color-bg); box-shadow: var(--shadow-md);
+}
+.card-widget.has-bg, .is-home .card.has-bg { background: var(--w-paper); }
+.card-widget .w-head { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 1em; flex: none; cursor: grab; }
+.card-widget .w-head > i { color: var(--color-accent); font-size: 1.1em; }
+.card-widget.has-bg .w-head > i { color: color-mix(in srgb, var(--w-bg) 70%, var(--color-text)); }
+.card-widget .w-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-widget .w-body { flex: 1; min-height: 0; overflow: auto; }
+.card-widget .w-empty { margin: 4px 0; color: color-mix(in srgb, var(--w-fg) 60%, transparent); font-size: 0.93em; }
+.card-widget .w-open, .card-widget .w-cal-nav { border: 0; background: none; color: inherit; opacity: 0.7; cursor: pointer; font-size: 1.05em; padding: 2px 4px; }
+.card-widget .w-open:hover, .card-widget .w-cal-nav:hover { opacity: 1; color: var(--color-accent); }
+.card-widget { font-size: 15px; }
+.card-widget.size-s, .is-home .card.size-s { font-size: 13px; }
+.card-widget.size-l, .is-home .card.size-l { font-size: 18px; }
+.card-widget.size-xl, .is-home .card.size-xl { font-size: 24px; }
+.font-read { font-family: var(--font-read); }
+.font-classic { font-family: "EB Garamond Variable", "EB Garamond", Garamond, Georgia, serif; }
+.font-mono { font-family: var(--font-mono); }
+.font-hand { font-family: "Segoe Print", "Bradley Hand", "Noteworthy", "Comic Sans MS", "Chalkboard SE", cursive; }
+
+/* Looks. */
+.look-paper { box-shadow: 0 1px 1px #0001, 0 8px 18px -6px #0003; border-radius: 3px; }
+.card-widget.look-paper:not(.has-bg), .is-home .card.look-paper:not(.has-bg) { background: color-mix(in srgb, #ffd84d 45%, var(--color-bg)); }
+.look-lined { background-image: repeating-linear-gradient(transparent 0 calc(1.55em - 1px), color-mix(in srgb, #4a90d9 35%, transparent) calc(1.55em - 1px) 1.55em) !important; background-position: 0 2.2em; }
+.look-grid {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--w-fg) 9%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--w-fg) 9%, transparent) 1px, transparent 1px) !important;
+  background-size: 16px 16px !important;
+}
+.look-tape { border-radius: 2px; box-shadow: 0 6px 14px -6px #0004; overflow: visible !important; }
+.look-tape::before {
+  content: ""; position: absolute; top: -10px; left: 50%; width: 90px; height: 22px; margin-left: -45px; transform: rotate(-3deg);
+  background: color-mix(in srgb, #f5f0e1 75%, transparent); box-shadow: 0 1px 2px #0002; pointer-events: none;
+}
+.look-pin { border-radius: 2px; box-shadow: 0 10px 16px -8px #0005; overflow: visible !important; }
+.look-pin::before {
+  content: ""; position: absolute; top: -7px; left: 50%; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ff8a8a, #c62828 60%, #7f1010); box-shadow: 0 2px 3px #0005; pointer-events: none;
+}
+.look-fold { border-radius: 2px; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%); }
+.look-outline { box-shadow: none !important; border: 2px solid color-mix(in srgb, var(--w-bg, var(--color-text)) 60%, var(--color-text)); background: transparent !important; }
+.look-glass { background: color-mix(in srgb, var(--color-bg) 55%, transparent) !important; backdrop-filter: blur(10px); border: 1px solid color-mix(in srgb, var(--color-bg) 70%, transparent); }
+.look-none { background: transparent !important; box-shadow: none !important; }
+.look-none.is-selected, .look-glass.is-selected { outline-style: dashed; }
+
+/* Sticky notes. */
+.card-widget[data-widget="sticky"] { padding: 14px 16px; }
+.w-sticky {
+  flex: 1; width: 100%; resize: none; border: 0; outline: 0; background: transparent; color: inherit;
+  font: inherit; line-height: 1.55; padding: 0; cursor: text;
+}
+/* Until it's picked, a sticky drags like any card; picked, it's for writing. */
+.card-widget[data-widget="sticky"]:not(.is-selected) .w-sticky { pointer-events: none; }
+.w-sticky::placeholder { color: color-mix(in srgb, var(--w-fg) 45%, transparent); }
+
+/* Tasks. */
+.w-tasks { display: flex; flex-direction: column; gap: 2px; }
+.w-group { margin: 8px 0 2px; font-size: 0.78em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: color-mix(in srgb, var(--w-fg) 60%, transparent); }
+.w-group:first-child { margin-top: 0; }
+.w-group.late { color: var(--color-accent-2-700, #c33); }
+.w-task { display: flex; align-items: flex-start; gap: 6px; padding: 3px 0; }
+.w-check { border: 0; background: none; padding: 1px 0 0; color: inherit; font-size: 1.15em; cursor: pointer; opacity: 0.75; }
+.w-check:hover { opacity: 1; color: var(--color-accent); }
+.w-task-main { min-width: 0; display: flex; flex-direction: column; }
+.w-task-text { border: 0; background: none; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; line-height: 1.35; }
+.w-task-text:hover { color: var(--color-accent-700); }
+.w-task.is-done .w-task-text { text-decoration: line-through; opacity: 0.55; }
+.w-task-meta { display: flex; gap: 8px; font-size: 0.78em; color: color-mix(in srgb, var(--w-fg) 55%, transparent); }
+.w-task-due.late { color: var(--color-accent-2-700, #c33); font-weight: 600; }
+.w-count-badge { font-size: 0.8em; font-weight: 700; padding: 1px 8px; border-radius: 99px; background: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent-700); }
+.w-count-badge:empty { display: none; }
+
+/* A note, today's note, lists. */
+.w-note { font-size: 0.93em; line-height: 1.55; }
+.w-note > :first-child { margin-top: 0; }
+.w-note h1 { font-size: 1.35em; } .w-note h2 { font-size: 1.2em; } .w-note h3 { font-size: 1.08em; }
+.w-notes { display: flex; flex-direction: column; gap: 1px; }
+.w-note-row { display: flex; align-items: center; gap: 8px; padding: 6px 6px; border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.w-note-row:hover { background: var(--hover); }
+.w-note-row i { color: var(--color-accent); flex: none; }
+.w-note-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Greeting, shortcuts, quick note. */
+.card-widget[data-widget="greeting"] { justify-content: center; gap: 2px; }
+.w-greet-hello { margin: 0; font-weight: 600; color: var(--color-accent-700); }
+.w-greet-date { margin: 0; font-family: var(--font-read); font-weight: 600; font-size: 2.6em; line-height: 1.05; letter-spacing: -0.02em; }
+.card-widget.font-hand .w-greet-date, .card-widget.font-mono .w-greet-date, .card-widget.font-classic .w-greet-date { font-family: inherit; }
+.w-greet-sub { margin: 4px 0 0; color: color-mix(in srgb, var(--w-fg) 62%, transparent); font-size: 0.93em; }
+.w-greet-sub:empty { display: none; }
+.card-widget[data-widget="shortcuts"] { padding: 6px; justify-content: center; }
+.w-shortcuts { display: flex; flex-wrap: wrap; gap: 8px; }
+.w-shortcuts .btn { min-height: 40px; padding: 0 14px; }
+.card-widget[data-widget="capture"] { justify-content: center; }
+.w-capture-row { display: flex; align-items: center; gap: 10px; }
+.w-capture-row > i { font-size: 1.3em; color: var(--color-accent); }
+.w-capture { flex: 1; min-width: 0; height: 2.6em; padding: 0 12px; border: 1px solid var(--color-divider); border-radius: 10px; background: var(--color-bg); color: var(--color-text); font: inherit; }
+.w-capture:focus { outline: 2px solid var(--color-accent); outline-offset: 0; }
+.w-capture-more { border: 0; background: none; color: inherit; font-size: 1.2em; cursor: pointer; opacity: 0.7; }
+
+/* Calendar. */
+.w-cal-head { display: flex; align-items: center; gap: 4px; font-weight: 700; }
+.w-cal-head .w-title { text-align: center; }
+.w-cal-grid { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; align-content: start; cursor: auto; }
+.w-cal-wd { text-align: center; font-size: 0.75em; font-weight: 700; color: color-mix(in srgb, var(--w-fg) 55%, transparent); padding: 2px 0; }
+.w-cal-day { position: relative; aspect-ratio: 1; border: 0; border-radius: 8px; background: none; color: inherit; font: inherit; font-size: 0.9em; cursor: pointer; }
+.w-cal-day:hover { background: var(--hover); }
+.w-cal-day.is-today { background: var(--color-accent); color: var(--color-bg); font-weight: 700; }
+.w-cal-day.has-note { font-weight: 700; }
+.w-cal-day.has-task::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--color-accent-2, #e8780c); }
+
+/* Countdown, clock. */
+.card-widget[data-widget="countdown"], .card-widget[data-widget="clock"] { align-items: center; justify-content: center; text-align: center; gap: 0; }
+.w-count-title { font-weight: 600; font-size: 0.93em; }
+.w-count { font-family: var(--font-read); font-weight: 700; font-size: 3em; line-height: 1; }
+.w-count-sub, .w-clock-day { font-size: 0.85em; color: color-mix(in srgb, var(--w-fg) 62%, transparent); }
+.w-clock { font-family: var(--font-read); font-weight: 600; font-size: 2.8em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.w-rediscover .rs-card { box-shadow: none; padding: 8px 0; background: none; }
+.w-steps { margin: 0 0 10px; }
+.w-sub { margin: 6px 0 8px; font-size: 0.93em; color: color-mix(in srgb, var(--w-fg) 70%, transparent); }

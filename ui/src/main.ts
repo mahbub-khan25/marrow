@@ -33,8 +33,8 @@ import { openHistory } from "./history";
 import { openTimeMachine } from "./timemachine";
 import { openHelp } from "./help";
 import { openSwitch, type SwitchFrom } from "./switch";
-import { setLanguage, uiLocale } from "./i18n";
-import { markSeen, openWeeklyReview, renderResurface, seenMoved, type ResurfaceApp } from "./resurface";
+import { setLanguage } from "./i18n";
+import { markSeen, openWeeklyReview, seenMoved, type ResurfaceApp } from "./resurface";
 import { openCapture } from "./capture";
 import { usePropertyTypes } from "./properties";
 import { maybeAskBackground, TasksView } from "./tasks";
@@ -97,7 +97,8 @@ import { CalendarView } from "./calendar";
 import { saveFiles } from "./attach";
 import { type DailyLayout, dailyIndex as indexDaily, dailyPathFor, misplaced as misplacedDaily } from "./daily";
 import { Tree } from "./tree";
-import { $, ago, h, icon, isMac, isoDay, kbd, longDate, storage, store, wordCount } from "./util";
+import { HOME_FILE, HomeView } from "./home";
+import { $, h, icon, isMac, isoDay, kbd, longDate, storage, store, wordCount } from "./util";
 
 // ------------------------------------------------------------------ state
 
@@ -222,8 +223,6 @@ async function refreshStats() {
   stats = await api.vaultStats().catch(() => stats);
   const line = `${stats.notes} ${stats.notes === 1 ? "note" : "notes"} · ${stats.links} ${stats.links === 1 ? "link" : "links"}`;
   $("vault-meta").textContent = line;
-  $("start-kicker").textContent = `${line} in ${vaultName}`;
-  $("start-guide").hidden = stats.notes >= 15;
   updateStatus();
 }
 
@@ -297,6 +296,7 @@ function showStage() {
   if (shownDay && side === "calendar" && sideOpen && shownDay !== lastCalendarDay) calendarView.reveal(shownDay);
   if (shownDay) lastCalendarDay = shownDay;
   $("rail-graph").setAttribute("aria-pressed", String(view === "graph"));
+  $("rail-home").setAttribute("aria-pressed", String(view === "start"));
   $("rail-canvas").setAttribute("aria-pressed", String(view === "canvas"));
   if (view === "start") void renderStart();
   const title = t?.kind === "note" ? t.doc.name : t?.kind === "canvas" ? displayName(t.path) : t?.kind === "graph" ? "Graph" : "";
@@ -316,57 +316,41 @@ const resurfaceApp: ResurfaceApp = {
   toast: (t, k) => toast(t, k),
 };
 
-function startHeading() {
-  const now = new Date();
-  const hr = now.getHours();
-  $("start-greeting").textContent = hr < 5 ? "Good evening" : hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening";
-  $("start-date").textContent = now.toLocaleDateString(uiLocale(), { weekday: "long", day: "numeric", month: "long" });
-}
+// ------------------------------------------------------------------- home
+
+const homeBoard = new HomeView({
+  vaultRoot: () => vaultRoot,
+  openPath: (p, inSplit) => void openPath(p, inSplit ? "split" : "replace"),
+  toast: (t, k) => toast(t, k),
+  files: () => tree.files(),
+  starred: () => vaultSettings.starred,
+  resurface: resurfaceApp,
+  openToday: () => void openToday(),
+  openDaily: (day) => void openDay(day),
+  appendToToday: (line, section) => appendToToday(line, section),
+  appendToNote: (path, line) => editNote(path, (text) => text.replace(/\s*$/, "") + "\n" + line + "\n"),
+  newNote: () => void newNote(),
+  search: () => openPalette(),
+  ask: () => askNotes(),
+  capture: () => quickCapture(),
+  moveFrom: (kind) => moveFrom(kind),
+  importNotes: () => importNotes(),
+  noteCount: () => stats.notes,
+});
 
 async function renderStart() {
-  startHeading();
-  // A new, nearly empty vault: offer to bring notes over.
-  const sw = $("switch-from");
-  const stats = await api.vaultStats().catch(() => null);
-  sw.replaceChildren(
-    ...(stats && stats.notes < 15
-      ? [
-          h(
-            "div.rs-card.rs-switch",
-            null,
-            h("div.rs-k", null, icon("signpost"), "Coming from another app?"),
-            h("p.rs-t", null, "Bring all your notes over, with their links, pictures and databases. Marrow shows you each step."),
-            h(
-              "div.rs-acts",
-              null,
-              h("button.btn.btn-secondary", { onclick: () => moveFrom("notion") }, icon("notion-logo"), "From Notion"),
-              h("button.btn.btn-secondary", { onclick: () => moveFrom("evernote") }, icon("notebook"), "From Evernote"),
-              h("button.btn.btn-ghost", { onclick: () => importNotes() }, "Other apps…"),
-            ),
-          ),
-        ]
-      : []),
-  );
-  const rs = $("resurface");
-  if (prefs.resurface) void renderResurface(rs, resurfaceApp).catch(() => rs.replaceChildren());
-  else rs.replaceChildren();
-  const files = await api.recentFiles(6).catch(() => []);
-  const box = $("recent");
-  if (files.length === 0) {
-    box.replaceChildren();
-    return;
-  }
-  box.replaceChildren(
-    h("div.smallcaps", null, "Recently edited"),
-    ...files.map((f) =>
-      h(
-        "button",
-        { onclick: (e: MouseEvent) => openPath(f.path, e.ctrlKey || e.metaKey ? "tab" : "replace"), title: f.path },
-        h("span.t", null, displayName(f.path)),
-        h("span.a", null, ago(f.modifiedMs)),
-      ),
-    ),
-  );
+  const box = $("start");
+  if (!box.contains(homeBoard.el)) box.replaceChildren(homeBoard.el);
+  await homeBoard.show();
+}
+
+/** Back to the Home board (the tabs stay open). */
+function goHome() {
+  if (active < 0) return;
+  stashActive();
+  active = -1;
+  renderTabs();
+  showStage();
 }
 
 // ------------------------------------------------------------------- tabs
@@ -480,6 +464,7 @@ async function settleEdits(action: string, only?: Doc[]): Promise<boolean> {
   const failed = (await saveAll()).filter((d) => !only || only.includes(d));
   const canvasOk = only ? true : await canvasView.flush();
   if (!only) await flushDrawings();
+  if (!only) await homeBoard.flush();
   if (!failed.length && canvasOk) return true;
   const notKept: string[] = (await keepDrafts(failed)).map((d) => `“${d.name}”`);
   if (!canvasOk && canvasView.changesAtRisk) notKept.push("the open canvas");
@@ -548,6 +533,7 @@ function remember(path: string) {
 // ------------------------------------------------------------------ opening
 
 async function openPath(path: string, how: OpenHow = "replace", at?: At): Promise<void> {
+  if (path === HOME_FILE) return goHome();
   if (isCanvasPath(path)) return openCanvas(path, how === "replace" ? "replace" : "tab");
   if (!isNotePath(path)) {
     toast("Only notes and canvases open in Marrow.");
@@ -1510,6 +1496,7 @@ async function onEngineEvents(events: EngineEvent[]) {
       const d = findDoc(v.path);
       if (d) await onDiskChanged(d);
       if (canvasView.path === v.path) void canvasView.onDiskChanged();
+      if (v.path === HOME_FILE) homeBoard.diskChanged();
     }
   }
   window.clearTimeout(refreshTimer);
@@ -1525,7 +1512,7 @@ async function onEngineEvents(events: EngineEvent[]) {
     if (side === "tags" && sideOpen) void tagsView.refresh();
     if (side === "tasks" && sideOpen) void tasksView.refresh();
     void refreshStats();
-    if (activeTab() === undefined) void renderStart();
+    if (activeTab() === undefined) homeBoard.refresh();
   }, 200);
 }
 
@@ -1541,6 +1528,7 @@ function commands(): Command[] {
   const fromPlugins = pluginCommands().map((c) => cmd(c.label, c.icon, c.run));
   return [
     cmd("New note", "note-pencil", () => void newNote(), kbd("N")),
+    cmd("Go to Home", "house", () => goHome()),
     cmd("Open today's daily note", "calendar-blank", () => void openToday(), kbd("D")),
     cmd("Show the calendar", "calendar-dots", () => setSide("calendar", true)),
     cmd("Weekly review", "sun-horizon", () => void openWeeklyReview(resurfaceApp)),
@@ -1962,6 +1950,7 @@ async function openVault(path: string) {
   tagsView.selected = null;
   graphPanel?.destroy();
   graphPanel = null;
+  homeBoard.reset();
   await api.lockNow().catch(() => {});
   void applySnippets(vaultSettings.snippets ?? []);
   void startPlugins(vaultSettings.plugins ?? []);
@@ -2046,6 +2035,7 @@ function bindKeys() {
 }
 
 function bindChrome() {
+  $("rail-home").addEventListener("click", () => goHome());
   $("rail-files").addEventListener("click", () => railSide("files"));
   $("rail-search").addEventListener("click", () => railSide("search"));
   $("rail-tags").addEventListener("click", () => railSide("tags"));
@@ -2053,7 +2043,6 @@ function bindChrome() {
   $("rail-calendar").addEventListener("click", () => railSide("calendar"));
   $("rail-ask").addEventListener("click", () => askNotes());
   $("capture-fab").addEventListener("click", () => quickCapture());
-  $("start-ask").addEventListener("click", () => askNotes());
   $("rail-today").addEventListener("click", () => void openToday());
   $("rail-graph").addEventListener("click", () => void openGraph());
   $("rail-canvas").addEventListener("click", () => void openSomeCanvas());
@@ -2076,9 +2065,6 @@ function bindChrome() {
   $("sidebar-btn").addEventListener("click", () => toggleSidebar());
   bindResizer("rs-side", "side");
   bindResizer("rs-insp", "insp");
-  $("start-new").addEventListener("click", () => void newNote());
-  $("start-today").addEventListener("click", () => void openToday());
-  $("start-search").addEventListener("click", () => openPalette());
 
   // Shortcut hints follow the platform.
   $("jump-kbd").textContent = isMac ? "⌘K" : "Ctrl K";

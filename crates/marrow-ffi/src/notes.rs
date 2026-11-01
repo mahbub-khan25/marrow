@@ -116,6 +116,30 @@ pub struct TaskItem {
     pub remind: Option<String>,
 }
 
+/// Which tasks a Home task card shows: `range` is "all", "today", "days"
+/// (today and the next `days - 1`) or "range" (`from`–`to`); the rest narrow
+/// it down or add overdue, undated or done tasks.
+#[derive(Debug, Clone, Default, uniffi::Record)]
+pub struct TaskFilter {
+    pub range: String,
+    pub days: u32,
+    pub from: String,
+    pub to: String,
+    pub overdue: bool,
+    pub undated: bool,
+    pub done: bool,
+    pub tag: String,
+    pub folder: String,
+    pub note: String,
+    pub text: String,
+}
+
+/// The part of a note under `heading`, or None.
+#[uniffi::export]
+pub fn note_section(text: String, heading: String) -> Option<String> {
+    marrow_core::engine::note_section(&text, &heading)
+}
+
 /// A task with a reminder that isn't done.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct Reminder {
@@ -466,6 +490,29 @@ impl Marrow {
     pub fn tasks(&self, include_done: bool) -> Result<Vec<TaskItem>> {
         self.with(|e| {
             Ok(e.tasks(include_done)
+                .into_iter()
+                .map(|t| TaskItem { title: t.name, path: t.path.to_string(), line: t.line, done: t.done, text: t.text, due: t.due, remind: t.remind })
+                .collect())
+        })
+    }
+
+    /// The tasks a Home task card shows, on day `today` (`YYYY-MM-DD`).
+    pub fn task_view(&self, today: String, filter: TaskFilter) -> Result<Vec<TaskItem>> {
+        let f = marrow_core::engine::TaskFilter {
+            range: filter.range,
+            days: filter.days,
+            from: filter.from,
+            to: filter.to,
+            overdue: filter.overdue,
+            undated: filter.undated,
+            done: filter.done,
+            tag: filter.tag,
+            folder: filter.folder,
+            note: filter.note,
+            text: filter.text,
+        };
+        self.with(|e| {
+            Ok(e.task_view(&today, &f)
                 .into_iter()
                 .map(|t| TaskItem { title: t.name, path: t.path.to_string(), line: t.line, done: t.done, text: t.text, due: t.due, remind: t.remind })
                 .collect())

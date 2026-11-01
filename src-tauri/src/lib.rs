@@ -141,6 +141,8 @@ pub fn run() {
             commands::unlinked_mentions,
             commands::history_list,
             commands::tasks,
+            commands::task_view,
+            commands::note_section,
             capture::set_capture_shortcut,
             recall::ai_index_info,
             recall::ai_set_embedding,

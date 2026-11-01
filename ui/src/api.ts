@@ -150,6 +150,22 @@ export interface TaskItem {
   remind?: string;
 }
 
+/** Which tasks a Home task card shows. */
+export interface TaskFilter {
+  /** "all" | "today" | "days" | "range" */
+  range: string;
+  days: number;
+  from: string;
+  to: string;
+  overdue: boolean;
+  undated: boolean;
+  done: boolean;
+  tag: string;
+  folder: string;
+  note: string;
+  text: string;
+}
+
 /** A Notion or Evernote export found in Downloads. */
 export interface FoundExport {
   path: string;
@@ -280,6 +296,10 @@ export const api = {
   backlinks: (path: string) => invoke<BacklinkGroup[]>("backlinks", { path }),
   noteLinks: (path: string) => invoke<NoteLinks>("note_links", { path }),
   tasks: (includeDone: boolean) => invoke<TaskItem[]>("tasks", { includeDone }),
+  /** The tasks a Home task card shows, on day `today` (YYYY-MM-DD). */
+  taskView: (today: string, filter: Partial<TaskFilter>) => invoke<TaskItem[]>("task_view", { today, filter }),
+  /** The part of a note under `heading`, or null. */
+  noteSection: (text: string, heading: string) => invoke<string | null>("note_section", { text, heading }),
   /** The system-wide quick-capture shortcut ("CommandOrControl+Alt+N"), or null for none. */
   setCaptureShortcut: (shortcut: string | null) => invoke<void>("set_capture_shortcut", { shortcut }),
   historyList: (path: string) => invoke<NoteVersion[]>("history_list", { path }),
