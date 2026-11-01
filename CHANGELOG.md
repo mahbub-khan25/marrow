@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.7.0
+
+More ways to draw, see-through shapes, and a window you can arrange your way, on computers and tablets.
 
 - **More to draw with:** 11 shapes (rectangle, rounded rectangle, circle,
   diamond, triangle, hexagon, parallelogram, star, cylinder, speech bubble
@@ -14,6 +16,11 @@
   `Ctrl+Shift+[` and `Ctrl+Shift+]` for the sidebar and inspector). Drag the
   edge of the sidebar or the inspector to make it wider or narrower;
   double-click the edge to put it back. Marrow remembers your choices.
+- **Tablets:** on an Android tablet or in Android desktop mode, drag the
+  line beside the sidebar to make it wider or narrower (double-tap to put it
+  back). On iPad, wide windows now have a sidebar instead of tabs; hide it
+  with its button or ⌘\, and drag its edge to resize. Both remember your
+  choice.
 
 ## 1.6.0
 
