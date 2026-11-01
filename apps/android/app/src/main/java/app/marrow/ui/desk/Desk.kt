@@ -57,6 +57,15 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -81,6 +90,45 @@ import kotlinx.coroutines.launch
 
 /** Windows at least this wide get the desktop layout: a sidebar beside the page. */
 val DESK_WIDTH = 840.dp
+
+/** How narrow and how wide the sidebar can be dragged, in dp. */
+const val SIDE_MIN = 200
+const val SIDE_MAX = 520
+
+/**
+ * The line between the sidebar and the page. Drag it (finger, stylus or
+ * mouse) to make the sidebar wider or narrower; double-tap to put it back.
+ */
+@Composable
+fun SidebarEdge(onDrag: (Int) -> Unit, onDone: () -> Unit, onReset: () -> Unit) {
+    val density = LocalDensity.current.density
+    var carry by remember { mutableStateOf(0f) }
+    val label = stringResource(R.string.sidebar_width)
+    val resize = PointerIcon(android.view.PointerIcon.getSystemIcon(LocalContext.current, android.view.PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW))
+    Box(
+        Modifier.fillMaxHeight().width(9.dp)
+            .pointerHoverIcon(resize)
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = { carry = 0f; onDone() },
+                    onDragCancel = { carry = 0f; onDone() },
+                ) { change, dx ->
+                    change.consume()
+                    carry += dx / density
+                    val whole = carry.toInt()
+                    if (whole != 0) {
+                        carry -= whole
+                        onDrag(whole)
+                    }
+                }
+            }
+            .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onReset() }) }
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        VerticalDivider()
+    }
+}
 
 /** The sidebar's places, besides the notes themselves. */
 enum class Place { Today, Tasks, Ask, Search, Calendar, Graph, Settings }

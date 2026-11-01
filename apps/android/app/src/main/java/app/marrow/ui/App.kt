@@ -32,8 +32,11 @@ import androidx.compose.ui.unit.dp
 import app.marrow.data.words
 import app.marrow.ui.common.NameDialog
 import app.marrow.ui.desk.DESK_WIDTH
+import app.marrow.ui.desk.SIDE_MAX
+import app.marrow.ui.desk.SIDE_MIN
 import app.marrow.ui.desk.Place
 import app.marrow.ui.desk.Sidebar
+import app.marrow.ui.desk.SidebarEdge
 import app.marrow.ui.desk.todayPath
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
@@ -231,7 +234,9 @@ private fun Main(engine: Engine, incoming: Incoming?, onHandled: () -> Unit) {
     val onTab = TABS.any { t -> dest?.hasRoute(t.route::class) == true }
     var capture by remember { mutableStateOf<Incoming.Shared?>(null) }
     var captureOpen by remember { mutableStateOf(false) }
-    var sidebar by rememberSaveable { mutableStateOf(true) }
+    var sidebar by rememberSaveable { mutableStateOf(engine.prefs.sidebarShown) }
+    var sideWidth by rememberSaveable { mutableStateOf(engine.prefs.sidebarWidth) }
+    LaunchedEffect(sidebar) { engine.prefs.sidebarShown = sidebar }
     var naming by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val snackbar = LocalSnackbar.current
@@ -272,6 +277,8 @@ private fun Main(engine: Engine, incoming: Incoming?, onHandled: () -> Unit) {
             },
         ) {
             val desk = maxWidth >= DESK_WIDTH
+            // The sidebar never takes more than 40% of the window.
+            val sideCap = maxOf(SIDE_MIN, minOf(SIDE_MAX, (maxWidth.value * 0.4f).toInt()))
             appNav.desk = desk
             val place = when {
                 dest?.hasRoute(TodayRoute::class) == true -> Place.Today
@@ -317,9 +324,14 @@ private fun Main(engine: Engine, incoming: Incoming?, onHandled: () -> Unit) {
                             onPlace = { goPlace(nav, it) },
                             onNewNote = { naming = true },
                             onHide = { sidebar = false },
-                            modifier = Modifier.width(280.dp),
+                            modifier = Modifier.width(sideWidth.coerceIn(SIDE_MIN, sideCap).dp),
                         )
-                        VerticalDivider()
+                        // Drag the edge to make the sidebar wider or narrower; double-tap puts it back.
+                        SidebarEdge(
+                            onDrag = { dx -> sideWidth = (sideWidth.coerceIn(SIDE_MIN, sideCap) + dx).coerceIn(SIDE_MIN, sideCap) },
+                            onDone = { engine.prefs.sidebarWidth = sideWidth },
+                            onReset = { sideWidth = 280; engine.prefs.sidebarWidth = 280 },
+                        )
                     } else if (desk) {
                         Column(
                             Modifier.fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerLow).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start + WindowInsetsSides.Vertical)).padding(4.dp),

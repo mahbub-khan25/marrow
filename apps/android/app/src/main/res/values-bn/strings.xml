@@ -79,6 +79,7 @@
     <string name="reminder_removed">রিমাইন্ডার মুছে ফেলা হয়েছে</string>
     <string name="hide_sidebar">সাইডবার লুকান</string>
     <string name="show_sidebar">সাইডবার দেখান</string>
+    <string name="sidebar_width">সাইডবারের চওড়া</string>
     <string name="edit">সম্পাদনা</string>
     <string name="delete">মুছুন</string>
     <string name="rename">নাম বদলান</string>

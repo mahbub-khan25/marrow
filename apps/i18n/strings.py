@@ -99,6 +99,7 @@ STRINGS = [
     ("reminder_removed", "Reminder removed", "রিমাইন্ডার মুছে ফেলা হয়েছে"),
     ("hide_sidebar", "Hide the sidebar", "সাইডবার লুকান"),
     ("show_sidebar", "Show the sidebar", "সাইডবার দেখান"),
+    ("sidebar_width", "Sidebar width", "সাইডবারের চওড়া"),
     ("edit", "Edit", "সম্পাদনা"),
     ("delete", "Delete", "মুছুন"),
     ("rename", "Rename", "নাম বদলান"),

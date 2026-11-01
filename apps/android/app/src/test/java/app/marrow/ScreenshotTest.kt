@@ -140,6 +140,19 @@ class ScreenshotTest {
         compose.onRoot().captureRoboImage(File(out, "21-desktop-note.png").path)
     }
 
+    /** Dragging the line beside the sidebar makes it wider, and the width is kept. */
+    @Config(qualifiers = "w1280dp-h800dp-mdpi")
+    @Test fun deskSidebarWidth() {
+        engine.prefs.sidebarWidth = 280
+        shot("27-desktop-wide-sidebar") { App(engine, null) {} }
+        val edge = compose.onNode(androidx.compose.ui.test.hasContentDescription("Sidebar width"))
+        edge.performTouchInput { swipe(center, center + Offset(120f, 0f), 300) }
+        repeat(6) { Thread.sleep(40); compose.mainClock.advanceTimeBy(120) }
+        compose.waitForIdle()
+        compose.onRoot().captureRoboImage(File(out, "27-desktop-wide-sidebar.png").path)
+        org.junit.Assert.assertTrue("width ${engine.prefs.sidebarWidth}", engine.prefs.sidebarWidth in 380..420)
+    }
+
     @Test fun remindSheet() = shot("22-remind") {
         app.marrow.ui.reminders.RemindSheet("2026-11-03 09:00", onDismiss = {}) {}
     }

@@ -5107,6 +5107,23 @@
         }
       }
     },
+    "Sidebar width": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sidebar width"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সাইডবারের চওড়া"
+          }
+        }
+      }
+    },
     "Sign in to %@": {
       "extractionState": "manual",
       "localizations": {

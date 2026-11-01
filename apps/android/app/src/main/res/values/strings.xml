@@ -79,6 +79,7 @@
     <string name="reminder_removed">Reminder removed</string>
     <string name="hide_sidebar">Hide the sidebar</string>
     <string name="show_sidebar">Show the sidebar</string>
+    <string name="sidebar_width">Sidebar width</string>
     <string name="edit">Edit</string>
     <string name="delete">Delete</string>
     <string name="rename">Rename</string>

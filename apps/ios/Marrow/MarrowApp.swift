@@ -169,10 +169,54 @@ struct Root: View {
 struct MainTabs: View {
     @Environment(Store.self) private var store
     @Environment(Router.self) private var router
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @AppStorage("sidebarShown") private var sidebarShown = true
+    @AppStorage("sidebarWidth") private var sidebarWidth = 280.0
+
+    /// iPad windows that are wide enough get a sidebar instead of tabs; it
+    /// can be hidden (⌘\\) and dragged wider or narrower.
+    private var wide: Bool { sizeClass == .regular && UIDevice.current.userInterfaceIdiom == .pad }
 
     var body: some View {
         @Bindable var router = router
-        TabView(selection: $router.tab) {
+        Group {
+            if wide { sideLayout } else { tabs }
+        }
+        .sheet(isPresented: $router.capture) { CaptureSheet(initial: router.captureText) }
+    }
+
+    private var sideLayout: some View {
+        GeometryReader { geo in
+            // The sidebar never takes more than 40% of the window.
+            let cap = max(PadSidebar.minWidth, min(PadSidebar.maxWidth, Double(geo.size.width) * 0.4))
+            HStack(spacing: 0) {
+                if sidebarShown {
+                    PadSidebar(hide: { withAnimation(.snappy) { sidebarShown = false } })
+                        .frame(width: min(max(sidebarWidth, PadSidebar.minWidth), cap))
+                    SidebarEdge(width: $sidebarWidth, cap: cap)
+                } else {
+                    PadRail(show: { withAnimation(.snappy) { sidebarShown = true } })
+                    Rectangle().fill(Color.line).frame(width: 1)
+                }
+                current.frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var current: some View {
+        switch router.tab {
+        case .today: stack(.today) { TodayView() }
+        case .notes: stack(.notes) { BrowserView(folder: "") }
+        case .ask: stack(.ask) { AskView() }
+        case .tasks: stack(.tasks) { TasksView() }
+        case .search: stack(.search) { SearchView() }
+        }
+    }
+
+    private var tabs: some View {
+        @Bindable var router = router
+        return TabView(selection: $router.tab) {
             stack(.today) { TodayView() }
                 .tabItem { Label("Today", systemImage: "sun.max") }.tag(AppTab.today)
             stack(.notes) { BrowserView(folder: "") }
@@ -184,7 +228,6 @@ struct MainTabs: View {
             stack(.search) { SearchView() }
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }.tag(AppTab.search)
         }
-        .sheet(isPresented: $router.capture) { CaptureSheet(initial: router.captureText) }
     }
 
     private func stack<V: View>(_ tab: AppTab, @ViewBuilder _ root: () -> V) -> some View {
@@ -214,6 +257,116 @@ struct MainTabs: View {
         case .importNotes: ImportView()
         case .conflicts: ConflictsView()
         }
+    }
+}
+
+// MARK: - iPad sidebar
+
+/// The iPad's sidebar: the main places and settings.
+struct PadSidebar: View {
+    static let minWidth = 220.0
+    static let maxWidth = 480.0
+    var hide: () -> Void
+    @Environment(Store.self) private var store
+    @Environment(Router.self) private var router
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(verbatim: store.vault?.name ?? "Marrow").font(.headline).lineLimit(1)
+                Spacer()
+                Button(action: hide) { Image(systemName: "sidebar.left").font(.body) }
+                    .keyboardShortcut("\\", modifiers: .command)
+                    .accessibilityLabel(Text("Hide the sidebar"))
+            }
+            .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 10)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    place(.today, "Today", "sun.max")
+                    place(.notes, "Notes", "folder")
+                    place(.tasks, "Tasks", "checklist")
+                    place(.ask, "Ask", "sparkles")
+                    place(.search, "Search", "magnifyingglass")
+                    Divider().padding(.vertical, 8).padding(.horizontal, 6)
+                    row("Calendar", "calendar", on: false) { router.push(.calendar) }
+                    row("Graph", "point.3.connected.trianglepath.dotted", on: false) { router.push(.graph()) }
+                }
+                .padding(.horizontal, 8)
+            }
+            Divider()
+            row("Settings", "gearshape", on: false) { router.push(.settings) }
+                .padding(8)
+        }
+        .background(Color.card)
+    }
+
+    /// A main place: opens it, or goes back to its start if it's already open.
+    private func place(_ tab: AppTab, _ title: LocalizedStringKey, _ symbol: String) -> some View {
+        row(title, symbol, on: router.tab == tab) {
+            if router.tab == tab { router.paths[tab] = [] } else { router.tab = tab }
+        }
+    }
+
+    private func row(_ title: LocalizedStringKey, _ symbol: String, on: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: symbol)
+                .font(.body.weight(on ? .semibold : .regular))
+                .foregroundStyle(on ? Color.accent : Color.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10).frame(height: 40)
+                .background(on ? Color.accentSoft : Color.clear, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// What's left when the iPad sidebar is hidden: a button to bring it back, and search.
+struct PadRail: View {
+    var show: () -> Void
+    @Environment(Router.self) private var router
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Button(action: show) { Image(systemName: "sidebar.left").frame(width: 40, height: 40) }
+                .keyboardShortcut("\\", modifiers: .command)
+                .accessibilityLabel(Text("Show the sidebar"))
+            Button { router.tab = .search } label: { Image(systemName: "magnifyingglass").frame(width: 40, height: 40) }
+                .accessibilityLabel(Text("Search"))
+            Spacer()
+        }
+        .padding(.top, 10).padding(.horizontal, 4)
+        .frame(maxHeight: .infinity)
+        .background(Color.card)
+    }
+}
+
+/// The line beside the iPad sidebar: drag it (finger, Pencil or pointer) to
+/// make the sidebar wider or narrower; double-tap puts it back.
+struct SidebarEdge: View {
+    @Binding var width: Double
+    let cap: Double
+    @State private var start: Double?
+
+    var body: some View {
+        Rectangle().fill(Color.line).frame(width: 1)
+            .frame(width: 13)
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 2, coordinateSpace: .global)
+                    .onChanged { v in
+                        let s = start ?? min(max(width, PadSidebar.minWidth), cap)
+                        start = s
+                        width = min(max(s + Double(v.translation.width), PadSidebar.minWidth), cap)
+                    }
+                    .onEnded { _ in start = nil }
+            )
+            .onTapGesture(count: 2) { width = 280 }
+            .hoverEffect(.highlight)
+            .accessibilityLabel(Text("Sidebar width"))
+            .padding(.horizontal, -6)
+            .zIndex(1)
     }
 }
 

@@ -58,6 +58,14 @@ class Prefs(context: Context) {
         get() = p.getString("recentQuestions", "")!!.split('\n').filter { it.isNotBlank() }
         set(v) = p.edit().putString("recentQuestions", v.take(6).joinToString("\n")).apply()
 
+    /** The desktop layout's sidebar: shown or hidden, and its width in dp (drag its edge). */
+    var sidebarShown: Boolean
+        get() = p.getBoolean("sidebarShown", true)
+        set(v) = p.edit().putBoolean("sidebarShown", v).apply()
+    var sidebarWidth: Int
+        get() = p.getInt("sidebarWidth", 280)
+        set(v) = p.edit().putInt("sidebarWidth", v).apply()
+
     /** What to show once the vault opens ("sync" after "Sync from a server"). */
     var afterOpen: String?
         get() = p.getString("afterOpen", null)
