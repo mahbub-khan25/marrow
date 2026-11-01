@@ -2616,8 +2616,15 @@ body.block-dragging, body.block-dragging * { cursor: grabbing !important; user-s
   border: 0; border-radius: var(--radius-md); background: var(--color-bg); box-shadow: var(--shadow-sm);
   color: var(--color-text); font-size: 16px; cursor: pointer; opacity: 0; transition: opacity 0.15s;
 }
-.drawing:hover .drawing-open, .drawing:focus-within .drawing-open { opacity: 1; }
+.drawing-delete {
+  position: absolute; right: 8px; top: 46px; z-index: 3; width: 32px; height: 32px; display: grid; place-items: center;
+  border: 0; border-radius: var(--radius-md); background: var(--color-bg); box-shadow: var(--shadow-sm);
+  color: var(--color-text); font-size: 16px; cursor: pointer; opacity: 0; transition: opacity 0.15s;
+}
+.drawing:hover .drawing-open, .drawing:focus-within .drawing-open,
+.drawing:hover .drawing-delete, .drawing:focus-within .drawing-delete { opacity: 1; }
 .drawing-open:hover { color: var(--color-accent); }
+.drawing-delete:hover { color: #c33; }
 .drawing-grip { position: absolute; left: 0; right: 0; bottom: 0; height: 10px; z-index: 3; cursor: ns-resize; }
 .drawing-grip::after {
   content: ""; position: absolute; left: 50%; bottom: 3px; width: 44px; height: 4px; margin-left: -22px;

@@ -90,6 +90,8 @@ class BlockActions(
     val onOpen: (String) -> Unit = {},
     /** Full path of a vault file, to show an image. */
     val fileOf: (String) -> String? = { null },
+    /** Takes a drawing (by its vault path) out of the note and trashes its file; null where that isn't possible. */
+    val onRemoveDrawing: ((String) -> Unit)? = null,
 )
 
 /** A note, drawn from the blocks the engine made of its Markdown. */
@@ -197,7 +199,11 @@ private fun BlockView(b: Block, actions: BlockActions) {
                 Text(b.text.ifEmpty { b.target }, style = MaterialTheme.typography.titleSmall)
             }
         }
-        BlockKind.DRAWING -> app.marrow.ui.drawing.InlineDrawing(b.target, b.number.toInt(), onOpenFull = { actions.onOpen(b.target) }, modifier = Modifier.padding(vertical = 6.dp))
+        BlockKind.DRAWING -> app.marrow.ui.drawing.InlineDrawing(
+            b.target, b.number.toInt(), onOpenFull = { actions.onOpen(b.target) },
+            modifier = Modifier.padding(vertical = 6.dp),
+            onDelete = actions.onRemoveDrawing?.let { remove -> { remove(b.target) } },
+        )
         BlockKind.PROPERTIES -> Properties(b)
         BlockKind.CALLOUT_TITLE -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val c = calloutColor(b.callout, isDark())

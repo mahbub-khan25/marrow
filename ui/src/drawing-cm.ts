@@ -7,7 +7,7 @@ import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemir
 
 import { drawingInLine, lineWithHeight, type DrawingRef, type MountedDrawing } from "./drawing";
 
-export type DrawingMount = (box: HTMLElement, ref: DrawingRef, setHeight: (h: number) => void) => MountedDrawing;
+export type DrawingMount = (box: HTMLElement, ref: DrawingRef, setHeight: (h: number) => void, remove: () => void) => MountedDrawing;
 
 class DrawingWidget extends WidgetType {
   constructor(
@@ -29,6 +29,16 @@ class DrawingWidget extends WidgetType {
       const line = view.state.doc.lineAt(pos);
       const next = lineWithHeight(line.text, height);
       if (next !== line.text) view.dispatch({ changes: { from: line.from, to: line.to, insert: next } });
+    }, () => {
+      // Take the whole line out, with its line break.
+      const doc = view.state.doc;
+      const line = doc.lineAt(view.posAtDOM(box));
+      let to = Math.min(doc.length, line.to + 1);
+      const from = to === line.to && line.from > 0 ? line.from - 1 : line.from;
+      // Between two blank lines, one of them goes too.
+      const blank = (n: number) => n >= 1 && n <= doc.lines && doc.line(n).text.trim() === "";
+      if (blank(line.number - 1) && blank(line.number + 1)) to = Math.min(doc.length, doc.line(line.number + 1).to + 1);
+      view.dispatch({ changes: { from, to, insert: "" } });
     });
     (box as HTMLElement & { _drawing?: MountedDrawing })._drawing = d;
     return box;

@@ -25,7 +25,7 @@ import { prefs } from "./prefs";
 import { BlockHandles } from "./blocks";
 import { highlightCodeBlocks, renderMermaid } from "./codeblocks";
 import { openDiagramEditor } from "./diagram-editor";
-import { clampHeight, createDrawing, DRAWING_HEIGHT, lineWithHeight, mountDrawing, type DrawingHost, type DrawingRef, type MountedDrawing } from "./drawing";
+import { clampHeight, createDrawing, DRAWING_HEIGHT, drawingInLine, lineWithHeight, mountDrawing, type DrawingHost, type DrawingRef, type MountedDrawing } from "./drawing";
 import { FormatBar } from "./format";
 import { Database, editNote, setConfigKey } from "./database";
 import { linkTarget, renderMarkdown, type ButtonSpec } from "./preview";
@@ -142,7 +142,7 @@ export class NotePane {
         editDiagram: (line) => this.editDiagramAt(line),
         newDrawing: () => createDrawing(),
       },
-      drawing: (box, ref, setHeight) => mountDrawing(box, ref, this.drawingHost(this.doc?.path ?? ""), setHeight),
+      drawing: (box, ref, setHeight, remove) => mountDrawing(box, ref, this.drawingHost(this.doc?.path ?? ""), setHeight, remove),
       onFolds: () => this.saveFolds(),
       onSelection: (state) => this.formatBar?.sync(state),
     };
@@ -1176,7 +1176,8 @@ export class NotePane {
     for (const box of container.querySelectorAll<HTMLElement>("[data-embed-canvas]")) {
       const ref: DrawingRef = { target: box.dataset.embedCanvas!, height: box.dataset.h ? clampHeight(Number(box.dataset.h)) : DRAWING_HEIGHT };
       const line = Number(box.closest<HTMLElement>("[data-line]")?.dataset.line ?? NaN);
-      const d = mountDrawing(box, ref, this.drawingHost(source), container === this.preview && Number.isFinite(line) ? (hgt) => this.setDrawingHeight(line, ref.target, hgt) : undefined);
+      const own = container === this.preview && Number.isFinite(line);
+      const d = mountDrawing(box, ref, this.drawingHost(source), own ? (hgt) => this.setDrawingHeight(line, ref.target, hgt) : undefined, own ? () => this.removeDrawing(line, ref.target) : undefined);
       if (container === this.preview) this.drawings.push(d);
     }
     for (const media of container.querySelectorAll<HTMLMediaElement>("[data-embed-media]")) {
@@ -1429,6 +1430,20 @@ export class NotePane {
     const i = order.find((n) => lines[n] !== undefined && lines[n].includes(`![[${target}`) && lineWithHeight(lines[n], height) !== lines[n]);
     if (i === undefined) return;
     lines[i] = lineWithHeight(lines[i], height);
+    replaceText(doc, lines.join("\n"));
+  }
+
+  /** Takes a drawing's embed line out of the note (the one at `line`, or wherever it is now). */
+  private removeDrawing(line: number, target: string) {
+    const doc = this.doc;
+    if (!doc) return;
+    const lines = doc.text.split("\n");
+    const isIt = (n: number) => lines[n] !== undefined && drawingInLine(lines[n])?.target === target;
+    const i = isIt(line) ? line : lines.findIndex((_l, n) => isIt(n));
+    if (i < 0) return;
+    // Between two blank lines, one of them goes too.
+    const both = i > 0 && lines[i - 1]?.trim() === "" && lines[i + 1]?.trim() === "";
+    lines.splice(i, both ? 2 : 1);
     replaceText(doc, lines.join("\n"));
   }
 

@@ -369,6 +369,23 @@ fun NoteScreen(path: String, line: Int, startEditing: Boolean) {
                             }
                         }
                     },
+                    onRemoveDrawing = { drawing ->
+                        scope.launch {
+                            try {
+                                save()
+                                val next = app.marrow.core.drawingRemoved(saved, drawing)
+                                if (next != saved) {
+                                    engine.run { writeNote(current, next, saved) }
+                                    saved = next
+                                    value = value.copy(text = next, selection = TextRange(value.selection.start.coerceAtMost(next.length)))
+                                    render(next)
+                                }
+                                engine.run { trash(drawing) }
+                            } catch (e: Exception) {
+                                engine.say(e.words())
+                            }
+                        }
+                    },
                     onToggle = { at ->
                         scope.launch {
                             try {

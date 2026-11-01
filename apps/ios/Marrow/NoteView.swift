@@ -224,7 +224,23 @@ struct NoteView: View {
             onOpen: { target in
                 if target.hasPrefix("http"), let u = URL(string: target) { UIApplication.shared.open(u) } else { router.open(path: target) }
             },
-            fileOf: { p in try? store.marrow.filePath(path: p) }
+            fileOf: { p in try? store.marrow.filePath(path: p) },
+            onRemoveDrawing: { drawing in
+                Task {
+                    await save()
+                    let base = saved, p = current
+                    let next = drawingRemoved(text: base, target: drawing)
+                    do {
+                        if next != base {
+                            try await store.run { try $0.writeNote(path: p, text: next, expected: base) }
+                            saved = next
+                            text = next
+                            await render(next)
+                        }
+                        try await store.run { try $0.trash(path: drawing) }
+                    } catch { store.say(error) }
+                }
+            }
         )
     }
 

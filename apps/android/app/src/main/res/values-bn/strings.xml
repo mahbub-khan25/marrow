@@ -30,6 +30,9 @@
     <string name="words">লেখা</string>
     <string name="eraser">মুছুন</string>
     <string name="select_move">বাছাই ও সরানো</string>
+    <string name="delete_drawing">আঁকা মুছুন</string>
+    <string name="delete_drawing_q">এই আঁকাটি মুছবেন?</string>
+    <string name="delete_drawing_text">এটি নোট থেকে সরানো হবে, আর এর ফাইলটি ম্যারোর ট্র্যাশে যাবে; সেখান থেকে ফিরিয়ে আনা যায়।</string>
     <string name="edit_words">লেখা বদলান</string>
     <string name="shapes">আকার</string>
     <string name="line">রেখা</string>

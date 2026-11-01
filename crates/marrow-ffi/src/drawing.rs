@@ -242,6 +242,31 @@ pub fn drawing_line_with_height(line: String, height: u32) -> String {
     format!("{indent}![[{}|{}]]", d.target, height.clamp(MIN_HEIGHT, MAX_HEIGHT))
 }
 
+/// The note's text without the embed line(s) of the drawing `target` (its
+/// link or its vault path); when
+/// that line sat between two blank lines, one of them goes too.
+#[uniffi::export]
+pub fn drawing_removed(text: String, target: String) -> String {
+    let lines: Vec<&str> = text.split('\n').collect();
+    // `target` may be the link as written or the file's vault path.
+    let name = |t: &str| t.rsplit('/').next().unwrap_or(t).to_string();
+    let want = name(&target);
+    let is_it = |l: &str| drawing_in_line(l.to_string()).is_some_and(|d| name(&d.target) == want);
+    let mut out: Vec<&str> = Vec::with_capacity(lines.len());
+    let mut i = 0;
+    while i < lines.len() {
+        if is_it(lines[i]) {
+            let before_blank = out.last().is_some_and(|l| l.trim().is_empty());
+            let after_blank = lines.get(i + 1).is_some_and(|l| l.trim().is_empty());
+            i += if before_blank && after_blank { 2 } else { 1 };
+            continue;
+        }
+        out.push(lines[i]);
+        i += 1;
+    }
+    out.join("\n")
+}
+
 #[uniffi::export]
 impl Marrow {
     /// Makes a new, empty drawing in the attachments folder and returns its
@@ -254,6 +279,14 @@ impl Marrow {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn removing_a_drawing() {
+        let t = "# Plan\n\nIntro.\n\n![[Drawing 1.canvas|360]]\n\nMore.\n![[Other.canvas]]\n";
+        assert_eq!(drawing_removed(t.into(), "Drawing 1.canvas".into()), "# Plan\n\nIntro.\n\nMore.\n![[Other.canvas]]\n");
+        assert_eq!(drawing_removed("a\n![[Drawing 1.canvas]]\nb".into(), "Attachments/Drawing 1.canvas".into()), "a\nb");
+        assert_eq!(drawing_removed("a\nsee ![[Drawing 1.canvas]] here".into(), "Drawing 1.canvas".into()), "a\nsee ![[Drawing 1.canvas]] here");
+    }
 
     #[test]
     fn embed_lines() {

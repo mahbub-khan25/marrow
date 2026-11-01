@@ -11,6 +11,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -216,9 +217,9 @@ private fun fit(b: Board?, size: IntSize, density: Float): View {
  * note doesn't scroll under the pen while it's on). "Done" finishes.
  */
 @Composable
-fun InlineDrawing(path: String, height: Int, onOpenFull: () -> Unit, modifier: Modifier = Modifier) {
+fun InlineDrawing(path: String, height: Int, onOpenFull: () -> Unit, modifier: Modifier = Modifier, onDelete: (() -> Unit)? = null) {
     var active by remember(path) { mutableStateOf(false) }
-    DrawingPad(path, active, { active = it }, onOpenFull, modifier.fillMaxWidth().height(height.dp))
+    DrawingPad(path, active, { active = it }, onOpenFull, modifier.fillMaxWidth(), onDelete, boardHeight = height)
 }
 
 /** A drawing that is being drawn on, filling `modifier` (used full size after inserting one). */
@@ -228,7 +229,7 @@ fun DrawingEditor(path: String, onDone: () -> Unit, modifier: Modifier = Modifie
 }
 
 @Composable
-private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Unit, onOpenFull: (() -> Unit)?, modifier: Modifier) {
+private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Unit, onOpenFull: (() -> Unit)?, modifier: Modifier, onDelete: (() -> Unit)? = null, boardHeight: Int? = null) {
     val engine = LocalEngine.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current.density
@@ -249,6 +250,7 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
     // The card picked with the select tool (moved by dragging it, resized by its corner).
     var selected by remember(path) { mutableStateOf<String?>(null) }
     var saveJob by remember { mutableStateOf<Job?>(null) }
+    var askDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(path) {
         val b = runCatching { engine.run { readCanvas(path) } }.getOrNull()
@@ -347,6 +349,7 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
                         asking = { t -> update(n.id) { it.copy(text = t.trim()) } }
                     }
                 },
+                onDeleteDrawing = onDelete?.let { { askDelete = true } },
                 canUndo = past.isNotEmpty(), onUndo = {
                 val prev = past.removeAt(past.lastIndex)
                 board = prev
@@ -355,7 +358,8 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
             }, onDone = { setActive(false) })
         }
         Box(
-            Modifier.fillMaxWidth().weight(1f)
+            // In a note the drawing keeps its height (the tools sit above it); full screen it fills the rest.
+            Modifier.fillMaxWidth().then(if (boardHeight != null) Modifier.height(boardHeight.dp) else Modifier.weight(1f))
                 .clip(RoundedCornerShape(12.dp))
                 .border(if (active) BorderStroke(2.dp, accent.copy(alpha = 0.7f)) else BorderStroke(1.dp, outline), RoundedCornerShape(12.dp))
                 .background(paper)
@@ -446,6 +450,23 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
         }
     }
 
+    if (askDelete && onDelete != null) {
+        AlertDialog(
+            onDismissRequest = { askDelete = false },
+            title = { Text(stringResource(R.string.delete_drawing_q)) },
+            text = { Text(stringResource(R.string.delete_drawing_text)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    askDelete = false
+                    saveJob?.cancel()
+                    setActive(false)
+                    onDelete()
+                }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { askDelete = false }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+
     asking?.let { done ->
         var text by remember(done) { mutableStateOf(askText) }
         AlertDialog(
@@ -458,6 +479,7 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun Toolbar(
     tool: DrawTool, setTool: (DrawTool) -> Unit,
@@ -466,12 +488,13 @@ private fun Toolbar(
     shapeKind: String, setShape: (String) -> Unit,
     fill: String, setFill: (String) -> Unit,
     selection: CanvasNode?, onDelete: () -> Unit, onEditWords: () -> Unit,
+    onDeleteDrawing: (() -> Unit)?,
     canUndo: Boolean, onUndo: () -> Unit, onDone: () -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
         Column(Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+            // Every tool shows: on a narrow screen they wrap onto a second line.
+            FlowRow(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.Center, itemVerticalAlignment = Alignment.CenterVertically) {
                 ToolButton(Icons.Outlined.PanTool, stringResource(R.string.select_move), tool == DrawTool.SELECT) { setTool(DrawTool.SELECT) }
                 ToolButton(Icons.Outlined.Draw, stringResource(R.string.pen), tool == DrawTool.PEN) { setTool(DrawTool.PEN) }
                 ToolButton(Icons.Outlined.BorderColor, stringResource(R.string.highlighter), tool == DrawTool.HIGHLIGHT) { setTool(DrawTool.HIGHLIGHT) }
@@ -497,35 +520,36 @@ private fun Toolbar(
                 ToolButton(Icons.AutoMirrored.Outlined.ArrowRightAlt, stringResource(R.string.arrow), tool == DrawTool.ARROW) { setTool(DrawTool.ARROW) }
                 ToolButton(DoubleArrowIcon, stringResource(R.string.double_arrow), tool == DrawTool.DOUBLE) { setTool(DrawTool.DOUBLE) }
                 ToolButton(Icons.Outlined.TextFields, stringResource(R.string.words), tool == DrawTool.TEXT) { setTool(DrawTool.TEXT) }
-                ToolButton(Icons.Outlined.Delete, stringResource(R.string.eraser), tool == DrawTool.ERASE) { setTool(DrawTool.ERASE) }
-                Spacer(Modifier.width(4.dp))
+                ToolButton(EraserIcon, stringResource(R.string.eraser), tool == DrawTool.ERASE) { setTool(DrawTool.ERASE) }
                 IconButton(onClick = onUndo, enabled = canUndo) { Icon(Icons.AutoMirrored.Outlined.Undo, stringResource(R.string.undo)) }
-            }
+                if (onDeleteDrawing != null) {
+                    IconButton(onClick = onDeleteDrawing) { Icon(Icons.Outlined.Delete, stringResource(R.string.delete_drawing), tint = MaterialTheme.colorScheme.error) }
+                }
                 TextButton(onClick = onDone) {
                     Icon(Icons.Outlined.Check, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.done))
                 }
             }
-            Row(Modifier.horizontalScroll(rememberScrollState()).padding(start = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(Modifier.padding(start = 8.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                 Swatch(null, color == "") { setColor("") }
                 PALETTE.forEach { (id, c) -> Swatch(c, color == id) { setColor(id) } }
                 if (selection != null) {
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(4.dp))
                     if (selection.ink == null) FillChip(stringResource(R.string.edit_words), false, onEditWords)
                     FillChip(stringResource(R.string.delete), false, onDelete)
                 }
                 if (tool == DrawTool.SHAPE || selection?.shape?.isNotEmpty() == true) {
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(4.dp))
                     FillChip(stringResource(R.string.fill_none), fill == "none") { setFill("none") }
                     FillChip(stringResource(R.string.fill_light), fill == "") { setFill("") }
                     FillChip(stringResource(R.string.fill_solid), fill == "solid") { setFill("solid") }
                 }
                 if (tool == DrawTool.PEN) {
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(4.dp))
                     PEN_SIZES.forEach { s ->
                         Box(
-                            Modifier.size(32.dp).clip(CircleShape).background(if (s == penSize) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent).clickable { setPenSize(s) },
+                            Modifier.size(30.dp).clip(CircleShape).background(if (s == penSize) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent).clickable { setPenSize(s) },
                             contentAlignment = Alignment.Center,
                         ) { Box(Modifier.size((s + 3).dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface)) }
                     }
@@ -605,6 +629,7 @@ private fun shapeIcon(kind: String): ImageVector = shapeIcons.getOrPut(kind) {
     val g = shapeOf(kind)
     pathIcon("Shape $kind", 100f, 8f, g?.outline ?: "M0,0 L100,0 L100,100 L0,100 Z", g?.extra.orEmpty())
 }
+private val EraserIcon: ImageVector by lazy { pathIcon("Eraser", 12f, 1.3f, "M4.5,11 L0.8,7.3 L7.3,0.8 L11.2,4.7 L4.9,11 Z M2.6,5.5 L6.5,9.4 M4.5,11 L12,11") }
 private val LineIcon: ImageVector by lazy { pathIcon("Line", 12f, 1.6f, "M0,12 L12,0") }
 private val DoubleArrowIcon: ImageVector by lazy { pathIcon("Double arrow", 12f, 1.4f, "M0,6 L12,6 M3,3 L0,6 L3,9 M9,3 L12,6 L9,9") }
 

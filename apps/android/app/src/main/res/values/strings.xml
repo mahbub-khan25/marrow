@@ -30,6 +30,9 @@
     <string name="words">Words</string>
     <string name="eraser">Eraser</string>
     <string name="select_move">Select and move</string>
+    <string name="delete_drawing">Delete drawing</string>
+    <string name="delete_drawing_q">Delete this drawing?</string>
+    <string name="delete_drawing_text">It\'s taken out of the note, and its file goes to Marrow\'s trash, where you can restore it.</string>
     <string name="edit_words">Edit words</string>
     <string name="shapes">Shapes</string>
     <string name="line">Line</string>

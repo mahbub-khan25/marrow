@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Delete a drawing in one step:** a bin button on every drawing (on
+  computers it shows when you point at the drawing; on phones and tablets
+  it's in the drawing's toolbar). After asking, it takes the drawing out of
+  the note and moves its file to Marrow's trash, where you can restore it.
+- **Every drawing tool fits on phones:** the drawing toolbar wraps onto a
+  second line instead of hiding tools off the edge, and the drawing keeps
+  its full size while you draw. The eraser has its own icon now, so it isn't
+  mistaken for delete.
+
 ## 1.7.1
 
 Move what you draw on phones and tablets, and the new Marrow logo everywhere.

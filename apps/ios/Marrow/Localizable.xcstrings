@@ -1484,6 +1484,40 @@
         }
       }
     },
+    "Delete drawing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete drawing"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আঁকা মুছুন"
+          }
+        }
+      }
+    },
+    "Delete this drawing?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this drawing?"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "এই আঁকাটি মুছবেন?"
+          }
+        }
+      }
+    },
     "Delete “%@”?": {
       "extractionState": "manual",
       "localizations": {
@@ -2330,6 +2364,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "এটি ভল্টের ট্র্যাশ ফোল্ডারে (.marrow/trash) যাবে, তাই পরে ফিরিয়ে আনা যাবে।"
+          }
+        }
+      }
+    },
+    "It's taken out of the note, and its file goes to Marrow's trash, where you can restore it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It's taken out of the note, and its file goes to Marrow's trash, where you can restore it."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "এটি নোট থেকে সরানো হবে, আর এর ফাইলটি ম্যারোর ট্র্যাশে যাবে; সেখান থেকে ফিরিয়ে আনা যায়।"
           }
         }
       }

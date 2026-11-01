@@ -125,6 +125,52 @@ func shapeName(_ g: ShapeGeometry) -> LocalizedStringKey {
     }
 }
 
+/// Lays its views out in lines, starting a new line when the next one doesn't fit.
+struct WrapLayout: Layout {
+    var spacing: CGFloat = 4
+    var lineSpacing: CGFloat = 4
+
+    private func lines(_ width: CGFloat, _ subviews: Subviews) -> [(items: [(Int, CGSize)], height: CGFloat)] {
+        var out: [(items: [(Int, CGSize)], height: CGFloat)] = []
+        var cur: [(Int, CGSize)] = []
+        var x: CGFloat = 0, h: CGFloat = 0
+        for (i, v) in subviews.enumerated() {
+            let size = v.sizeThatFits(.unspecified)
+            if !cur.isEmpty, x + spacing + size.width > width {
+                out.append((cur, h))
+                cur = []
+                x = 0
+                h = 0
+            }
+            x += (cur.isEmpty ? 0 : spacing) + size.width
+            h = max(h, size.height)
+            cur.append((i, size))
+        }
+        if !cur.isEmpty { out.append((cur, h)) }
+        return out
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        let ls = lines(width, subviews)
+        let used = ls.map { l in l.items.map(\.1.width).reduce(0, +) + spacing * CGFloat(max(0, l.items.count - 1)) }.max() ?? 0
+        let height = ls.map(\.height).reduce(0, +) + lineSpacing * CGFloat(max(0, ls.count - 1))
+        return CGSize(width: proposal.width ?? used, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for l in lines(bounds.width, subviews) {
+            var x = bounds.minX
+            for (i, size) in l.items {
+                subviews[i].place(at: CGPoint(x: x, y: y + (l.height - size.height) / 2), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += l.height + lineSpacing
+        }
+    }
+}
+
 /// A shape's outline as a small icon.
 struct ShapeGlyph: View {
     let kind: String
@@ -168,11 +214,11 @@ struct InlineDrawing: View {
     let path: String
     let height: Int
     var onOpenFull: () -> Void
+    var onDelete: (() -> Void)?
     @State private var active = false
 
     var body: some View {
-        DrawingPad(path: path, active: $active, onOpenFull: onOpenFull)
-            .frame(height: CGFloat(height) + (active ? 100 : 0))
+        DrawingPad(path: path, active: $active, onOpenFull: onOpenFull, onDelete: onDelete, boardHeight: CGFloat(height))
             .preference(key: DrawingActiveKey.self, value: active)
             .padding(.vertical, 6)
     }
@@ -208,6 +254,10 @@ struct DrawingPad: View {
     let path: String
     @Binding var active: Bool
     var onOpenFull: (() -> Void)?
+    var onDelete: (() -> Void)?
+    /// In a note the drawing keeps this height (the tools sit above it); nil fills the space.
+    var boardHeight: CGFloat?
+    @State private var askDelete = false
 
     @Environment(Store.self) private var store
     @State private var board: Board?
@@ -266,7 +316,8 @@ struct DrawingPad: View {
                     Text("Tap to draw").font(.subheadline).foregroundStyle(Color.faint)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: boardHeight == nil ? .infinity : nil)
+            .frame(height: boardHeight)
             .background(Color.paper)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(active ? Color.accent.opacity(0.7) : Color.line, lineWidth: active ? 2 : 1))
@@ -295,6 +346,16 @@ struct DrawingPad: View {
         }
         .onChange(of: size) { _, _ in freeze() }
         .onChange(of: tool) { _, t in if t != .select { selected = nil } }
+        .confirmationDialog(Text("Delete this drawing?"), isPresented: $askDelete, titleVisibility: .visible) {
+            Button("Delete drawing", role: .destructive) {
+                saveTask?.cancel()
+                active = false
+                onDelete?()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("It's taken out of the note, and its file goes to Marrow's trash, where you can restore it.")
+        }
         .alert(alertTitle, isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } })) {
             TextField(String(localized: "Label (optional)"), text: $words)
             Button("OK") { answer() }
@@ -463,84 +524,90 @@ struct DrawingPad: View {
 
     private var toolbar: some View {
         VStack(spacing: 4) {
-            HStack(spacing: 2) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 2) {
-                        toolButton(.select, "hand.point.up.left", "Select and move")
-                        toolButton(.pen, "scribble.variable", "Pen")
-                        toolButton(.highlight, "highlighter", "Highlighter")
-                        // One button for every shape: a tap lists them.
-                        Menu {
-                            ForEach(drawShapes, id: \.kind) { g in
-                                Button {
-                                    shapeKind = g.kind
-                                    tool = .shape
-                                } label: { Text(shapeName(g)) }
-                            }
-                        } label: {
-                            ShapeGlyph(kind: shapeKind)
-                                .foregroundStyle(tool == .shape ? Color.paper : Color.ink)
-                                .frame(width: 38, height: 34)
-                                .background(tool == .shape ? Color.accent : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        }
-                        .accessibilityLabel(Text("Shapes"))
-                        toolButton(.line, "line.diagonal", "Line")
-                        toolButton(.arrow, "arrow.right", "Arrow")
-                        toolButton(.double, "arrow.left.and.right", "Double arrow")
-                        toolButton(.text, "textformat", "Words")
-                        toolButton(.erase, "eraser", "Eraser")
+            // Every tool shows: on a narrow screen they wrap onto more lines.
+            WrapLayout(spacing: 2, lineSpacing: 2) {
+                toolButton(.select, "hand.point.up.left", "Select and move")
+                toolButton(.pen, "scribble.variable", "Pen")
+                toolButton(.highlight, "highlighter", "Highlighter")
+                // One button for every shape: a tap lists them.
+                Menu {
+                    ForEach(drawShapes, id: \.kind) { g in
                         Button {
-                            if let prev = past.popLast() { board = prev; save(prev) }
-                        } label: { Image(systemName: "arrow.uturn.backward").frame(width: 38, height: 34) }
-                        .disabled(past.isEmpty)
-                        .accessibilityLabel(Text("Undo"))
+                            shapeKind = g.kind
+                            tool = .shape
+                        } label: { Text(shapeName(g)) }
+                    }
+                } label: {
+                    ShapeGlyph(kind: shapeKind)
+                        .foregroundStyle(tool == .shape ? Color.paper : Color.ink)
+                        .frame(width: 38, height: 34)
+                        .background(tool == .shape ? Color.accent : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .accessibilityLabel(Text("Shapes"))
+                toolButton(.line, "line.diagonal", "Line")
+                toolButton(.arrow, "arrow.right", "Arrow")
+                toolButton(.double, "arrow.left.and.right", "Double arrow")
+                toolButton(.text, "textformat", "Words")
+                toolButton(.erase, "eraser", "Eraser")
+                Button {
+                    if let prev = past.popLast() { board = prev; save(prev) }
+                } label: { Image(systemName: "arrow.uturn.backward").frame(width: 38, height: 34) }
+                .disabled(past.isEmpty)
+                .accessibilityLabel(Text("Undo"))
+                if onDelete != nil {
+                    Button { askDelete = true } label: {
+                        Image(systemName: "trash").font(.system(size: 17)).foregroundStyle(Color.red).frame(width: 38, height: 34)
+                    }
+                    .accessibilityLabel(Text("Delete drawing"))
+                }
+                Button { active = false } label: {
+                    Label("Done", systemImage: "checkmark").font(.subheadline.weight(.semibold)).frame(height: 34).padding(.horizontal, 8)
+                }
+            }
+            .padding(.horizontal, 4)
+            WrapLayout(spacing: 8, lineSpacing: 6) {
+                swatch(nil, "")
+                ForEach(drawPalette, id: \.0) { p in swatch(p.1, p.0) }
+                if let n = selection {
+                    gap
+                    if n.ink == nil {
+                        actionChip("Edit words") {
+                            words = n.text
+                            asking = .label(n.id)
+                        }
+                    }
+                    actionChip("Delete") {
+                        change { b in b.nodes.removeAll { $0.id == n.id }; b.edges.removeAll { $0.fromNode == n.id || $0.toNode == n.id } }
+                        selected = nil
                     }
                 }
-                Button { active = false } label: { Label("Done", systemImage: "checkmark").font(.subheadline.weight(.semibold)) }
-                    .padding(.horizontal, 8)
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    swatch(nil, "")
-                    ForEach(drawPalette, id: \.0) { p in swatch(p.1, p.0) }
-                    if let n = selection {
-                        Divider().frame(height: 20)
-                        if n.ink == nil {
-                            actionChip("Edit words") {
-                                words = n.text
-                                asking = .label(n.id)
-                            }
+                if tool == .shape || selection?.shape.isEmpty == false {
+                    gap
+                    fillChip("none", "No fill")
+                    fillChip("", "Light")
+                    fillChip("solid", "Solid")
+                }
+                if tool == .pen {
+                    gap
+                    ForEach(penSizes, id: \.self) { s in
+                        Button { penSize = s } label: {
+                            Circle().fill(Color.ink).frame(width: s + 3, height: s + 3)
+                                .frame(width: 30, height: 30)
+                                .background(s == penSize ? Color.line : Color.clear, in: Circle())
                         }
-                        actionChip("Delete") {
-                            change { b in b.nodes.removeAll { $0.id == n.id }; b.edges.removeAll { $0.fromNode == n.id || $0.toNode == n.id } }
-                            selected = nil
-                        }
-                    }
-                    if tool == .shape || selection?.shape.isEmpty == false {
-                        Divider().frame(height: 20)
-                        fillChip("none", "No fill")
-                        fillChip("", "Light")
-                        fillChip("solid", "Solid")
-                    }
-                    if tool == .pen {
-                        Divider().frame(height: 20)
-                        ForEach(penSizes, id: \.self) { s in
-                            Button { penSize = s } label: {
-                                Circle().fill(Color.ink).frame(width: s + 3, height: s + 3)
-                                    .frame(width: 30, height: 30)
-                                    .background(s == penSize ? Color.line : Color.clear, in: Circle())
-                            }
-                            .accessibilityLabel(Text(verbatim: "\(Int(s))"))
-                        }
+                        .accessibilityLabel(Text(verbatim: "\(Int(s))"))
                     }
                 }
-                .padding(.horizontal, 8)
             }
+            .padding(.horizontal, 8)
         }
         .padding(.vertical, 4)
         .background(Color.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .buttonStyle(.plain)
     }
+
+    /// A thin line between groups in the second row.
+    private var gap: some View { Rectangle().fill(Color.line).frame(width: 1, height: 20) }
 
     private func toolButton(_ t: DrawTool, _ symbol: String, _ label: LocalizedStringKey) -> some View {
         Button { tool = t } label: {

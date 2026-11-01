@@ -11,6 +11,8 @@ struct BlockActions {
     var onOpen: (String) -> Void = { _ in }
     /// Full path of a vault file, to show an image.
     var fileOf: (String) -> String? = { _ in nil }
+    /// Takes a drawing (by its vault path) out of the note and trashes its file; nil where that isn't possible.
+    var onRemoveDrawing: ((String) -> Void)?
 }
 
 /// Links inside text are carried as marrow:// addresses, then handed to `onLink`.
@@ -231,7 +233,7 @@ private struct BlockView: View {
             }
             .buttonStyle(.plain)
         case .drawing:
-            InlineDrawing(path: b.target, height: Int(b.number), onOpenFull: { actions.onOpen(b.target) })
+            InlineDrawing(path: b.target, height: Int(b.number), onOpenFull: { actions.onOpen(b.target) }, onDelete: actions.onRemoveDrawing.map { remove in { remove(b.target) } })
         case .properties:
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(Array(b.props.enumerated()), id: \.offset) { _, p in

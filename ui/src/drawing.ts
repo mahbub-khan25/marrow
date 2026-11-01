@@ -11,6 +11,7 @@
 import { api, displayName } from "./api";
 import { ATTACHMENT_FOLDER } from "./attach";
 import { CanvasView, type CanvasApp } from "./canvas";
+import { confirmDialog } from "./lock";
 import { h, icon, isoDay } from "./util";
 
 export const DRAWING_HEIGHT = 360;
@@ -85,16 +86,20 @@ export function drawingsChanged() {
 
 /**
  * Draws a drawing into `box` (which takes its height), ready to draw on.
- * `onHeight` saves a new height (dragged with the grip at the bottom).
+ * `onHeight` saves a new height (dragged with the grip at the bottom);
+ * `onRemove` takes its embed out of the note (the trash button, after
+ * asking), and the drawing's file then goes to the trash.
  */
-export function mountDrawing(box: HTMLElement, ref: DrawingRef, host: DrawingHost, onHeight?: (h: number) => void): MountedDrawing {
+export function mountDrawing(box: HTMLElement, ref: DrawingRef, host: DrawingHost, onHeight?: (h: number) => void, onRemove?: () => void): MountedDrawing {
   box.classList.add("drawing");
   box.contentEditable = "false";
   box.style.height = `${ref.height}px`;
   const board = h("div.drawing-board.canvas-view");
   const grip = h("div.drawing-grip", { title: "Drag to make the drawing taller or shorter" });
   const open = h("button.drawing-open", { type: "button", title: "Open full size" }, icon("arrows-out-simple"));
+  const del = h("button.drawing-delete", { type: "button", title: "Delete drawing" }, icon("trash"));
   box.replaceChildren(board, open, grip);
+  if (onRemove) box.append(del);
 
   const view = new CanvasView(board, host, { inline: true });
   const entry = { view };
@@ -121,6 +126,19 @@ export function mountDrawing(box: HTMLElement, ref: DrawingRef, host: DrawingHos
   open.addEventListener("click", (e) => {
     e.stopPropagation();
     if (path) void view.flush().then(() => host.openPath(path!, false));
+  });
+
+  del.addEventListener("click", (e) => {
+    e.stopPropagation();
+    void (async () => {
+      if (!(await confirmDialog("Delete this drawing?", "It's taken out of the note, and its file goes to Marrow's trash, where you can restore it.", "Delete"))) return;
+      const file = path;
+      gone = true;
+      mounted.delete(entry);
+      await view.flush().catch(() => {});
+      onRemove?.();
+      if (file) await api.trash(file).catch((err) => host.toast(`Couldn't move the drawing's file to the trash: ${err}`, "error"));
+    })();
   });
 
   // The note mustn't react to what happens in the drawing: no paragraph

@@ -214,6 +214,21 @@ class ScreenshotTest {
         org.junit.Assert.assertTrue("moved down: y=${saved.y}", saved.y > 40)
     }
 
+    /** "Delete drawing" takes the drawing out of the note and moves its file to the trash. */
+    @Test fun drawingDelete() {
+        val note = "Projects/Shift tracker.md"
+        shot("28-drawing-toolbar") { NoteScreen(note, -1, false) }
+        val ctx = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        compose.onNode(androidx.compose.ui.test.hasContentDescription("Drawing")).performClick()
+        repeat(4) { Thread.sleep(60); compose.mainClock.advanceTimeBy(120) }
+        compose.onRoot().captureRoboImage(File(out, "28-drawing-toolbar.png").path)
+        compose.onNode(androidx.compose.ui.test.hasContentDescription(ctx.getString(R.string.delete_drawing))).performClick()
+        compose.onAllNodesWithText(ctx.getString(R.string.delete)).onFirst().performClick()
+        settle { !engine.marrow.readNote(note).contains(".canvas") && runCatching { engine.marrow.readCanvas("Attachments/Drawing app screens.canvas") }.isFailure }
+        org.junit.Assert.assertFalse(engine.marrow.readNote(note).contains("Drawing app screens.canvas"))
+        org.junit.Assert.assertTrue(runCatching { engine.marrow.readCanvas("Attachments/Drawing app screens.canvas") }.isFailure)
+    }
+
     @Test fun today() = shot("01-today") { TodayScreen(onCapture = {}) }
     @Test fun notes() = shot("02-notes") { BrowserScreen("") }
     @Test fun folder() = shot("03-folder") { BrowserScreen("Projects") }

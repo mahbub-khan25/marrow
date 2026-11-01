@@ -688,6 +688,9 @@ export const BN: Record<string, string> = {
     "ম্যারো চালু থাকলে রিমাইন্ডার আসে। এটি চালু থাকলে উইন্ডো বন্ধ করলেও ম্যারো ট্রেতে (ঘড়ির পাশে) থাকে, আর সাইন ইন করলে নিজে থেকে চালু হয়।",
   "Marrow will keep running in the tray.": "ম্যারো ট্রেতে চালু থাকবে।",
   // ---- window parts and drawing tools
+  "It's taken out of the note, and its file goes to Marrow's trash, where you can restore it.": "এটি নোট থেকে সরানো হবে, আর এর ফাইলটি ম্যারোর ট্র্যাশে যাবে; সেখান থেকে ফিরিয়ে আনা যায়।",
+  "Delete this drawing?": "এই আঁকাটি মুছবেন?",
+  "Delete drawing": "আঁকা মুছুন",
   "Toggle sidebar": "সাইডবার চালু/বন্ধ",
   "Toggle icon bar": "আইকন বার চালু/বন্ধ",
   "Toggle status bar": "স্ট্যাটাস বার চালু/বন্ধ",
