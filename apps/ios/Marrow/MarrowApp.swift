@@ -206,7 +206,7 @@ struct MainTabs: View {
     @ViewBuilder
     private var current: some View {
         switch router.tab {
-        case .today: stack(.today) { TodayView() }
+        case .today: stack(.today) { HomeView() }
         case .notes: stack(.notes) { BrowserView(folder: "") }
         case .ask: stack(.ask) { AskView() }
         case .tasks: stack(.tasks) { TasksView() }
@@ -217,8 +217,8 @@ struct MainTabs: View {
     private var tabs: some View {
         @Bindable var router = router
         return TabView(selection: $router.tab) {
-            stack(.today) { TodayView() }
-                .tabItem { Label("Today", systemImage: "sun.max") }.tag(AppTab.today)
+            stack(.today) { HomeView() }
+                .tabItem { Label("Home", systemImage: "house") }.tag(AppTab.today)
             stack(.notes) { BrowserView(folder: "") }
                 .tabItem { Label("Notes", systemImage: "folder") }.tag(AppTab.notes)
             stack(.ask) { AskView() }
@@ -282,7 +282,7 @@ struct PadSidebar: View {
             .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 10)
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    place(.today, "Today", "sun.max")
+                    place(.today, "Home", "house")
                     place(.notes, "Notes", "folder")
                     place(.tasks, "Tasks", "checklist")
                     place(.ask, "Ask", "sparkles")

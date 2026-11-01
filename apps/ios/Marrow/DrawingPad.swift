@@ -656,94 +656,6 @@ struct DrawingPad: View {
         }
     }
 
-    // MARK: rendering (in world units: 1 = 1 point at 100%)
-
-    private func drawBoard(_ c: inout GraphicsContext, _ b: Board) {
-        let byId = Dictionary(b.nodes.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        for e in b.edges {
-            guard let a = byId[e.fromNode], let z = byId[e.toNode] else { continue }
-            let p1 = CGPoint(x: CGFloat(a.x + a.width / 2), y: CGFloat(a.y + a.height / 2)), p2 = CGPoint(x: CGFloat(z.x + z.width / 2), y: CGFloat(z.y + z.height / 2))
-            var p = Path()
-            p.move(to: p1)
-            p.addLine(to: p2)
-            p.addPath(head(p1, p2, 1.5))
-            c.stroke(p, with: .color(drawColor(e.color) ?? Color.ink.opacity(0.5)), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
-        }
-        for n in b.nodes.sorted(by: { ($0.kind == "group" ? 0 : 1) < ($1.kind == "group" ? 0 : 1) }) {
-            let r = CGRect(x: CGFloat(n.x), y: CGFloat(n.y), width: CGFloat(n.width), height: CGFloat(n.height))
-            let col = drawColor(n.color)
-            if let ink = n.ink {
-                let inkColor = ink.highlight ? (col ?? highlightColor).opacity(0.4) : col ?? Color.ink.opacity(0.85)
-                c.stroke(inkPath(ink, in: r), with: .color(inkColor), style: StrokeStyle(lineWidth: CGFloat(ink.size), lineCap: .round, lineJoin: .round))
-            } else if !n.shape.isEmpty {
-                let g = shapeOf(n.shape)
-                drawShape(&c, g, fill: n.fill, color: col, in: r, width: 2)
-                let lb = (g?.label.count == 4 ? g?.label : nil) ?? [4, 4, 96, 96]
-                let box = CGRect(x: r.minX + CGFloat(lb[0]) / 100 * r.width, y: r.minY + CGFloat(lb[1]) / 100 * r.height, width: CGFloat(lb[2] - lb[0]) / 100 * r.width, height: CGFloat(lb[3] - lb[1]) / 100 * r.height)
-                label(&c, n.text, in: box.insetBy(dx: 4, dy: 2), size: 17, center: true, color: n.fill == "solid" ? Color.paper : Color.ink)
-            } else if n.kind == "group" {
-                let g = col ?? Color.accent
-                c.fill(Path(roundedRect: r, cornerRadius: 12), with: .color(g.opacity(0.07)))
-                c.stroke(Path(roundedRect: r, cornerRadius: 12), with: .color(g.opacity(0.35)), lineWidth: 1)
-            } else {
-                c.fill(Path(roundedRect: r, cornerRadius: 10), with: .color((col ?? Color.red).opacity(col == nil ? 0.06 : 0.14)))
-                let words = n.kind == "file" ? nameOf(n.file) : n.kind == "link" ? n.url : n.text
-                label(&c, words, in: r.insetBy(dx: 10, dy: 8), size: 15, center: false)
-            }
-        }
-    }
-
-    private func label(_ c: inout GraphicsContext, _ text: String, in r: CGRect, size: CGFloat, center: Bool, color: Color = Color.ink) {
-        guard !text.trimmingCharacters(in: .whitespaces).isEmpty, r.width > 1, r.height > 1 else { return }
-        let t = c.resolve(Text(verbatim: text).font(.system(size: size)).foregroundColor(color))
-        let s = t.measure(in: r.size)
-        let box = center ? CGRect(x: r.midX - s.width / 2, y: r.midY - s.height / 2, width: s.width, height: min(s.height, r.height)) : CGRect(origin: r.origin, size: CGSize(width: r.width, height: min(s.height, r.height)))
-        c.draw(t, in: box)
-    }
-
-    private func inkPath(_ ink: Ink, in r: CGRect) -> Path {
-        let sx = r.width / CGFloat(ink.w), sy = r.height / CGFloat(ink.h)
-        var pts: [CGPoint] = []
-        var i = 0
-        while i + 1 < ink.points.count {
-            pts.append(CGPoint(x: r.minX + CGFloat(ink.points[i]) * sx, y: r.minY + CGFloat(ink.points[i + 1]) * sy))
-            i += 2
-        }
-        var p = Path()
-        guard pts.count >= 2 else { return p }
-        if ink.arrow || ink.startArrow {
-            p.move(to: pts[0])
-            p.addLine(to: pts[pts.count - 1])
-            if ink.arrow { p.addPath(head(pts[0], pts[pts.count - 1], CGFloat(ink.size))) }
-            if ink.startArrow { p.addPath(head(pts[pts.count - 1], pts[0], CGFloat(ink.size))) }
-            return p
-        }
-        return smooth(pts)
-    }
-
-    private func smooth(_ pts: [CGPoint]) -> Path {
-        var p = Path()
-        guard let first = pts.first else { return p }
-        p.move(to: first)
-        for j in 1..<max(1, pts.count) {
-            let mid = CGPoint(x: (pts[j - 1].x + pts[j].x) / 2, y: (pts[j - 1].y + pts[j].y) / 2)
-            p.addQuadCurve(to: mid, control: pts[j - 1])
-        }
-        if let last = pts.last { p.addLine(to: last) }
-        return p
-    }
-
-    private func head(_ from: CGPoint, _ to: CGPoint, _ width: CGFloat) -> Path {
-        let a = atan2(to.y - from.y, to.x - from.x)
-        let len = 10 + width * 2
-        var p = Path()
-        for side in [-0.45, 0.45] {
-            p.move(to: to)
-            p.addLine(to: CGPoint(x: to.x - len * cos(a + side), y: to.y - len * sin(a + side)))
-        }
-        return p
-    }
-
     /// What's being drawn right now, on screen.
     private func drawDraft(_ ctx: GraphicsContext, _ pts: [CGPoint]) {
         guard let a = pts.first, let z = pts.last else { return }
@@ -768,4 +680,92 @@ struct DrawingPad: View {
         case .text, .select: break
         }
     }
+}
+
+// MARK: rendering (in world units: 1 = 1 point at 100%); Home draws boards with it too
+
+func drawBoard(_ c: inout GraphicsContext, _ b: Board) {
+    let byId = Dictionary(b.nodes.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    for e in b.edges {
+        guard let a = byId[e.fromNode], let z = byId[e.toNode] else { continue }
+        let p1 = CGPoint(x: CGFloat(a.x + a.width / 2), y: CGFloat(a.y + a.height / 2)), p2 = CGPoint(x: CGFloat(z.x + z.width / 2), y: CGFloat(z.y + z.height / 2))
+        var p = Path()
+        p.move(to: p1)
+        p.addLine(to: p2)
+        p.addPath(head(p1, p2, 1.5))
+        c.stroke(p, with: .color(drawColor(e.color) ?? Color.ink.opacity(0.5)), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+    }
+    for n in b.nodes.sorted(by: { ($0.kind == "group" ? 0 : 1) < ($1.kind == "group" ? 0 : 1) }) {
+        let r = CGRect(x: CGFloat(n.x), y: CGFloat(n.y), width: CGFloat(n.width), height: CGFloat(n.height))
+        let col = drawColor(n.color)
+        if let ink = n.ink {
+            let inkColor = ink.highlight ? (col ?? highlightColor).opacity(0.4) : col ?? Color.ink.opacity(0.85)
+            c.stroke(inkPath(ink, in: r), with: .color(inkColor), style: StrokeStyle(lineWidth: CGFloat(ink.size), lineCap: .round, lineJoin: .round))
+        } else if !n.shape.isEmpty {
+            let g = shapeOf(n.shape)
+            drawShape(&c, g, fill: n.fill, color: col, in: r, width: 2)
+            let lb = (g?.label.count == 4 ? g?.label : nil) ?? [4, 4, 96, 96]
+            let box = CGRect(x: r.minX + CGFloat(lb[0]) / 100 * r.width, y: r.minY + CGFloat(lb[1]) / 100 * r.height, width: CGFloat(lb[2] - lb[0]) / 100 * r.width, height: CGFloat(lb[3] - lb[1]) / 100 * r.height)
+            label(&c, n.text, in: box.insetBy(dx: 4, dy: 2), size: 17, center: true, color: n.fill == "solid" ? Color.paper : Color.ink)
+        } else if n.kind == "group" {
+            let g = col ?? Color.accent
+            c.fill(Path(roundedRect: r, cornerRadius: 12), with: .color(g.opacity(0.07)))
+            c.stroke(Path(roundedRect: r, cornerRadius: 12), with: .color(g.opacity(0.35)), lineWidth: 1)
+        } else {
+            c.fill(Path(roundedRect: r, cornerRadius: 10), with: .color((col ?? Color.red).opacity(col == nil ? 0.06 : 0.14)))
+            let words = n.kind == "file" ? nameOf(n.file) : n.kind == "link" ? n.url : n.text
+            label(&c, words, in: r.insetBy(dx: 10, dy: 8), size: 15, center: false)
+        }
+    }
+}
+
+fileprivate func label(_ c: inout GraphicsContext, _ text: String, in r: CGRect, size: CGFloat, center: Bool, color: Color = Color.ink) {
+    guard !text.trimmingCharacters(in: .whitespaces).isEmpty, r.width > 1, r.height > 1 else { return }
+    let t = c.resolve(Text(verbatim: text).font(.system(size: size)).foregroundColor(color))
+    let s = t.measure(in: r.size)
+    let box = center ? CGRect(x: r.midX - s.width / 2, y: r.midY - s.height / 2, width: s.width, height: min(s.height, r.height)) : CGRect(origin: r.origin, size: CGSize(width: r.width, height: min(s.height, r.height)))
+    c.draw(t, in: box)
+}
+
+fileprivate func inkPath(_ ink: Ink, in r: CGRect) -> Path {
+    let sx = r.width / CGFloat(ink.w), sy = r.height / CGFloat(ink.h)
+    var pts: [CGPoint] = []
+    var i = 0
+    while i + 1 < ink.points.count {
+        pts.append(CGPoint(x: r.minX + CGFloat(ink.points[i]) * sx, y: r.minY + CGFloat(ink.points[i + 1]) * sy))
+        i += 2
+    }
+    var p = Path()
+    guard pts.count >= 2 else { return p }
+    if ink.arrow || ink.startArrow {
+        p.move(to: pts[0])
+        p.addLine(to: pts[pts.count - 1])
+        if ink.arrow { p.addPath(head(pts[0], pts[pts.count - 1], CGFloat(ink.size))) }
+        if ink.startArrow { p.addPath(head(pts[pts.count - 1], pts[0], CGFloat(ink.size))) }
+        return p
+    }
+    return smooth(pts)
+}
+
+fileprivate func smooth(_ pts: [CGPoint]) -> Path {
+    var p = Path()
+    guard let first = pts.first else { return p }
+    p.move(to: first)
+    for j in 1..<max(1, pts.count) {
+        let mid = CGPoint(x: (pts[j - 1].x + pts[j].x) / 2, y: (pts[j - 1].y + pts[j].y) / 2)
+        p.addQuadCurve(to: mid, control: pts[j - 1])
+    }
+    if let last = pts.last { p.addLine(to: last) }
+    return p
+}
+
+fileprivate func head(_ from: CGPoint, _ to: CGPoint, _ width: CGFloat) -> Path {
+    let a = atan2(to.y - from.y, to.x - from.x)
+    let len = 10 + width * 2
+    var p = Path()
+    for side in [-0.45, 0.45] {
+        p.move(to: to)
+        p.addLine(to: CGPoint(x: to.x - len * cos(a + side), y: to.y - len * sin(a + side)))
+    }
+    return p
 }
