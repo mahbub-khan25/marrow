@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.7.1
+
+Move what you draw on phones and tablets, and the new Marrow logo everywhere.
 
 - **The new Marrow logo on phones and tablets:** the Android and iPhone/iPad
   apps now use the same wings logo as the computer app, on the home screen,
