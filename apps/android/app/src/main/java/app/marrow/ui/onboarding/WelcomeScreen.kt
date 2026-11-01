@@ -97,7 +97,7 @@ fun WelcomeScreen() {
             Modifier.widthIn(max = 520.dp).fillMaxWidth().verticalScroll(rememberScrollState()).statusBarsPadding().navigationBarsPadding().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Image(painterResource(R.mipmap.ic_launcher_foreground), null, Modifier.size(132.dp).clip(RoundedCornerShape(32.dp)))
+            Image(painterResource(R.drawable.marrow_logo), null, Modifier.size(132.dp).clip(RoundedCornerShape(32.dp)))
             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall)
             Spacer(Modifier.height(8.dp))
             Text(

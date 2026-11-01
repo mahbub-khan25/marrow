@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **The new Marrow logo on phones and tablets:** the Android and iPhone/iPad
+  apps now use the same wings logo as the computer app, on the home screen,
+  the welcome screen and in notifications. On Android 13 and later it also
+  follows your themed-icons colour.
+
 ## 1.7.0
 
 More ways to draw, see-through shapes, and a window you can arrange your way, on computers and tablets.
