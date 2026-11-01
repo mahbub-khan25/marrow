@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.8.0
+
+Home: your own board, the way you want it. Plus quicker drawing on phones.
 
 - **Home, your own board:** the start page (and the Today screen on phones
   and tablets) is now Home, a free-form board that is yours to arrange. Add

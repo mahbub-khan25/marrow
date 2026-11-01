@@ -2834,7 +2834,7 @@ dependencies = [
 
 [[package]]
 name = "marrow-app"
-version = "1.7.1"
+version = "1.8.0"
 dependencies = [
  "arboard",
  "chrono",
@@ -2865,7 +2865,7 @@ dependencies = [
 
 [[package]]
 name = "marrow-cloud"
-version = "1.7.1"
+version = "1.8.0"
 dependencies = [
  "base64 0.22.1",
  "getrandom 0.2.17",
@@ -2880,7 +2880,7 @@ dependencies = [
 
 [[package]]
 name = "marrow-core"
-version = "1.7.1"
+version = "1.8.0"
 dependencies = [
  "argon2",
  "base64 0.22.1",
@@ -2913,7 +2913,7 @@ dependencies = [
 
 [[package]]
 name = "marrow-ffi"
-version = "1.7.1"
+version = "1.8.0"
 dependencies = [
  "marrow-cloud",
  "marrow-core",
@@ -2929,7 +2929,7 @@ dependencies = [
 
 [[package]]
 name = "marrow-webdav"
-version = "1.7.1"
+version = "1.8.0"
 dependencies = [
  "marrow-core",
  "quick-xml 0.37.5",
