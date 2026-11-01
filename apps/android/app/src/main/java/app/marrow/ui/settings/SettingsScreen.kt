@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.CallMerge
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
@@ -163,6 +164,11 @@ fun SettingsScreen() {
 
                 item { SectionTitle(stringResource(R.string.about)) }
                 item { SettingRow(Icons.Outlined.Info, "Marrow ${engine.marrow.version()}", stringResource(R.string.about_text)) }
+                item {
+                    SettingRow(Icons.Outlined.FavoriteBorder, stringResource(R.string.support), stringResource(R.string.support_text), onClick = {
+                        runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/sponsors/mahbub-khan25"))) }
+                    })
+                }
                 item {
                     SettingRow(Icons.Outlined.Web, stringResource(R.string.website), "github.com/mahbub-khan25/marrow", onClick = {
                         runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/mahbub-khan25/marrow"))) }

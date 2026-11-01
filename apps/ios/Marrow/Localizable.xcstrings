@@ -3951,6 +3951,23 @@
         }
       }
     },
+    "Marrow is free and has no ads. If it helps you, you can support its work.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marrow is free and has no ads. If it helps you, you can support its work."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ম্যারো বিনামূল্যে, কোনো বিজ্ঞাপন নেই। কাজে লাগলে এর কাজে সমর্থন দিতে পারেন।"
+          }
+        }
+      }
+    },
     "Marrow keeps earlier versions of each note as you write, every few minutes, and thins them out over time.": {
       "extractionState": "manual",
       "localizations": {
@@ -7262,6 +7279,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "এই সপ্তাহের নোটগুলোর সারাংশ দিন"
+          }
+        }
+      }
+    },
+    "Support Marrow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Support Marrow"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ম্যারোকে সমর্থন করুন"
           }
         }
       }

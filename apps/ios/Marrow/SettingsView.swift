@@ -66,6 +66,9 @@ struct SettingsView: View {
             } header: { SectionTitle(text: "Locked notes") }
             Section {
                 Label { VStack(alignment: .leading) { Text(verbatim: "Marrow \(store.marrow.version())"); Text("Plain Markdown notes that stay yours. Free and open source (MIT).").font(.caption).foregroundStyle(Color.inkSoft) } } icon: { Image(systemName: "info.circle") }
+                Link(destination: URL(string: "https://github.com/sponsors/mahbub-khan25")!) {
+                    Label { VStack(alignment: .leading) { Text("Support Marrow"); Text("Marrow is free and has no ads. If it helps you, you can support its work.").font(.caption).foregroundStyle(Color.inkSoft) } } icon: { Image(systemName: "heart") }
+                }
                 Link(destination: URL(string: "https://github.com/mahbub-khan25/marrow")!) { Label("Website and source code", systemImage: "safari") }
             } header: { SectionTitle(text: "About") }
         }

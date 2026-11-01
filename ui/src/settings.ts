@@ -1,6 +1,7 @@
 // Settings (Ctrl+,): Editor, Appearance, Hotkeys, Vault, AI, Customize.
 
 import { getVersion } from "@tauri-apps/api/app";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 import { api, type MirrorStatus, type VaultSettings } from "./api";
 import { renderAi } from "./ai-settings";
@@ -383,6 +384,12 @@ function render() {
           "A local-first notes app. Your notes are plain Markdown files in a folder you choose; Marrow reads and writes them in place and keeps its own data in a hidden .marrow folder.",
         ),
         h("div.line", null, "Built in Rust with Tauri and CodeMirror. Canvases use the open JSON Canvas format."),
+        h(
+          "div.line",
+          null,
+          "Marrow is free and has no ads. If it helps you, you can support its work. ",
+          h("button.btn", { type: "button", onclick: () => void openUrl("https://github.com/sponsors/mahbub-khan25").catch(() => {}) }, h("i.ph.ph-heart"), " Support Marrow"),
+        ),
         h(
           "div.line",
           null,

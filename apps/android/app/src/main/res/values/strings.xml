@@ -438,6 +438,8 @@
     <string name="ai_off">Off</string>
     <string name="about">About</string>
     <string name="about_text">Plain Markdown notes that stay yours. Free and open source (MIT).</string>
+    <string name="support">Support Marrow</string>
+    <string name="support_text">Marrow is free and has no ads. If it helps you, you can support its work.</string>
     <string name="website">Website and source code</string>
     <string name="theme">Theme</string>
     <string name="light">Light</string>

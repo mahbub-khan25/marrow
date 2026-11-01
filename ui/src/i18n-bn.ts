@@ -2,6 +2,9 @@
 // shows it; anything missing simply stays in English.
 
 export const BN: Record<string, string> = {
+  // ---- support
+  "Support Marrow": "ম্যারোকে সমর্থন করুন",
+  "Marrow is free and has no ads. If it helps you, you can support its work.": "ম্যারো বিনামূল্যে, কোনো বিজ্ঞাপন নেই। কাজে লাগলে এর কাজে সমর্থন দিতে পারেন।",
   // ---- 1.3 interface refresh
   Ask: "জিজ্ঞাসা",
   Commands: "কমান্ড",

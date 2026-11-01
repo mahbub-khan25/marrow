@@ -438,6 +438,8 @@
     <string name="ai_off">বন্ধ</string>
     <string name="about">সম্পর্কে</string>
     <string name="about_text">সাধারণ মার্কডাউন নোট, যা আপনারই থাকে। বিনামূল্যে ও ওপেন সোর্স (MIT)।</string>
+    <string name="support">ম্যারোকে সমর্থন করুন</string>
+    <string name="support_text">ম্যারো বিনামূল্যে, কোনো বিজ্ঞাপন নেই। কাজে লাগলে এর কাজে সমর্থন দিতে পারেন।</string>
     <string name="website">ওয়েবসাইট ও সোর্স কোড</string>
     <string name="theme">থিম</string>
     <string name="light">হালকা</string>

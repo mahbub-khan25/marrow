@@ -469,6 +469,8 @@ STRINGS = [
     ("ai_off", "Off", "বন্ধ"),
     ("about", "About", "সম্পর্কে"),
     ("about_text", "Plain Markdown notes that stay yours. Free and open source (MIT).", "সাধারণ মার্কডাউন নোট, যা আপনারই থাকে। বিনামূল্যে ও ওপেন সোর্স (MIT)।"),
+    ("support", "Support Marrow", "ম্যারোকে সমর্থন করুন"),
+    ("support_text", "Marrow is free and has no ads. If it helps you, you can support its work.", "ম্যারো বিনামূল্যে, কোনো বিজ্ঞাপন নেই। কাজে লাগলে এর কাজে সমর্থন দিতে পারেন।"),
     ("website", "Website and source code", "ওয়েবসাইট ও সোর্স কোড"),
     ("theme", "Theme", "থিম"),
     ("light", "Light", "হালকা"),

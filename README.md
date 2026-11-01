@@ -9,6 +9,9 @@ in [apps/](apps/README.md). Marrow is free and open source under the
 [MIT license](LICENSE). Bug reports and pull requests are welcome; see
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+**Support Marrow:** Marrow is free and has no ads. If it helps you, you can
+[support its work on GitHub Sponsors](https://github.com/sponsors/mahbub-khan25).
+
 **Status:** Phases 0–8 of [PLAN.md](PLAN.md) and the redesign work: open a
 folder, read notes rendered or write them as Markdown, link notes and see
 backlinks, rename or move notes without breaking links, explore a graph, lay
