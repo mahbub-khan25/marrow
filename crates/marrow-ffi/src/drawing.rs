@@ -60,15 +60,25 @@ fn simplify(pts: &[(f64, f64)], eps: f64) -> Vec<(f64, f64)> {
     left
 }
 
-/// A pen stroke (or, with `arrow`, a straight arrow from the first point to
-/// the last) as a canvas card. `points` are x, y, x, y… on the drawing;
+/// A pen stroke as a canvas card. `points` are x, y, x, y… on the drawing;
 /// `zoom` is how much the drawing is enlarged on screen (to keep strokes as
 /// smooth as they look). `color` is "1"–"6", "#rrggbb" or "".
+///
+/// `kind` is:
+/// - "pen": the stroke as drawn;
+/// - "line": a straight line from the first point to the last;
+/// - "arrow" / "double": a straight arrow, or one with a head at each end;
+/// - "highlighter": a wide, see-through stroke.
 #[uniffi::export]
-pub fn stroke_node(points: Vec<f64>, size: f64, arrow: bool, color: String, zoom: f64) -> Option<CanvasNode> {
+pub fn stroke_node(points: Vec<f64>, size: f64, kind: String, color: String, zoom: f64) -> Option<CanvasNode> {
+    let arrow = kind == "arrow" || kind == "double";
+    let start_arrow = kind == "double";
+    let highlight = kind == "highlighter";
+    let straight = kind == "line";
     let pts: Vec<(f64, f64)> = points.chunks(2).filter(|p| p.len() == 2 && p[0].is_finite() && p[1].is_finite()).map(|p| (p[0], p[1])).collect();
     let (first, last) = (*pts.first()?, *pts.last()?);
-    let mut ps = if arrow {
+    let straight = straight || arrow || start_arrow;
+    let mut ps = if straight {
         if ((last.0 - first.0).powi(2) + (last.1 - first.1).powi(2)).sqrt() < 8.0 {
             return None;
         }
@@ -79,8 +89,8 @@ pub fn stroke_node(points: Vec<f64>, size: f64, arrow: bool, color: String, zoom
     if ps.len() == 1 {
         ps.push((ps[0].0 + 0.5, ps[0].1 + 0.5));
     }
-    let size = if arrow { 2.5 } else { size.clamp(1.0, 40.0) };
-    let pad = size + if arrow { 12.0 } else { 4.0 };
+    let size = if arrow || start_arrow { 2.5 } else if highlight { size.clamp(1.0, 40.0).max(14.0) } else { size.clamp(1.0, 40.0) };
+    let pad = size + if arrow || start_arrow { 12.0 } else { 4.0 };
     let x0 = (ps.iter().map(|p| p.0).fold(f64::INFINITY, f64::min) - pad).round();
     let y0 = (ps.iter().map(|p| p.1).fold(f64::INFINITY, f64::min) - pad).round();
     let w = (ps.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max) + pad - x0).round().max(1.0);
@@ -99,18 +109,21 @@ pub fn stroke_node(points: Vec<f64>, size: f64, arrow: bool, color: String, zoom
         label: String::new(),
         color,
         shape: String::new(),
-        ink: Some(Ink { w, h, size, points: ps.iter().flat_map(|p| [r(p.0 - x0), r(p.1 - y0)]).collect(), arrow }),
+        fill: String::new(),
+        ink: Some(Ink { w, h, size, points: ps.iter().flat_map(|p| [r(p.0 - x0), r(p.1 - y0)]).collect(), arrow, start_arrow, highlight }),
         extra: String::new(),
     })
 }
 
-/// A rectangle, ellipse or diamond dragged from one corner to the other (a
-/// tap makes a standard size). `shape` is "rect", "ellipse" or "diamond".
+/// A shape dragged from one corner to the other (a tap makes a standard
+/// size). `shape` is one of `shape_kinds()`; `fill` is "" (light), "none"
+/// (see-through) or "solid".
 #[uniffi::export]
-pub fn shape_node(shape: String, x0: f64, y0: f64, x1: f64, y1: f64, color: String) -> CanvasNode {
+pub fn shape_node(shape: String, x0: f64, y0: f64, x1: f64, y1: f64, color: String, fill: String) -> CanvasNode {
     let small = (x1 - x0).abs() < 8.0 && (y1 - y0).abs() < 8.0;
     let (x, y, w, h) = if small { (x0 - 80.0, y0 - 50.0, 160.0, 100.0) } else { (x0.min(x1), y0.min(y1), (x1 - x0).abs(), (y1 - y0).abs()) };
-    let shape = if matches!(shape.as_str(), "ellipse" | "diamond") { shape } else { "rect".into() };
+    let shape = if shape_geometry(shape.clone()).is_some() { shape } else { "rect".into() };
+    let fill = if matches!(fill.as_str(), "none" | "solid") { fill } else { String::new() };
     CanvasNode {
         id: new_id(),
         kind: "text".into(),
@@ -124,9 +137,56 @@ pub fn shape_node(shape: String, x0: f64, y0: f64, x1: f64, y1: f64, color: Stri
         label: String::new(),
         color,
         shape,
+        fill,
         ink: None,
         extra: String::new(),
     }
+}
+
+/// A shape's outline in a 100 × 100 box (scaled to the card), from the one
+/// list every app uses (`marrow-core/data/shapes.json`).
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct ShapeGeometry {
+    pub kind: String,
+    /// Its name ("Rounded rectangle").
+    pub name: String,
+    /// The outline, as SVG path data using only M, L, C and Z.
+    pub outline: String,
+    /// More lines drawn on it, not filled (the top of a cylinder), or "".
+    pub extra: String,
+    /// Where words go: x0, y0, x1, y1 in the same 100 × 100 box.
+    pub label: Vec<f64>,
+}
+
+fn shapes() -> &'static [ShapeGeometry] {
+    static SHAPES: std::sync::OnceLock<Vec<ShapeGeometry>> = std::sync::OnceLock::new();
+    SHAPES.get_or_init(|| {
+        let v: serde_json::Value = serde_json::from_str(include_str!("../../marrow-core/data/shapes.json")).unwrap_or_default();
+        v["shapes"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|s| ShapeGeometry {
+                kind: s["kind"].as_str().unwrap_or_default().to_string(),
+                name: s["name"].as_str().unwrap_or_default().to_string(),
+                outline: s["d"].as_str().unwrap_or_default().to_string(),
+                extra: s["extra"].as_str().unwrap_or_default().to_string(),
+                label: s["label"].as_array().into_iter().flatten().filter_map(|x| x.as_f64()).collect(),
+            })
+            .collect()
+    })
+}
+
+/// Every shape that can be drawn, in the order the apps show them.
+#[uniffi::export]
+pub fn shape_kinds() -> Vec<ShapeGeometry> {
+    shapes().to_vec()
+}
+
+/// One shape's outline, or None for a kind that isn't known.
+#[uniffi::export]
+pub fn shape_geometry(kind: String) -> Option<ShapeGeometry> {
+    shapes().iter().find(|s| s.kind == kind).cloned()
 }
 
 /// A text card at a point on the drawing.
@@ -145,6 +205,7 @@ pub fn text_node(text: String, x: f64, y: f64, color: String) -> CanvasNode {
         label: String::new(),
         color,
         shape: String::new(),
+        fill: String::new(),
         ink: None,
         extra: String::new(),
     }
@@ -210,25 +271,62 @@ mod tests {
     #[test]
     fn strokes_and_shapes() {
         // A nearly straight stroke keeps only its ends; the card wraps it with room for the line.
-        let n = stroke_node(vec![10.0, 10.0, 20.0, 10.2, 30.0, 10.0, 40.0, 10.1], 4.0, false, "5".into(), 1.0).unwrap();
+        let n = stroke_node(vec![10.0, 10.0, 20.0, 10.2, 30.0, 10.0, 40.0, 10.1], 4.0, "pen".into(), "5".into(), 1.0).unwrap();
         let ink = n.ink.as_ref().unwrap();
         assert_eq!(ink.points.len(), 4);
         assert_eq!((n.x, n.y, n.width), (2.0, 2.0, 46.0));
         assert_eq!(&ink.points[..2], &[8.0, 8.0]);
         assert_eq!(n.color, "5");
         // A dot still draws; a tiny arrow doesn't.
-        assert!(stroke_node(vec![5.0, 5.0], 4.0, false, "".into(), 1.0).is_some());
-        assert!(stroke_node(vec![5.0, 5.0, 7.0, 6.0], 4.0, true, "".into(), 1.0).is_none());
-        let a = stroke_node(vec![0.0, 0.0, 50.0, 80.0, 100.0, 0.0], 4.0, true, "".into(), 1.0).unwrap();
-        assert!(a.ink.unwrap().arrow);
+        assert!(stroke_node(vec![5.0, 5.0], 4.0, "pen".into(), "".into(), 1.0).is_some());
+        assert!(stroke_node(vec![5.0, 5.0, 7.0, 6.0], 4.0, "arrow".into(), "".into(), 1.0).is_none());
+        let a = stroke_node(vec![0.0, 0.0, 50.0, 80.0, 100.0, 0.0], 4.0, "double".into(), "".into(), 1.0).unwrap();
+        let ink = a.ink.clone().unwrap();
+        assert!(ink.arrow && ink.start_arrow && ink.points.len() == 4);
+        // A straight line keeps only its ends; a highlighter is wide.
+        let l = stroke_node(vec![0.0, 0.0, 50.0, 80.0, 100.0, 0.0], 4.0, "line".into(), "".into(), 1.0).unwrap();
+        assert_eq!(l.ink.unwrap().points.len(), 4);
+        let hl = stroke_node(vec![0.0, 0.0, 50.0, 80.0, 100.0, 0.0], 4.0, "highlighter".into(), "3".into(), 1.0).unwrap();
+        assert!(hl.ink.as_ref().unwrap().highlight && hl.ink.unwrap().size >= 14.0);
         // Shapes: dragged, or a tap for a standard size.
-        let s = shape_node("ellipse".into(), 100.0, 50.0, 20.0, 10.0, "".into());
+        let s = shape_node("ellipse".into(), 100.0, 50.0, 20.0, 10.0, "".into(), "none".into());
+        assert_eq!(s.fill, "none");
         assert_eq!((s.x, s.y, s.width, s.height, s.shape.as_str()), (20.0, 10.0, 80.0, 40.0, "ellipse"));
-        let t = shape_node("star".into(), 100.0, 100.0, 101.0, 101.0, "".into());
-        assert_eq!((t.width, t.height, t.shape.as_str()), (160.0, 100.0, "rect"));
+        let t = shape_node("blob".into(), 100.0, 100.0, 101.0, 101.0, "".into(), "glass".into());
+        assert_eq!((t.width, t.height, t.shape.as_str(), t.fill.as_str()), (160.0, 100.0, "rect", ""));
+        assert_eq!(shape_node("star".into(), 0.0, 0.0, 50.0, 50.0, "".into(), "solid".into()).shape, "star");
         // They save as the desktop app writes them.
-        let out = crate::canvas::canvas_json(&crate::canvas::Board { nodes: vec![n, s], edges: vec![] });
-        assert!(out.contains("\"ink\"") && out.contains("\"shape\": \"ellipse\"") && out.contains("Drawing —"));
+        let board = crate::canvas::Board { nodes: vec![n, s, a, hl_clone()], edges: vec![] };
+        let out = crate::canvas::canvas_json(&board);
+        assert!(out.contains("\"ink\"") && out.contains("\"shape\": \"ellipse\"") && out.contains("\"fill\": \"none\"") && out.contains("\"arrowStart\": true") && out.contains("Drawing —"));
+        // Read back the same (drawings also say "open in Marrow" for other apps).
+        let mut back = crate::canvas::parse_canvas(&out).unwrap();
+        for n in &mut back.nodes {
+            if n.ink.is_some() {
+                n.text.clear();
+            }
+        }
+        assert_eq!(back, board);
+    }
+
+    fn hl_clone() -> CanvasNode {
+        stroke_node(vec![0.0, 0.0, 30.0, 0.0], 4.0, "highlighter".into(), "".into(), 1.0).unwrap()
+    }
+
+    #[test]
+    fn the_shape_list() {
+        let all = shape_kinds();
+        assert!(all.len() >= 11, "{}", all.len());
+        for s in &all {
+            assert!(!s.name.is_empty() && s.label.len() == 4, "{}", s.kind);
+            // Only the commands every app draws.
+            for c in s.outline.chars().chain(s.extra.chars()) {
+                assert!(c.is_ascii_digit() || " ,.-MLCZ".contains(c), "{}: {c}", s.kind);
+            }
+            assert!(s.outline.starts_with('M') && s.outline.ends_with('Z'), "{}", s.kind);
+        }
+        assert!(!shape_geometry("cylinder".into()).unwrap().extra.is_empty());
+        assert!(shape_geometry("blob".into()).is_none());
     }
 
     #[test]

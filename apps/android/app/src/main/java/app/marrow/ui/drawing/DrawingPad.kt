@@ -25,14 +25,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowRightAlt
 import androidx.compose.material.icons.automirrored.outlined.Undo
+import androidx.compose.material.icons.outlined.BorderColor
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.CropSquare
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Draw
 import androidx.compose.material.icons.outlined.OpenInFull
-import androidx.compose.material.icons.outlined.PanoramaFishEye
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +57,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -63,6 +65,7 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -84,6 +87,8 @@ import androidx.compose.ui.unit.sp
 import app.marrow.R
 import app.marrow.core.Board
 import app.marrow.core.CanvasNode
+import app.marrow.core.ShapeGeometry
+import app.marrow.core.shapeKinds
 import app.marrow.core.shapeNode
 import app.marrow.core.strokeNode
 import app.marrow.core.textNode
@@ -101,7 +106,8 @@ import kotlin.math.sin
 /*
  * Drawings inside notes: a small canvas (a `.canvas` file) shown where its
  * `![[Drawing ….canvas|360]]` line is. Tap it to draw right there, with a
- * finger or a stylus: pen, shapes, arrows and words, in colour. The cards it
+ * finger or a stylus: pen, highlighter, lines, arrows, shapes (filled, light
+ * or see-through) and words, in colour. The cards it
  * makes are the same as on the desktop and in canvases, so the drawing looks
  * the same everywhere.
  */
@@ -112,7 +118,42 @@ private val PALETTE = listOf("1" to Color(0xFFE03E3E), "2" to Color(0xFFE8780C),
 private fun colorOf(c: String): Color? = PALETTE.firstOrNull { it.first == c }?.second
     ?: if (Regex("#[0-9a-fA-F]{6}").matches(c)) Color(android.graphics.Color.parseColor(c)) else null
 
-enum class DrawTool { PEN, RECT, ELLIPSE, DIAMOND, ARROW, TEXT, ERASE }
+enum class DrawTool(val stroke: String = "") { PEN("pen"), SHAPE, LINE("line"), ARROW("arrow"), DOUBLE("double"), HIGHLIGHT("highlighter"), TEXT, ERASE }
+
+/** The highlighter's colour when none is picked. */
+private val HIGHLIGHT = Color(0xFFF2C94C)
+
+/** The engine's shapes (the same list as the desktop's): outlines in a 100 × 100 box. */
+private val SHAPES: List<ShapeGeometry> by lazy { runCatching { shapeKinds() }.getOrDefault(emptyList()) }
+internal fun shapeOf(kind: String): ShapeGeometry? = SHAPES.firstOrNull { it.kind == kind } ?: SHAPES.firstOrNull()
+
+/** SVG path data (only M, L, C and Z) from the 100 × 100 box, placed in the box at `tl`. */
+internal fun placePath(d: String, tl: Offset, sz: Size): Path {
+    val p = Path()
+    val tokens = Regex("[MLCZ]|-?\\d*\\.?\\d+").findAll(d).map { it.value }.toList()
+    var i = 0
+    var cmd = 'M'
+    fun x() = tl.x + tokens[i++].toFloat() / 100f * sz.width
+    fun y() = tl.y + tokens[i++].toFloat() / 100f * sz.height
+    runCatching {
+        while (i < tokens.size) {
+            val t = tokens[i]
+            if (t[0].isLetter()) {
+                cmd = t[0]
+                i++
+                if (cmd == 'Z') p.close()
+                continue
+            }
+            when (cmd) {
+                'M' -> { p.moveTo(x(), y()); cmd = 'L' }
+                'L' -> p.lineTo(x(), y())
+                'C' -> p.cubicTo(x(), y(), x(), y(), x(), y())
+                else -> i++
+            }
+        }
+    }
+    return p
+}
 
 private val PEN_SIZES = listOf(2.0, 4.0, 8.0)
 
@@ -161,6 +202,8 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
     var tool by remember { mutableStateOf(DrawTool.PEN) }
     var color by remember { mutableStateOf("") }
     var penSize by remember { mutableStateOf(4.0) }
+    var shapeKind by remember { mutableStateOf("rect") }
+    var fill by remember { mutableStateOf("") }
     var box by remember { mutableStateOf(IntSize.Zero) }
     var frozen by remember { mutableStateOf<View?>(null) }
     var draft by remember { mutableStateOf<List<Offset>>(emptyList()) }
@@ -199,10 +242,10 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
         val a = w.first()
         val z = w.last()
         when (tool) {
-            DrawTool.PEN, DrawTool.ARROW -> add(strokeNode(w.flatMap { listOf(it.x.toDouble(), it.y.toDouble()) }, penSize, tool == DrawTool.ARROW, color, (view.k / density).toDouble()))
-            DrawTool.RECT, DrawTool.ELLIPSE, DrawTool.DIAMOND -> {
-                val kind = when (tool) { DrawTool.ELLIPSE -> "ellipse"; DrawTool.DIAMOND -> "diamond"; else -> "rect" }
-                val n = shapeNode(kind, a.x.toDouble(), a.y.toDouble(), z.x.toDouble(), z.y.toDouble(), color)
+            DrawTool.PEN, DrawTool.LINE, DrawTool.ARROW, DrawTool.DOUBLE, DrawTool.HIGHLIGHT ->
+                add(strokeNode(w.flatMap { listOf(it.x.toDouble(), it.y.toDouble()) }, penSize, tool.stroke, color, (view.k / density).toDouble()))
+            DrawTool.SHAPE -> {
+                val n = shapeNode(shapeKind, a.x.toDouble(), a.y.toDouble(), z.x.toDouble(), z.y.toDouble(), color, fill)
                 add(n)
                 asking = { label -> if (label.isNotBlank()) board?.let { b -> change(b.copy(nodes = b.nodes.map { if (it.id == n.id) it.copy(text = label.trim()) else it })) } }
             }
@@ -226,7 +269,7 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
 
     Column(modifier) {
         if (active) {
-            Toolbar(tool, { tool = it }, color, { color = it }, penSize, { penSize = it }, canUndo = past.isNotEmpty(), onUndo = {
+            Toolbar(tool, { tool = it }, color, { color = it }, penSize, { penSize = it }, shapeKind, { shapeKind = it }, fill, { fill = it }, canUndo = past.isNotEmpty(), onUndo = {
                 val prev = past.removeAt(past.lastIndex)
                 board = prev
                 saveJob?.cancel()
@@ -242,7 +285,7 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
                 .semantics { contentDescription = "Drawing" }
                 .then(
                     if (active) {
-                        Modifier.pointerInput(tool, color, penSize, view) {
+                        Modifier.pointerInput(tool, color, penSize, view, shapeKind, fill) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
                                 down.consume()
@@ -273,7 +316,7 @@ private fun DrawingPad(path: String, active: Boolean, setActive: (Boolean) -> Un
                 }) {
                     drawBoard(b, measurer, ink, paper)
                 }
-                if (draft.size > 1) drawDraft(tool, draft, colorOf(color) ?: ink, (penSize * view.k).toFloat(), accent)
+                if (draft.size > 1) drawDraft(tool, draft, colorOf(color), ink, (penSize * view.k).toFloat(), accent, shapeKind)
             }
             when {
                 missing -> Text(stringResource(R.string.drawing_missing), Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -304,6 +347,8 @@ private fun Toolbar(
     tool: DrawTool, setTool: (DrawTool) -> Unit,
     color: String, setColor: (String) -> Unit,
     penSize: Double, setPenSize: (Double) -> Unit,
+    shapeKind: String, setShape: (String) -> Unit,
+    fill: String, setFill: (String) -> Unit,
     canUndo: Boolean, onUndo: () -> Unit, onDone: () -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
@@ -311,10 +356,28 @@ private fun Toolbar(
             Row(verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
                 ToolButton(Icons.Outlined.Draw, stringResource(R.string.pen), tool == DrawTool.PEN) { setTool(DrawTool.PEN) }
-                ToolButton(Icons.Outlined.CropSquare, stringResource(R.string.rectangle), tool == DrawTool.RECT) { setTool(DrawTool.RECT) }
-                ToolButton(Icons.Outlined.PanoramaFishEye, stringResource(R.string.ellipse), tool == DrawTool.ELLIPSE) { setTool(DrawTool.ELLIPSE) }
-                ToolButton(DiamondIcon, stringResource(R.string.diamond), tool == DrawTool.DIAMOND) { setTool(DrawTool.DIAMOND) }
+                ToolButton(Icons.Outlined.BorderColor, stringResource(R.string.highlighter), tool == DrawTool.HIGHLIGHT) { setTool(DrawTool.HIGHLIGHT) }
+                // One button for every shape: a tap lists them.
+                Box {
+                    var picking by remember { mutableStateOf(false) }
+                    ToolButton(shapeIcon(shapeKind), stringResource(R.string.shapes), tool == DrawTool.SHAPE) { picking = true }
+                    DropdownMenu(picking, { picking = false }) {
+                        SHAPES.forEach { g ->
+                            DropdownMenuItem(
+                                text = { Text(shapeName(g)) },
+                                leadingIcon = { Icon(shapeIcon(g.kind), null, Modifier.size(22.dp)) },
+                                onClick = {
+                                    picking = false
+                                    setShape(g.kind)
+                                    setTool(DrawTool.SHAPE)
+                                },
+                            )
+                        }
+                    }
+                }
+                ToolButton(LineIcon, stringResource(R.string.line), tool == DrawTool.LINE) { setTool(DrawTool.LINE) }
                 ToolButton(Icons.AutoMirrored.Outlined.ArrowRightAlt, stringResource(R.string.arrow), tool == DrawTool.ARROW) { setTool(DrawTool.ARROW) }
+                ToolButton(DoubleArrowIcon, stringResource(R.string.double_arrow), tool == DrawTool.DOUBLE) { setTool(DrawTool.DOUBLE) }
                 ToolButton(Icons.Outlined.TextFields, stringResource(R.string.words), tool == DrawTool.TEXT) { setTool(DrawTool.TEXT) }
                 ToolButton(Icons.Outlined.Delete, stringResource(R.string.eraser), tool == DrawTool.ERASE) { setTool(DrawTool.ERASE) }
                 Spacer(Modifier.width(4.dp))
@@ -329,6 +392,12 @@ private fun Toolbar(
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(start = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Swatch(null, color == "") { setColor("") }
                 PALETTE.forEach { (id, c) -> Swatch(c, color == id) { setColor(id) } }
+                if (tool == DrawTool.SHAPE) {
+                    Spacer(Modifier.width(8.dp))
+                    FillChip(stringResource(R.string.fill_none), fill == "none") { setFill("none") }
+                    FillChip(stringResource(R.string.fill_light), fill == "") { setFill("") }
+                    FillChip(stringResource(R.string.fill_solid), fill == "solid") { setFill("solid") }
+                }
                 if (tool == DrawTool.PEN) {
                     Spacer(Modifier.width(8.dp))
                     PEN_SIZES.forEach { s ->
@@ -369,15 +438,67 @@ private fun Swatch(c: Color?, on: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** A diamond outline, drawn as an icon. */
-private val DiamondIcon: ImageVector by lazy {
-    ImageVector.Builder("Diamond", 24.dp, 24.dp, 24f, 24f).addPath(
-        pathData = androidx.compose.ui.graphics.vector.PathParser().parsePathString("M12,2.5 L21.5,12 L12,21.5 L2.5,12 Z").toNodes(),
-        fill = null,
-        stroke = androidx.compose.ui.graphics.SolidColor(Color.Black),
-        strokeLineWidth = 2f,
-        strokeLineJoin = StrokeJoin.Round,
-    ).build()
+@Composable
+private fun FillChip(label: String, on: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.height(30.dp).clip(RoundedCornerShape(15.dp))
+            .background(if (on) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(15.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(label, style = MaterialTheme.typography.labelLarge) }
+}
+
+@Composable
+private fun shapeName(g: ShapeGeometry): String = when (g.kind) {
+    "rect" -> stringResource(R.string.rectangle)
+    "ellipse" -> stringResource(R.string.ellipse)
+    "diamond" -> stringResource(R.string.diamond)
+    "rounded" -> stringResource(R.string.shape_rounded)
+    "triangle" -> stringResource(R.string.shape_triangle)
+    "hexagon" -> stringResource(R.string.shape_hexagon)
+    "parallelogram" -> stringResource(R.string.shape_parallelogram)
+    "star" -> stringResource(R.string.shape_star)
+    "cylinder" -> stringResource(R.string.shape_cylinder)
+    "bubble" -> stringResource(R.string.shape_bubble)
+    "cloud" -> stringResource(R.string.shape_cloud)
+    else -> g.name
+}
+
+/** An outline icon from path data in a `box` × `box` square. */
+private fun pathIcon(name: String, box: Float, width: Float, vararg paths: String): ImageVector {
+    val b = ImageVector.Builder(name, 24.dp, 24.dp, box + 12f, box + 12f)
+    b.addGroup(translationX = 6f, translationY = 6f)
+    paths.filter { it.isNotEmpty() }.forEach {
+        b.addPath(PathParser().parsePathString(it).toNodes(), fill = null, stroke = SolidColor(Color.Black), strokeLineWidth = width, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round)
+    }
+    b.clearGroup()
+    return b.build()
+}
+
+private val shapeIcons = mutableMapOf<String, ImageVector>()
+private fun shapeIcon(kind: String): ImageVector = shapeIcons.getOrPut(kind) {
+    val g = shapeOf(kind)
+    pathIcon("Shape $kind", 100f, 8f, g?.outline ?: "M0,0 L100,0 L100,100 L0,100 Z", g?.extra.orEmpty())
+}
+private val LineIcon: ImageVector by lazy { pathIcon("Line", 12f, 1.6f, "M0,12 L12,0") }
+private val DoubleArrowIcon: ImageVector by lazy { pathIcon("Double arrow", 12f, 1.4f, "M0,6 L12,6 M3,3 L0,6 L3,9 M9,3 L12,6 L9,9") }
+
+/**
+ * A shape, filled lightly (see-through), solid, or not at all ("none": what's
+ * under it shows), with its outline in `line` (or its colour).
+ */
+internal fun DrawScope.drawShape(g: ShapeGeometry?, fill: String, c: Color?, ink: Color, paper: Color, tl: Offset, sz: Size, width: Float, line: Color? = null) {
+    val stroke = line ?: c ?: ink.copy(alpha = 0.7f)
+    val path = g?.let { placePath(it.outline, tl, sz) } ?: Path().apply { addRect(androidx.compose.ui.geometry.Rect(tl, sz)) }
+    when (fill) {
+        "none" -> {}
+        "solid" -> drawPath(path, c ?: mix(ink, paper, 0.78f), style = Fill)
+        else -> drawPath(path, c?.copy(alpha = 0.16f) ?: paper.copy(alpha = 0.82f), style = Fill)
+    }
+    drawPath(path, stroke, style = Stroke(width, join = StrokeJoin.Round))
+    g?.extra?.takeIf { it.isNotEmpty() }?.let { drawPath(placePath(it, tl, sz), stroke, style = Stroke(width)) }
 }
 
 private fun mix(c: Color, bg: Color, a: Float) = Color(c.red * a + bg.red * (1 - a), c.green * a + bg.green * (1 - a), c.blue * a + bg.blue * (1 - a), 1f)
@@ -406,28 +527,21 @@ private fun DrawScope.drawBoard(b: Board, measurer: TextMeasurer, ink: Color, pa
                 val sy = sz.height / ink2.h.toFloat()
                 val pts = ink2.points.chunked(2).filter { it.size == 2 }.map { Offset(tl.x + it[0].toFloat() * sx, tl.y + it[1].toFloat() * sy) }
                 if (pts.size < 2) return@forEach
-                val color = c ?: ink.copy(alpha = 0.85f)
+                val color = if (ink2.highlight) (c ?: HIGHLIGHT).copy(alpha = 0.4f) else c ?: ink.copy(alpha = 0.85f)
                 val stroke = Stroke(ink2.size.toFloat(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                if (ink2.arrow) {
+                if (ink2.arrow || ink2.startArrow) {
                     drawLine(color, pts.first(), pts.last(), stroke.width, StrokeCap.Round)
-                    arrowHead(pts.first(), pts.last(), color, stroke.width)
+                    if (ink2.arrow) arrowHead(pts.first(), pts.last(), color, stroke.width)
+                    if (ink2.startArrow) arrowHead(pts.last(), pts.first(), color, stroke.width)
                 } else drawPath(smooth(pts), color, style = stroke)
             }
             n.shape.isNotEmpty() -> {
-                val line = c ?: ink.copy(alpha = 0.7f)
-                val fill = if (c != null) mix(c, paper, 0.13f) else paper
-                val path = when (n.shape) {
-                    "ellipse" -> Path().apply { addOval(androidx.compose.ui.geometry.Rect(tl, sz)) }
-                    "diamond" -> Path().apply {
-                        moveTo(tl.x + sz.width / 2, tl.y); lineTo(tl.x + sz.width, tl.y + sz.height / 2)
-                        lineTo(tl.x + sz.width / 2, tl.y + sz.height); lineTo(tl.x, tl.y + sz.height / 2); close()
-                    }
-                    else -> Path().apply { addRoundRect(androidx.compose.ui.geometry.RoundRect(androidx.compose.ui.geometry.Rect(tl, sz), CornerRadius(4f))) }
-                }
-                drawPath(path, fill, style = Fill)
-                drawPath(path, line, style = Stroke(2f))
-                val (ix, iy) = when (n.shape) { "diamond" -> 0.2f to 0.16f; "ellipse" -> 0.1f to 0.1f; else -> 0.04f to 0.04f }
-                label(measurer, n.text, tl, sz, ink, 17f, ix, iy)
+                val g = shapeOf(n.shape)
+                drawShape(g, n.fill, c, ink, paper, tl, sz, 2f)
+                val lb = g?.label?.takeIf { it.size == 4 }?.map { it.toFloat() / 100f } ?: listOf(0.04f, 0.04f, 0.96f, 0.96f)
+                val ltl = Offset(tl.x + lb[0] * sz.width, tl.y + lb[1] * sz.height)
+                val lsz = Size((lb[2] - lb[0]) * sz.width, (lb[3] - lb[1]) * sz.height)
+                label(measurer, n.text, ltl, lsz, if (n.fill == "solid") paper else ink, 17f, 0f, 0f)
             }
             n.kind == "group" -> {
                 val col = c ?: Color(0xFF0B8CB5)
@@ -481,27 +595,25 @@ private fun DrawScope.arrowHead(from: Offset, to: Offset, color: Color, width: F
 }
 
 /** What's being drawn right now, in screen pixels. */
-private fun DrawScope.drawDraft(tool: DrawTool, pts: List<Offset>, color: Color, penPx: Float, accent: Color) {
+private fun DrawScope.drawDraft(tool: DrawTool, pts: List<Offset>, picked: Color?, ink: Color, penPx: Float, accent: Color, shapeKind: String) {
     val a = pts.first()
     val z = pts.last()
+    val color = picked ?: ink
     when (tool) {
         DrawTool.PEN -> drawPath(smooth(pts), color, style = Stroke(penPx.coerceAtLeast(1.5f), cap = StrokeCap.Round, join = StrokeJoin.Round))
-        DrawTool.ARROW -> {
+        DrawTool.HIGHLIGHT -> drawPath(smooth(pts), (picked ?: HIGHLIGHT).copy(alpha = 0.4f), style = Stroke(max(penPx, 14f * density), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        DrawTool.LINE -> drawLine(color, a, z, max(penPx, 1.5f), StrokeCap.Round)
+        DrawTool.ARROW, DrawTool.DOUBLE -> {
             drawLine(color, a, z, 2.5f * density, StrokeCap.Round)
             arrowHead(a, z, color, 2.5f * density)
+            if (tool == DrawTool.DOUBLE) arrowHead(z, a, color, 2.5f * density)
         }
-        DrawTool.RECT, DrawTool.ELLIPSE, DrawTool.DIAMOND -> {
+        DrawTool.SHAPE -> {
             val tl = Offset(min(a.x, z.x), min(a.y, z.y))
             val sz = Size(abs(z.x - a.x), abs(z.y - a.y))
             val dash = Stroke(1.5f * density, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
-            when (tool) {
-                DrawTool.ELLIPSE -> drawOval(accent, tl, sz, style = dash)
-                DrawTool.DIAMOND -> drawPath(Path().apply {
-                    moveTo(tl.x + sz.width / 2, tl.y); lineTo(tl.x + sz.width, tl.y + sz.height / 2)
-                    lineTo(tl.x + sz.width / 2, tl.y + sz.height); lineTo(tl.x, tl.y + sz.height / 2); close()
-                }, accent, style = dash)
-                else -> drawRect(accent, tl, sz, style = dash)
-            }
+            val g = shapeOf(shapeKind)
+            if (g != null) drawPath(placePath(g.outline, tl, sz), accent, style = dash) else drawRect(accent, tl, sz, style = dash)
         }
         DrawTool.ERASE -> drawCircle(accent.copy(alpha = 0.3f), 14f * density, z)
         DrawTool.TEXT -> {}

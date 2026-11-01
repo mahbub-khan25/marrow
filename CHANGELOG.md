@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **More to draw with:** 11 shapes (rectangle, rounded rectangle, circle,
+  diamond, triangle, hexagon, parallelogram, star, cylinder, speech bubble
+  and cloud), plus a straight line, a double-headed arrow and a highlighter.
+- **See-through shapes:** pick **No fill** to lay a shape over others and
+  still see what's under it, or **Solid** for a filled shape. The usual
+  light fill is still there.
+- **Hide or resize the parts of the window** (computers): hide the icon bar,
+  the sidebar, the inspector or the status bar, each on its own (buttons in
+  the tab bar, Settings › Appearance, or the command palette;
+  `Ctrl+Shift+[` and `Ctrl+Shift+]` for the sidebar and inspector). Drag the
+  edge of the sidebar or the inspector to make it wider or narrower;
+  double-click the edge to put it back. Marrow remembers your choices.
+
 ## 1.6.0
 
 Draw inside your notes, save web pages, get reminded, and see today's tasks on your home screen.

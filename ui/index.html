@@ -90,7 +90,10 @@
       </aside>
 
       <main class="main">
+        <div class="resizer rs-side" id="rs-side" role="separator" aria-orientation="vertical" aria-label="Sidebar width" title="Drag to resize. Double-click to reset."></div>
+        <div class="resizer rs-insp" id="rs-insp" role="separator" aria-orientation="vertical" aria-label="Inspector width" title="Drag to resize. Double-click to reset."></div>
         <div class="tabbar">
+          <button id="sidebar-btn" class="icon-btn" title="Sidebar" aria-pressed="true"><i class="ph-duotone ph-sidebar-simple"></i></button>
           <div id="tabs" class="tabs" role="tablist" aria-label="Open tabs"></div>
           <button id="jump" class="jump"><i class="ph-duotone ph-magnifying-glass"></i><span>Search or jump to…</span><kbd id="jump-kbd"></kbd></button>
           <button id="split-btn" class="icon-btn" aria-pressed="false"><i class="ph-duotone ph-columns"></i></button>

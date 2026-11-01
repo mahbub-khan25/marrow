@@ -360,15 +360,18 @@ kbd {
 .shell {
   height: 100vh;
   display: grid;
-  grid-template-columns: 76px auto minmax(0, 1fr) auto;
-  grid-template-rows: minmax(0, 1fr) 28px;
+  /* Every part has its own column, so hiding one (display: none) just
+     closes its column up. */
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   overflow: hidden;
   background: var(--color-bg);
 }
 
 /* The rail: every place in Marrow, with its name under its icon. */
 .rail {
-  grid-row: 1 / 3;
+  grid-column: 1; grid-row: 1 / 3;
+  width: 76px; box-sizing: border-box;
   background: var(--color-chrome);
   border-right: 1px solid var(--color-divider);
   display: flex; flex-direction: column; align-items: center;
@@ -421,7 +424,8 @@ kbd {
   border-right: 1px solid var(--color-divider);
   display: flex; flex-direction: column;
   min-height: 0; min-width: 0; overflow: hidden;
-  width: 272px;
+  grid-column: 2; grid-row: 1;
+  width: min(var(--side-w, 272px), 34vw); box-sizing: border-box;
   padding: 16px 10px 12px;
 }
 .shell.no-sidebar .sidebar { display: none; }
@@ -573,8 +577,33 @@ mark { background: color-mix(in srgb, var(--color-process-yellow) 34%, transpare
 
 /* ------------------------------------------------------------------- main */
 
-.main { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-.tabbar { height: 50px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 14px; border-bottom: 1px solid var(--color-divider); }
+.main { grid-column: 3; grid-row: 1; position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+
+/* Hide the icon bar or the status bar (Settings › Appearance, or the palette). */
+@media (min-width: 700px) {
+  :root[data-rail="off"] .rail { display: none; }
+  :root[data-statusbar="off"] .statusbar { display: none; }
+}
+
+/* Drag the edge of the sidebar or the inspector to make it wider or narrower. */
+.resizer {
+  position: absolute; top: 0; bottom: 0; z-index: 6;
+  width: 7px; cursor: col-resize; touch-action: none;
+}
+.resizer.rs-side { left: -4px; }
+.resizer.rs-insp { right: -4px; }
+.resizer::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px;
+  background: transparent; transition: background-color 0.12s 0.1s;
+}
+.resizer:hover::after, .resizer.is-dragging::after { background: var(--color-accent); width: 2px; left: 2.5px; }
+.shell.no-sidebar .rs-side, .shell.no-inspector .rs-insp { display: none; }
+/* Below 1200px the inspector floats over the note, and phones have no edges to drag. */
+@media (max-width: 1199px) { .rs-insp { display: none; } }
+@media (max-width: 699px) { .resizer { display: none; } }
+:root.is-resizing, :root.is-resizing * { cursor: col-resize !important; user-select: none !important; }
+:root.is-resizing iframe { pointer-events: none; }
+.tabbar { height: 50px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 8px; border-bottom: 1px solid var(--color-divider); }
 .tabs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; overflow: hidden; }
 .tab {
   flex: 0 1 auto; min-width: 96px; max-width: 220px; overflow: hidden;
@@ -936,15 +965,25 @@ mark { background: color-mix(in srgb, var(--color-process-yellow) 34%, transpare
 .card.has-color.card-group { background: color-mix(in srgb, var(--c) 8%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 45%, transparent); }
 .card.has-color.card-group .k { color: var(--c); }
 
-/* Shapes */
-.card-shape { background: none; display: grid; place-items: center; padding: 10px 14px; }
+/* Shapes: any outline from shapes.ts, filled lightly (see-through), solid, or not at all. */
+.card-shape { background: none; }
 .shape-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-.shape-fill { fill: var(--color-bg); stroke: color-mix(in srgb, var(--color-text) 70%, transparent); stroke-width: 2; }
-.card-shape.has-color .shape-fill { fill: color-mix(in srgb, var(--c) 13%, var(--color-bg)); stroke: var(--c); }
-.card-shape[data-shape="diamond"] { padding: 18% 22%; }
-.card-shape[data-shape="ellipse"] { padding: 12% 16%; }
+.shape-fill { fill: color-mix(in srgb, var(--color-bg) 82%, transparent); stroke: color-mix(in srgb, var(--color-text) 70%, transparent); stroke-width: 2; stroke-linejoin: round; }
+.shape-line { fill: none; stroke: color-mix(in srgb, var(--color-text) 70%, transparent); stroke-width: 2; }
+.shape-hit { fill: none; stroke: transparent; stroke-width: 12; }
+.card-shape.has-color .shape-fill { fill: color-mix(in srgb, var(--c) 16%, transparent); stroke: var(--c); }
+.card-shape.has-color .shape-line { stroke: var(--c); }
+.card-shape[data-fill="none"] .shape-fill { fill: none; }
+.card-shape[data-fill="solid"] .shape-fill { fill: color-mix(in srgb, var(--color-text) 78%, var(--color-bg)); }
+.card-shape[data-fill="solid"].has-color .shape-fill { fill: var(--c); }
+.card-shape[data-fill="solid"] .shape-label { color: var(--color-bg); }
+/* A see-through shape lets clicks through to what's under it, except on its outline and words. */
+.card-shape[data-fill="none"] { pointer-events: none; }
+.card-shape[data-fill="none"] .shape-hit, .card-shape[data-fill="none"] .shape-label:not(:empty), .card-shape[data-fill="none"] .card-resize, .card-shape[data-fill="none"] .card-handle { pointer-events: auto; }
+.card-shape[data-fill="none"] .shape-hit { pointer-events: stroke; cursor: grab; }
+.canvas-view:not(.tool-select) .card-shape .shape-hit { pointer-events: none; }
 .shape-label {
-  position: relative; max-width: 100%; max-height: 100%; overflow: hidden; text-align: center;
+  position: absolute; display: flex; align-items: center; justify-content: center; overflow: hidden; text-align: center;
   font-size: 17px; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; outline: none;
 }
 .shape-label[contenteditable="true"], .shape-label[contenteditable="plaintext-only"] { cursor: text; user-select: text; min-width: 2ch; }
@@ -959,6 +998,9 @@ mark { background: color-mix(in srgb, var(--color-process-yellow) 34%, transpare
 .card-ink.is-selected { outline: 1px dashed var(--color-accent); outline-offset: 2px; }
 .card-ink .card-resize { pointer-events: auto; }
 .ink-draft { fill: none; stroke: color-mix(in srgb, var(--color-text) 85%, transparent); stroke-linecap: round; stroke-linejoin: round; }
+/* The highlighter: wide and see-through (yellow unless a colour is picked). */
+.ink-line.ink-hl, .ink-draft.ink-hl { stroke: var(--c, #f2c94c); opacity: 0.4; stroke-linecap: round; }
+.ink-draft.ink-hl { stroke: #f2c94c; }
 .shape-draft { fill: none; stroke: var(--color-accent); stroke-width: 1.5; stroke-dasharray: 5 4; }
 .canvas-edges .draw-draft path, .canvas-edges .draw-draft ellipse, .canvas-edges .draw-draft rect, .canvas-edges .draw-draft polygon { pointer-events: none; }
 .cv-edge-input {
@@ -974,7 +1016,8 @@ mark { background: color-mix(in srgb, var(--color-process-yellow) 34%, transpare
 /* -------------------------------------------------------------- inspector */
 
 .inspector {
-  width: 300px; min-height: 0; overflow: auto;
+  grid-column: 4; grid-row: 1;
+  width: min(var(--insp-w, 300px), 34vw); box-sizing: border-box; min-height: 0; overflow: auto;
   padding: 20px 18px 40px;
   display: flex; flex-direction: column; gap: 26px;
   background: var(--color-chrome); border-left: 1px solid var(--color-divider);
@@ -1032,7 +1075,7 @@ mark { background: color-mix(in srgb, var(--color-process-yellow) 34%, transpare
 /* ------------------------------------------------------------- status bar */
 
 .statusbar {
-  grid-column: 2 / -1;
+  grid-column: 2 / -1; grid-row: 2; height: 28px;
   display: flex; align-items: center; gap: 18px;
   padding: 0 16px; font-size: var(--t-meta); color: var(--ink-65);
   background: var(--color-chrome); border-top: 1px solid var(--color-divider);
@@ -1946,6 +1989,7 @@ body.block-dragging, body.block-dragging * { cursor: grabbing !important; user-s
 :root[data-mobile] .shell { height: 100dvh; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); box-sizing: border-box; }
 :root[data-mobile] .statusbar { padding-bottom: env(safe-area-inset-bottom); }
 :root[data-mobile] #split-btn { display: none; }
+:root[data-mobile] .resizer { display: none; }
 /* No keyboard shortcuts to show on a touch screen. */
 :root[data-mobile] .hint, :root[data-mobile] .jump kbd { display: none; }
 
@@ -1959,7 +2003,7 @@ body.block-dragging, body.block-dragging * { cursor: grabbing !important; user-s
   .main { grid-column: 1; grid-row: 1; }
   .statusbar { display: none; }
   .rail {
-    grid-column: 1; grid-row: 2;
+    grid-column: 1; grid-row: 2; width: auto;
     flex-direction: row; justify-content: space-around; align-items: center;
     padding: 4px 4px env(safe-area-inset-bottom); gap: 0;
     border-top: 1px solid var(--color-divider); border-right: 0; overflow: visible;
@@ -1981,6 +2025,7 @@ body.block-dragging, body.block-dragging * { cursor: grabbing !important; user-s
     padding: 20px 20px 40px;
   }
   .tabbar { padding: 0 6px 0 10px; gap: 2px; }
+  #sidebar-btn { display: none; }
   .tab { min-width: 0; max-width: 52vw; }
   .tabbar { gap: 4px; }
   .pane-col { padding-bottom: 120px; }
@@ -2581,3 +2626,20 @@ body.block-dragging, body.block-dragging * { cursor: grabbing !important; user-s
 .drawing:hover .drawing-grip::after { opacity: 1; }
 .drawing-missing { padding: 18px; color: var(--ink-65); font-size: 14px; }
 .cm-content .drawing { margin: 8px 0; }
+
+/* The shape picker and fill buttons in the drawing tools. */
+.cv-shape-btn { position: relative; width: 44px; }
+.cv-shape-btn .cv-caret { position: absolute; right: 1px; bottom: 1px; font-size: 10px; opacity: 0.7; }
+.cv-shape-icon { width: 20px; height: 20px; display: block; }
+.cv-shape-icon path { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+.cv-shapes {
+  position: absolute; z-index: 6; display: grid; grid-template-columns: repeat(4, 40px); gap: 4px; padding: 6px;
+  background: var(--color-bg); border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+}
+.cv-shape { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 6px; background: none; color: var(--color-text); cursor: pointer; }
+.cv-shape .cv-shape-icon { width: 24px; height: 24px; }
+.cv-shape:hover { background: var(--color-surface); }
+.cv-shape.is-on { background: var(--color-accent); color: var(--color-bg); }
+.cv-fills { display: none; align-items: center; }
+.canvas-tools.is-shape .cv-fills { display: flex; }
+.cv-fill { width: 30px; height: 30px; font-size: 16px; }

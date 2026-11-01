@@ -80,6 +80,8 @@ import app.marrow.ui.common.BackBar
 import app.marrow.ui.common.LocalEngine
 import app.marrow.ui.common.LocalNav
 import app.marrow.ui.common.nameOf
+import app.marrow.ui.drawing.drawShape
+import app.marrow.ui.drawing.shapeOf
 import app.marrow.ui.note.BlockActions
 import app.marrow.ui.note.Blocks
 import kotlinx.coroutines.delay
@@ -175,7 +177,7 @@ fun CanvasScreen(path: String) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                     Tool(Icons.Outlined.AddComment, stringResource(R.string.add_card)) {
                         val c = center()
-                        val n = CanvasNode(newId(), "text", (c.x - 120).toDouble(), (c.y - 60).toDouble(), 240.0, 120.0, "", "", "", "", "", "", null, "")
+                        val n = CanvasNode(newId(), "text", (c.x - 120).toDouble(), (c.y - 60).toDouble(), 240.0, 120.0, "", "", "", "", "", "", "", null, "")
                         add(n)
                         editing = n
                     }
@@ -287,7 +289,7 @@ fun CanvasScreen(path: String) {
                                 modifier = Modifier.clickable {
                                     picking = false
                                     val c = center()
-                                    add(CanvasNode(newId(), "file", (c.x - 150).toDouble(), (c.y - 100).toDouble(), 300.0, 200.0, "", h.path, "", "", "", "", null, ""))
+                                    add(CanvasNode(newId(), "file", (c.x - 150).toDouble(), (c.y - 100).toDouble(), 300.0, 200.0, "", h.path, "", "", "", "", "", null, ""))
                                 },
                             )
                         }
@@ -354,6 +356,8 @@ private fun Card(n: CanvasNode, selected: Boolean, density: Float, onTap: () -> 
     ) {
         if (isInk) {
             Ink(n, accent ?: MaterialTheme.colorScheme.onSurface)
+        } else if (n.shape.isNotEmpty()) {
+            ShapeCard(n, accent, selected)
         } else {
             Surface(
                 shape = RoundedCornerShape(if (isGroup) 16.dp else 12.dp),
@@ -406,6 +410,30 @@ private fun CardContent(n: CanvasNode) {
     }
 }
 
+/** A shape from a drawing: its outline, and its words where the shape keeps them. */
+@Composable
+private fun ShapeCard(n: CanvasNode, accent: Color?, selected: Boolean) {
+    val ink = MaterialTheme.colorScheme.onSurface
+    val paper = MaterialTheme.colorScheme.surface
+    val sel = MaterialTheme.colorScheme.primary
+    val g = remember(n.shape) { shapeOf(n.shape) }
+    Canvas(Modifier.fillMaxSize()) {
+        drawShape(g, n.fill, accent, ink, paper, Offset.Zero, size, (if (selected) 3f else 2f) * density, if (selected) sel else null)
+    }
+    if (n.text.isNotBlank()) {
+        val lb = g?.label?.takeIf { it.size == 4 } ?: listOf(4.0, 4.0, 96.0, 96.0)
+        Box(
+            Modifier.fillMaxSize().padding(
+                start = (lb[0] / 100 * n.width).toFloat().dp, top = (lb[1] / 100 * n.height).toFloat().dp,
+                end = ((100 - lb[2]) / 100 * n.width).toFloat().dp, bottom = ((100 - lb[3]) / 100 * n.height).toFloat().dp,
+            ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(n.text, color = if (n.fill == "solid") paper else ink, textAlign = androidx.compose.ui.text.style.TextAlign.Center, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
 @Composable
 private fun Ink(n: CanvasNode, color: Color) {
     val ink = n.ink ?: return
@@ -415,9 +443,11 @@ private fun Ink(n: CanvasNode, color: Color) {
         val pts = ink.points.chunked(2).filter { it.size == 2 }.map { Offset(it[0].toFloat() * sx, it[1].toFloat() * sy) }
         if (pts.size < 2) return@Canvas
         val stroke = Stroke(ink.size.toFloat() * density, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        if (ink.arrow) {
+        val color = if (ink.highlight) (if (n.color.isEmpty()) Color(0xFFF2C94C) else color).copy(alpha = 0.4f) else color
+        if (ink.arrow || ink.startArrow) {
             drawLine(color, pts.first(), pts.last(), stroke.width, StrokeCap.Round)
-            arrowHead(pts.first(), pts.last(), color, stroke.width)
+            if (ink.arrow) arrowHead(pts.first(), pts.last(), color, stroke.width)
+            if (ink.startArrow) arrowHead(pts.last(), pts.first(), color, stroke.width)
         } else {
             val p = Path().apply {
                 moveTo(pts[0].x, pts[0].y)

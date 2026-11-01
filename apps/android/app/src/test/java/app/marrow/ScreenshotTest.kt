@@ -146,7 +146,7 @@ class ScreenshotTest {
 
     @Test fun noteDrawing() = shot("25-note-drawing") { NoteScreen("Projects/Shift tracker.md", -1, false) }
     @Test fun drawingPad() = shot("26-drawing-pad") { app.marrow.ui.drawing.DrawingEditor("Attachments/Drawing app screens.canvas", onDone = {}, modifier = androidx.compose.ui.Modifier.fillMaxSize().padding(12.dp)) }
-    /** A finger stroke and a dragged rectangle are saved into the drawing's file. */
+    /** A finger stroke and a dragged see-through star are saved into the drawing's file. */
     @Test fun drawingStroke() {
         val path = engine.marrow.createDrawing("test stroke")
         compose.setContent {
@@ -161,14 +161,19 @@ class ScreenshotTest {
         settle { false }
         val pad = compose.onNode(androidx.compose.ui.test.hasContentDescription("Drawing"))
         pad.performTouchInput { swipe(Offset(100f, 400f), Offset(500f, 600f), 300) }
-        compose.onNode(androidx.compose.ui.test.hasContentDescription(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>().getString(R.string.rectangle))).performClick()
+        val ctx = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        // The shapes button lists every shape; pick the star, with no fill.
+        compose.onNode(androidx.compose.ui.test.hasContentDescription(ctx.getString(R.string.shapes))).performClick()
+        compose.onNode(androidx.compose.ui.test.hasText(ctx.getString(R.string.shape_star))).performClick()
+        compose.onNode(androidx.compose.ui.test.hasText(ctx.getString(R.string.fill_none))).performClick()
         pad.performTouchInput { swipe(Offset(150f, 800f), Offset(450f, 1000f), 200) }
         // (The label box that opens next keeps the test runner busy, so read the file now.)
         repeat(10) { Thread.sleep(80); compose.mainClock.advanceTimeBy(200) }
         val saved = engine.marrow.readCanvas(path)
         org.junit.Assert.assertEquals(2, saved.nodes.size)
         org.junit.Assert.assertNotNull(saved.nodes[0].ink)
-        org.junit.Assert.assertEquals("rect", saved.nodes[1].shape)
+        org.junit.Assert.assertEquals("star", saved.nodes[1].shape)
+        org.junit.Assert.assertEquals("none", saved.nodes[1].fill)
     }
 
     @Test fun today() = shot("01-today") { TodayScreen(onCapture = {}) }

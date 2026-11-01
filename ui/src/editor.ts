@@ -216,6 +216,8 @@ const writingTheme = EditorView.theme({
 /** Ctrl+D, Ctrl+G and Ctrl+Shift+G belong to the app (daily note, graph). */
 const appKeys = new Set(["Mod-d", "Mod-g", "Shift-Mod-g", "Mod-Shift-g"]);
 const editorSearchKeymap = searchKeymap.filter((b) => !appKeys.has(b.key ?? ""));
+/** Ctrl+Shift+[ and ] show and hide the sidebar and inspector, so folding keeps only its Mac keys there. */
+const editorFoldKeymap = foldKeymap.map((b) => (b.key === "Ctrl-Shift-[" || b.key === "Ctrl-Shift-]" ? { ...b, key: undefined } : b));
 
 export interface EditorHooks {
   onChange: () => void;
@@ -282,7 +284,7 @@ export function editorExtensions(hooks: EditorHooks): Extension[] {
       ...editorSearchKeymap,
       ...historyKeymap,
       indentWithTab,
-      ...foldKeymap,
+      ...editorFoldKeymap,
       ...defaultKeymap,
       {
         key: "Mod-Enter",

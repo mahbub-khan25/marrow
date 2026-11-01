@@ -2,7 +2,8 @@ import SwiftUI
 
 // Drawings inside notes: a small canvas (a `.canvas` file) shown where its
 // `![[Drawing ….canvas|360]]` line is. Tap it to draw right there with a
-// finger or Apple Pencil: pen, shapes, arrows and words, in colour. The
+// finger or Apple Pencil: pen, highlighter, lines, arrows, shapes (filled,
+// light or see-through) and words, in colour. The
 // cards it makes are the same as on the desktop and in canvases (the
 // engine's strokeNode / shapeNode), so a drawing looks the same everywhere.
 
@@ -15,7 +16,128 @@ private func drawColor(_ c: String) -> Color? {
     return nil
 }
 
-enum DrawTool: CaseIterable { case pen, rect, ellipse, diamond, arrow, text, erase }
+enum DrawTool: CaseIterable {
+    case pen, shape, line, arrow, double, highlight, text, erase
+    /// What the engine's strokeNode calls it.
+    var stroke: String {
+        switch self {
+        case .pen: return "pen"
+        case .line: return "line"
+        case .arrow: return "arrow"
+        case .double: return "double"
+        case .highlight: return "highlighter"
+        default: return ""
+        }
+    }
+}
+
+/// The highlighter's colour when none is picked.
+let highlightColor = Color(light: 0xF2C94C, dark: 0xE8C040)
+
+/// The engine's shapes (the same list as the desktop's): outlines in a 100 × 100 box.
+let drawShapes: [ShapeGeometry] = shapeKinds()
+func shapeOf(_ kind: String) -> ShapeGeometry? { drawShapes.first { $0.kind == kind } ?? drawShapes.first }
+
+/// SVG path data (only M, L, C and Z) from the 100 × 100 box, placed in `r`.
+func placePath(_ d: String, in r: CGRect) -> Path {
+    var tokens: [String] = []
+    var cur = ""
+    for ch in d {
+        if "MLCZ".contains(ch) {
+            if !cur.isEmpty { tokens.append(cur); cur = "" }
+            tokens.append(String(ch))
+        } else if ch == "," || ch == " " {
+            if !cur.isEmpty { tokens.append(cur); cur = "" }
+        } else if ch == "-", !cur.isEmpty {
+            tokens.append(cur)
+            cur = "-"
+        } else {
+            cur.append(ch)
+        }
+    }
+    if !cur.isEmpty { tokens.append(cur) }
+    var p = Path()
+    var i = 0
+    var cmd: Character = "M"
+    func pt() -> CGPoint? {
+        guard i + 1 < tokens.count, let x = Double(tokens[i]), let y = Double(tokens[i + 1]) else { return nil }
+        i += 2
+        return CGPoint(x: r.minX + CGFloat(x) / 100 * r.width, y: r.minY + CGFloat(y) / 100 * r.height)
+    }
+    while i < tokens.count {
+        if let c = tokens[i].first, c.isLetter {
+            cmd = c
+            i += 1
+            if cmd == "Z" { p.closeSubpath() }
+            continue
+        }
+        switch cmd {
+        case "M":
+            guard let a = pt() else { return p }
+            p.move(to: a)
+            cmd = "L"
+        case "L":
+            guard let a = pt() else { return p }
+            p.addLine(to: a)
+        case "C":
+            guard let a = pt(), let b = pt(), let z = pt() else { return p }
+            p.addCurve(to: z, control1: a, control2: b)
+        default:
+            i += 1
+        }
+    }
+    return p
+}
+
+/// A shape, filled lightly (see-through), solid, or not at all ("none": what's
+/// under it shows), with its outline in `line` (or its colour).
+func drawShape(_ c: inout GraphicsContext, _ g: ShapeGeometry?, fill: String, color col: Color?, in r: CGRect, width: CGFloat, line: Color? = nil) {
+    let shape = g.map { placePath($0.outline, in: r) } ?? Path(r)
+    switch fill {
+    case "none": break
+    case "solid":
+        if let col { c.fill(shape, with: .color(col)) } else {
+            c.fill(shape, with: .color(Color.paper))
+            c.fill(shape, with: .color(Color.ink.opacity(0.78)))
+        }
+    default: c.fill(shape, with: .color(col.map { $0.opacity(0.16) } ?? Color.paper.opacity(0.82)))
+    }
+    let stroke = line ?? col ?? Color.ink.opacity(0.7)
+    c.stroke(shape, with: .color(stroke), style: StrokeStyle(lineWidth: width, lineJoin: .round))
+    if let extra = g?.extra, !extra.isEmpty { c.stroke(placePath(extra, in: r), with: .color(stroke), lineWidth: width) }
+}
+
+/// A shape's name, in the interface language.
+func shapeName(_ g: ShapeGeometry) -> LocalizedStringKey {
+    switch g.kind {
+    case "rect": return "Rectangle"
+    case "rounded": return "Rounded rectangle"
+    case "ellipse": return "Ellipse"
+    case "diamond": return "Diamond"
+    case "triangle": return "Triangle"
+    case "hexagon": return "Hexagon"
+    case "parallelogram": return "Parallelogram"
+    case "star": return "Star"
+    case "cylinder": return "Cylinder"
+    case "bubble": return "Speech bubble"
+    case "cloud": return "Cloud"
+    default: return LocalizedStringKey(g.name)
+    }
+}
+
+/// A shape's outline as a small icon.
+struct ShapeGlyph: View {
+    let kind: String
+    var body: some View {
+        Canvas { ctx, size in
+            guard let g = shapeOf(kind) else { return }
+            let r = CGRect(origin: .zero, size: size).insetBy(dx: 1.5, dy: 1.5)
+            ctx.stroke(placePath(g.outline, in: r), with: .foreground, style: StrokeStyle(lineWidth: 1.6, lineJoin: .round))
+            if !g.extra.isEmpty { ctx.stroke(placePath(g.extra, in: r), with: .foreground, lineWidth: 1.6) }
+        }
+        .frame(width: 18, height: 18)
+    }
+}
 
 private let penSizes: [Double] = [2, 4, 8]
 
@@ -94,6 +216,8 @@ struct DrawingPad: View {
     @State private var tool: DrawTool = .pen
     @State private var color = ""
     @State private var penSize: Double = 4
+    @State private var shapeKind = "rect"
+    @State private var fill = ""
     @State private var frozen: Xform?
     @State private var size: CGSize = .zero
     @State private var draft: [CGPoint] = []
@@ -186,10 +310,10 @@ struct DrawingPad: View {
         let w = pts.map { view.world($0) }
         guard let a = w.first, let z = w.last, let b = board else { return }
         switch tool {
-        case .pen, .arrow:
-            if let n = strokeNode(points: w.flatMap { [Double($0.x), Double($0.y)] }, size: penSize, arrow: tool == .arrow, color: color, zoom: Double(view.k)) { change { $0.nodes.append(n) } }
-        case .rect, .ellipse, .diamond:
-            let n = shapeNode(shape: tool == .ellipse ? "ellipse" : tool == .diamond ? "diamond" : "rect", x0: Double(a.x), y0: Double(a.y), x1: Double(z.x), y1: Double(z.y), color: color)
+        case .pen, .line, .arrow, .double, .highlight:
+            if let n = strokeNode(points: w.flatMap { [Double($0.x), Double($0.y)] }, size: penSize, kind: tool.stroke, color: color, zoom: Double(view.k)) { change { $0.nodes.append(n) } }
+        case .shape:
+            let n = shapeNode(shape: shapeKind, x0: Double(a.x), y0: Double(a.y), x1: Double(z.x), y1: Double(z.y), color: color, fill: fill)
             change { $0.nodes.append(n) }
             words = ""
             asking = .label(n.id)
@@ -243,10 +367,25 @@ struct DrawingPad: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 2) {
                         toolButton(.pen, "scribble.variable", "Pen")
-                        toolButton(.rect, "rectangle", "Rectangle")
-                        toolButton(.ellipse, "circle", "Ellipse")
-                        toolButton(.diamond, "diamond", "Diamond")
+                        toolButton(.highlight, "highlighter", "Highlighter")
+                        // One button for every shape: a tap lists them.
+                        Menu {
+                            ForEach(drawShapes, id: \.kind) { g in
+                                Button {
+                                    shapeKind = g.kind
+                                    tool = .shape
+                                } label: { Text(shapeName(g)) }
+                            }
+                        } label: {
+                            ShapeGlyph(kind: shapeKind)
+                                .foregroundStyle(tool == .shape ? Color.paper : Color.ink)
+                                .frame(width: 38, height: 34)
+                                .background(tool == .shape ? Color.accent : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        }
+                        .accessibilityLabel(Text("Shapes"))
+                        toolButton(.line, "line.diagonal", "Line")
                         toolButton(.arrow, "arrow.right", "Arrow")
+                        toolButton(.double, "arrow.left.and.right", "Double arrow")
                         toolButton(.text, "textformat", "Words")
                         toolButton(.erase, "eraser", "Eraser")
                         Button {
@@ -263,6 +402,12 @@ struct DrawingPad: View {
                 HStack(spacing: 8) {
                     swatch(nil, "")
                     ForEach(drawPalette, id: \.0) { p in swatch(p.1, p.0) }
+                    if tool == .shape {
+                        Divider().frame(height: 20)
+                        fillChip("none", "No fill")
+                        fillChip("", "Light")
+                        fillChip("solid", "Solid")
+                    }
                     if tool == .pen {
                         Divider().frame(height: 20)
                         ForEach(penSizes, id: \.self) { s in
@@ -294,6 +439,15 @@ struct DrawingPad: View {
         .accessibilityLabel(Text(label))
     }
 
+    private func fillChip(_ f: String, _ label: LocalizedStringKey) -> some View {
+        Button { fill = f } label: {
+            Text(label).font(.subheadline)
+                .padding(.horizontal, 10).frame(height: 28)
+                .background(fill == f ? Color.line : Color.clear, in: Capsule())
+                .overlay(Capsule().stroke(Color.line, lineWidth: 1))
+        }
+    }
+
     private func swatch(_ c: Color?, _ id: String) -> some View {
         Button { color = id } label: {
             ZStack {
@@ -322,22 +476,14 @@ struct DrawingPad: View {
             let r = CGRect(x: CGFloat(n.x), y: CGFloat(n.y), width: CGFloat(n.width), height: CGFloat(n.height))
             let col = drawColor(n.color)
             if let ink = n.ink {
-                c.stroke(inkPath(ink, in: r), with: .color(col ?? Color.ink.opacity(0.85)), style: StrokeStyle(lineWidth: CGFloat(ink.size), lineCap: .round, lineJoin: .round))
+                let inkColor = ink.highlight ? (col ?? highlightColor).opacity(0.4) : col ?? Color.ink.opacity(0.85)
+                c.stroke(inkPath(ink, in: r), with: .color(inkColor), style: StrokeStyle(lineWidth: CGFloat(ink.size), lineCap: .round, lineJoin: .round))
             } else if !n.shape.isEmpty {
-                let shape: Path
-                switch n.shape {
-                case "ellipse": shape = Path(ellipseIn: r)
-                case "diamond":
-                    var p = Path()
-                    p.move(to: CGPoint(x: r.midX, y: r.minY)); p.addLine(to: CGPoint(x: r.maxX, y: r.midY))
-                    p.addLine(to: CGPoint(x: r.midX, y: r.maxY)); p.addLine(to: CGPoint(x: r.minX, y: r.midY)); p.closeSubpath()
-                    shape = p
-                default: shape = Path(roundedRect: r, cornerRadius: 4)
-                }
-                c.fill(shape, with: .color(col.map { $0.opacity(0.13) } ?? Color.paper))
-                c.stroke(shape, with: .color(col ?? Color.ink.opacity(0.7)), lineWidth: 2)
-                let inset = n.shape == "diamond" ? CGSize(width: r.width * 0.2, height: r.height * 0.16) : n.shape == "ellipse" ? CGSize(width: r.width * 0.1, height: r.height * 0.1) : CGSize(width: 6, height: 4)
-                label(&c, n.text, in: r.insetBy(dx: inset.width + 6, dy: inset.height + 4), size: 17, center: true)
+                let g = shapeOf(n.shape)
+                drawShape(&c, g, fill: n.fill, color: col, in: r, width: 2)
+                let lb = (g?.label.count == 4 ? g?.label : nil) ?? [4, 4, 96, 96]
+                let box = CGRect(x: r.minX + CGFloat(lb[0]) / 100 * r.width, y: r.minY + CGFloat(lb[1]) / 100 * r.height, width: CGFloat(lb[2] - lb[0]) / 100 * r.width, height: CGFloat(lb[3] - lb[1]) / 100 * r.height)
+                label(&c, n.text, in: box.insetBy(dx: 4, dy: 2), size: 17, center: true, color: n.fill == "solid" ? Color.paper : Color.ink)
             } else if n.kind == "group" {
                 let g = col ?? Color.accent
                 c.fill(Path(roundedRect: r, cornerRadius: 12), with: .color(g.opacity(0.07)))
@@ -350,9 +496,9 @@ struct DrawingPad: View {
         }
     }
 
-    private func label(_ c: inout GraphicsContext, _ text: String, in r: CGRect, size: CGFloat, center: Bool) {
+    private func label(_ c: inout GraphicsContext, _ text: String, in r: CGRect, size: CGFloat, center: Bool, color: Color = Color.ink) {
         guard !text.trimmingCharacters(in: .whitespaces).isEmpty, r.width > 1, r.height > 1 else { return }
-        let t = c.resolve(Text(verbatim: text).font(.system(size: size)).foregroundColor(Color.ink))
+        let t = c.resolve(Text(verbatim: text).font(.system(size: size)).foregroundColor(color))
         let s = t.measure(in: r.size)
         let box = center ? CGRect(x: r.midX - s.width / 2, y: r.midY - s.height / 2, width: s.width, height: min(s.height, r.height)) : CGRect(origin: r.origin, size: CGSize(width: r.width, height: min(s.height, r.height)))
         c.draw(t, in: box)
@@ -368,10 +514,11 @@ struct DrawingPad: View {
         }
         var p = Path()
         guard pts.count >= 2 else { return p }
-        if ink.arrow {
+        if ink.arrow || ink.startArrow {
             p.move(to: pts[0])
             p.addLine(to: pts[pts.count - 1])
-            p.addPath(head(pts[0], pts[pts.count - 1], CGFloat(ink.size)))
+            if ink.arrow { p.addPath(head(pts[0], pts[pts.count - 1], CGFloat(ink.size))) }
+            if ink.startArrow { p.addPath(head(pts[pts.count - 1], pts[0], CGFloat(ink.size))) }
             return p
         }
         return smooth(pts)
@@ -407,19 +554,18 @@ struct DrawingPad: View {
         let dash = StrokeStyle(lineWidth: 1.5, dash: [6, 5])
         switch tool {
         case .pen: ctx.stroke(smooth(pts), with: .color(ink), style: StrokeStyle(lineWidth: max(1.5, penSize * view.k), lineCap: .round, lineJoin: .round))
-        case .arrow:
+        case .highlight:
+            ctx.stroke(smooth(pts), with: .color((drawColor(color) ?? highlightColor).opacity(0.4)), style: StrokeStyle(lineWidth: max(14, penSize) * view.k, lineCap: .round, lineJoin: .round))
+        case .line:
+            var p = Path(); p.move(to: a); p.addLine(to: z)
+            ctx.stroke(p, with: .color(ink), style: StrokeStyle(lineWidth: max(1.5, penSize * view.k), lineCap: .round))
+        case .arrow, .double:
             var p = Path(); p.move(to: a); p.addLine(to: z); p.addPath(head(a, z, 2.5))
+            if tool == .double { p.addPath(head(z, a, 2.5)) }
             ctx.stroke(p, with: .color(ink), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-        case .rect, .ellipse, .diamond:
+        case .shape:
             let r = CGRect(x: min(a.x, z.x), y: min(a.y, z.y), width: abs(z.x - a.x), height: abs(z.y - a.y))
-            var p: Path
-            switch tool {
-            case .ellipse: p = Path(ellipseIn: r)
-            case .diamond:
-                p = Path(); p.move(to: CGPoint(x: r.midX, y: r.minY)); p.addLine(to: CGPoint(x: r.maxX, y: r.midY))
-                p.addLine(to: CGPoint(x: r.midX, y: r.maxY)); p.addLine(to: CGPoint(x: r.minX, y: r.midY)); p.closeSubpath()
-            default: p = Path(r)
-            }
+            let p = shapeOf(shapeKind).map { placePath($0.outline, in: r) } ?? Path(r)
             ctx.stroke(p, with: .color(Color.accent), style: dash)
         case .erase: ctx.fill(Path(ellipseIn: CGRect(x: z.x - 14, y: z.y - 14, width: 28, height: 28)), with: .color(Color.accent.opacity(0.3)))
         case .text: break

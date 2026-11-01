@@ -18,6 +18,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 
 import { api, displayName, parentOf } from "./api";
 import { DRAG_TYPE } from "./tree";
+import { FILLS, placePath, shapeDef, SHAPES } from "./shapes";
 import { h, icon, plainText, trunc } from "./util";
 
 type Side = "top" | "right" | "bottom" | "left";
@@ -34,15 +35,18 @@ interface CNode {
   url?: string;
   label?: string;
   color?: string;
-  /** Marrow: draw this text card as a shape. */
-  shape?: ShapeKind;
+  /** Marrow: draw this text card as a shape (a kind from shapes.ts). */
+  shape?: string;
+  /** Marrow: how a shape is filled: none (see-through), solid, or light (unset). */
+  fill?: "none" | "solid";
   /** Marrow: a pen stroke or a free arrow. */
   ink?: Ink;
   [k: string]: unknown;
 }
 
-type ShapeKind = "rect" | "ellipse" | "diamond";
-type Tool = "select" | "text" | ShapeKind | "arrow" | "pen";
+/** Strokes: the pen as drawn, straight lines, arrows and the highlighter. */
+type StrokeTool = "pen" | "line" | "arrow" | "double" | "highlighter";
+type Tool = "select" | "text" | "shape" | StrokeTool;
 
 interface Ink {
   /** The box the points were drawn in (the card scales it). */
@@ -52,7 +56,11 @@ interface Ink {
   size: number;
   /** "x,y x,y …" inside that box. */
   points: string;
+  /** An arrowhead at the end; `arrowStart` one at the start too. */
   arrow?: boolean;
+  arrowStart?: boolean;
+  /** A highlighter stroke: wide and see-through. */
+  highlight?: boolean;
 }
 
 interface CEdge {
@@ -102,7 +110,7 @@ const PALETTE: [string, string, string][] = [
 const colorOf = (c?: string) => (c ? (PALETTE.find((p) => p[0] === c)?.[2] ?? (/^#[0-9a-f]{3,8}$/i.test(c) ? c : null)) : null);
 const INK_TEXT = "✏️ Drawing — open this canvas in Marrow to see it.";
 const isInk = (n: CNode) => n.type === "text" && !!n.ink && typeof n.ink === "object" && typeof n.ink.points === "string";
-const isShape = (n: CNode) => n.type === "text" && (n.shape === "rect" || n.shape === "ellipse" || n.shape === "diamond");
+const isShape = (n: CNode) => n.type === "text" && !!shapeDef(n.shape);
 const svgEl = (tag: string, attrs: Record<string, string | number>) => {
   const el = document.createElementNS(SVGNS, tag);
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
@@ -111,12 +119,15 @@ const svgEl = (tag: string, attrs: Record<string, string | number>) => {
 const TOOLS: [Tool, string, string, string][] = [
   ["select", "cursor", "Select and move", "V"],
   ["text", "text-t", "Text card", "T"],
-  ["rect", "square", "Rectangle", "R"],
-  ["ellipse", "circle", "Ellipse", "O"],
-  ["diamond", "diamond", "Diamond", "D"],
+  ["shape", "shapes", "Shapes", "S"],
+  ["line", "line-segment", "Line", "L"],
   ["arrow", "arrow-up-right", "Arrow", "A"],
+  ["double", "arrows-horizontal", "Double arrow", "W"],
   ["pen", "pencil-simple", "Pen", "P"],
+  ["highlighter", "highlighter", "Highlighter", "H"],
 ];
+/** Keys that pick a shape straight away. */
+const SHAPE_KEYS: Record<string, string> = { r: "rect", o: "ellipse", d: "diamond" };
 const PEN_SIZES = [2, 4, 8];
 const newId = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, "0")).join("");
 
@@ -133,6 +144,11 @@ export class CanvasView {
   private selected = new Set<string>();
   private selectedEdge: string | null = null;
   private tool: Tool = "select";
+  /** The shape the Shapes tool draws. */
+  private shapeKind = "rect";
+  /** How new shapes are filled. */
+  private fill: CNode["fill"] | undefined;
+  private shapePop: HTMLElement | null = null;
   private color: string | undefined;
   private penSize = 4;
   /** Undo: the canvas as JSON before each change, and after undoing. */
@@ -154,7 +170,7 @@ export class CanvasView {
     | { kind: "move"; x: number; y: number; moved: boolean; start: Map<string, { x: number; y: number }> }
     | { kind: "resize"; id: string; x: number; y: number; w: number; h: number }
     | { kind: "connect"; from: string; x: number; y: number; target: string | null }
-    | { kind: "draw"; tool: ShapeKind | "arrow" | "pen"; pts: { x: number; y: number }[]; x: number; y: number }
+    | { kind: "draw"; tool: "shape" | StrokeTool; pts: { x: number; y: number }[]; x: number; y: number }
     | null = null;
 
   constructor(
@@ -516,19 +532,19 @@ export class CanvasView {
     if (ex) ex.style.setProperty("-webkit-line-clamp", String(Math.max(1, Math.floor((n.height - 84) / 21))));
   }
 
-  /** A rectangle, ellipse or diamond with a label (double-click to edit it). */
+  /** A shape with a label (double-click to edit it). */
   private shapeCard(n: CNode): HTMLElement {
+    const def = shapeDef(n.shape)!;
     const svg = svgEl("svg", { class: "shape-svg", viewBox: "0 0 100 100", preserveAspectRatio: "none" });
-    const attrs = { class: "shape-fill", "vector-effect": "non-scaling-stroke" };
-    svg.append(
-      n.shape === "ellipse"
-        ? svgEl("ellipse", { ...attrs, cx: 50, cy: 50, rx: 49, ry: 49 })
-        : n.shape === "diamond"
-          ? svgEl("polygon", { ...attrs, points: "50,1 99,50 50,99 1,50" })
-          : svgEl("rect", { ...attrs, x: 1, y: 1, width: 98, height: 98, rx: 4, ry: 4 }),
-    );
+    const attrs = { "vector-effect": "non-scaling-stroke" };
+    svg.append(svgEl("path", { ...attrs, class: "shape-fill", d: def.d }));
+    if (def.extra) svg.append(svgEl("path", { ...attrs, class: "shape-line", d: def.extra }));
+    // See-through shapes are picked by their outline, so what's under them can be picked too.
+    svg.append(svgEl("path", { ...attrs, class: "shape-hit", d: def.d }));
     const label = h("div.shape-label", { spellcheck: false });
     label.textContent = n.text ?? "";
+    const [x0, y0, x1, y1] = def.label;
+    label.style.cssText = `left:${x0}%;top:${y0}%;width:${x1 - x0}%;height:${y1 - y0}%`;
     label.addEventListener("input", () => {
       n.text = label.innerText.replace(/\n$/, "");
       this.changed();
@@ -548,7 +564,7 @@ export class CanvasView {
       label.contentEditable = "false";
       window.getSelection()?.removeAllRanges();
     });
-    return h("div.card.card-shape", { dataset: { shape: n.shape ?? "rect" } }, svg, label);
+    return h("div.card.card-shape", { dataset: { shape: n.shape ?? "rect", fill: n.fill ?? "light" } }, svg, label);
   }
 
   private editLabel(id: string) {
@@ -572,7 +588,7 @@ export class CanvasView {
     const ink = n.ink!;
     const svg = svgEl("svg", { class: "ink-svg", viewBox: `0 0 ${ink.w} ${ink.h}`, preserveAspectRatio: "none" });
     const d = inkPath(ink);
-    svg.append(svgEl("path", { class: "ink-line", d, "stroke-width": ink.size }), svgEl("path", { class: "ink-hit", d }));
+    svg.append(svgEl("path", { class: ink.highlight ? "ink-line ink-hl" : "ink-line", d, "stroke-width": ink.size }), svgEl("path", { class: "ink-hit", d }));
     return h("div.card.card-ink", null, svg);
   }
 
@@ -695,7 +711,17 @@ export class CanvasView {
 
   private makeToolbar(): HTMLElement {
     const tools = TOOLS.map(([t, ic, label, key]) =>
-      h("button.cv-tool", { type: "button", title: `${label} (${key})`, dataset: { tool: t }, onclick: () => this.setTool(t) }, icon(ic)),
+      t === "shape"
+        ? h(
+            "button.cv-tool.cv-shape-btn",
+            { type: "button", title: `${label} (${key}): pick one`, dataset: { tool: t }, onclick: (e: Event) => this.toggleShapes(e.currentTarget as HTMLElement) },
+            shapeIcon(this.shapeKind),
+            h("span.cv-caret", null, icon("caret-down")),
+          )
+        : h("button.cv-tool", { type: "button", title: `${label} (${key})`, dataset: { tool: t }, onclick: () => this.setTool(t) }, icon(ic)),
+    );
+    const fills = FILLS.map(([f, label, ic]) =>
+      h("button.cv-tool.cv-fill", { type: "button", title: label, dataset: { fill: f }, onclick: () => this.setFill((f || undefined) as CNode["fill"]) }, icon(ic)),
     );
     const swatches = [
       h("button.cv-swatch.is-none", { type: "button", title: "No colour", dataset: { color: "" }, onclick: () => this.setColor(undefined) }),
@@ -714,7 +740,7 @@ export class CanvasView {
       "div.canvas-tools",
       null,
       h("div.cv-bar", null, ...tools),
-      h("div.cv-bar", null, ...swatches, h("span.cv-pen-sizes", null, h("span.cv-sep"), ...sizes)),
+      h("div.cv-bar", null, ...swatches, h("span.cv-fills", null, h("span.cv-sep"), ...fills), h("span.cv-pen-sizes", null, h("span.cv-sep"), ...sizes)),
       h(
         "div.cv-bar",
         null,
@@ -734,12 +760,80 @@ export class CanvasView {
     const shown = first ? (first.color ?? "") : edge ? (edge.color ?? "") : (this.color ?? "");
     for (const b of this.toolbar.querySelectorAll<HTMLElement>(".cv-swatch")) b.classList.toggle("is-on", b.dataset.color === shown);
     for (const b of this.toolbar.querySelectorAll<HTMLElement>(".cv-size")) b.classList.toggle("is-on", Number(b.dataset.size) === this.penSize);
-    this.toolbar.classList.toggle("is-pen", this.tool === "pen");
+    // The fill shows the selected shape's, or the one for new shapes.
+    const firstShape = [...this.selected].map((id) => this.node(id)).find((n) => n && isShape(n));
+    const fillShown = firstShape ? (firstShape.fill ?? "") : (this.fill ?? "");
+    for (const b of this.toolbar.querySelectorAll<HTMLElement>(".cv-fill")) b.classList.toggle("is-on", b.dataset.fill === fillShown);
+    this.toolbar.classList.toggle("is-pen", this.tool === "pen" || this.tool === "highlighter");
+    this.toolbar.classList.toggle("is-shape", this.tool === "shape" || !!firstShape);
+    const sb = this.toolbar.querySelector<HTMLElement>(".cv-shape-btn");
+    if (sb && sb.dataset.kind !== this.shapeKind) {
+      sb.dataset.kind = this.shapeKind;
+      sb.firstElementChild?.replaceWith(shapeIcon(this.shapeKind));
+      sb.title = `${shapeDef(this.shapeKind)?.name ?? "Shapes"} (S): pick another`;
+    }
     for (const t of TOOLS) this.host.classList.toggle(`tool-${t[0]}`, t[0] === this.tool);
   }
 
   setTool(t: Tool) {
     this.tool = t;
+    this.shapePop?.remove();
+    this.shapePop = null;
+    this.syncToolbar();
+  }
+
+  /** Draw this shape next. */
+  setShape(kind: string) {
+    if (shapeDef(kind)) this.shapeKind = kind;
+    this.setTool("shape");
+  }
+
+  /** The shape picker: every shape, drawn as itself. */
+  private toggleShapes(anchor: HTMLElement) {
+    if (this.shapePop) {
+      this.shapePop.remove();
+      this.shapePop = null;
+      return;
+    }
+    const pop = h(
+      "div.cv-shapes",
+      { role: "menu", "aria-label": "Shapes" },
+      ...SHAPES.map((sd) =>
+        h(
+          "button.cv-shape",
+          { type: "button", role: "menuitem", title: sd.name, "aria-label": sd.name, onclick: () => this.setShape(sd.kind) },
+          shapeIcon(sd.kind),
+        ),
+      ),
+    );
+    pop.querySelector<HTMLElement>(`.cv-shape:nth-child(${SHAPES.findIndex((x) => x.kind === this.shapeKind) + 1})`)?.classList.add("is-on");
+    this.toolbar.append(pop);
+    const bar = this.toolbar.getBoundingClientRect();
+    const a = anchor.getBoundingClientRect();
+    pop.style.left = `${a.left - bar.left}px`;
+    // Below the toolbar when it sits at the top (in a note), above it otherwise.
+    if (this.opts.inline) pop.style.top = `${a.bottom - bar.top + 6}px`;
+    else pop.style.bottom = `${bar.bottom - a.top + 6}px`;
+    this.shapePop = pop;
+  }
+
+  /** How shapes are filled: the selected ones, and the next ones drawn. */
+  private setFill(f: CNode["fill"] | undefined) {
+    this.fill = f;
+    let touched = false;
+    for (const id of this.selected) {
+      const n = this.node(id);
+      if (!n || !isShape(n)) continue;
+      if (f) n.fill = f;
+      else delete n.fill;
+      touched = true;
+    }
+    if (touched) {
+      const keep = [...this.selected];
+      this.renderAll();
+      this.select(keep);
+      this.changed();
+    }
     this.syncToolbar();
   }
 
@@ -755,7 +849,7 @@ export class CanvasView {
 
   private setPenSize(sz: number) {
     this.penSize = sz;
-    this.setTool("pen");
+    if (this.tool !== "highlighter") this.setTool("pen");
   }
 
   /** Colours what's selected, and what's drawn next. */
@@ -836,18 +930,20 @@ export class CanvasView {
     this.select(this.data.nodes.map((n) => n.id));
   }
 
-  /** Finishes a shape, an arrow or a pen stroke. */
-  private finishDrawing(tool: ShapeKind | "arrow" | "pen", pts: { x: number; y: number }[]) {
+  /** Finishes a shape, a line, an arrow or a pen stroke. */
+  private finishDrawing(tool: "shape" | StrokeTool, pts: { x: number; y: number }[]) {
     this.draftG.replaceChildren();
     const a = pts[0];
     const b = pts[pts.length - 1];
     let n: CNode | null = null;
-    if (tool === "pen" || tool === "arrow") {
-      let ps = tool === "arrow" ? [a, b] : simplify(pts, 0.8 / this.k);
-      if (tool === "arrow" && Math.hypot(b.x - a.x, b.y - a.y) < 8) return;
+    if (tool !== "shape") {
+      const straight = tool === "line" || tool === "arrow" || tool === "double";
+      const heads = tool === "arrow" || tool === "double";
+      let ps = straight ? [a, b] : simplify(pts, 0.8 / this.k);
+      if (straight && Math.hypot(b.x - a.x, b.y - a.y) < 8) return;
       if (ps.length === 1) ps = [ps[0], { x: ps[0].x + 0.5, y: ps[0].y + 0.5 }];
-      const size = tool === "arrow" ? 2.5 : this.penSize;
-      const pad = size + (tool === "arrow" ? 12 : 4);
+      const size = heads ? 2.5 : tool === "highlighter" ? Math.max(14, this.penSize * 4) : this.penSize;
+      const pad = size + (heads ? 12 : 4);
       const x0 = Math.min(...ps.map((p) => p.x)) - pad;
       const y0 = Math.min(...ps.map((p) => p.y)) - pad;
       const w = Math.max(...ps.map((p) => p.x)) + pad - x0;
@@ -866,7 +962,9 @@ export class CanvasView {
           h: Math.max(1, Math.round(hgt)),
           size,
           points: ps.map((p) => `${r(p.x - Math.round(x0))},${r(p.y - Math.round(y0))}`).join(" "),
-          ...(tool === "arrow" ? { arrow: true } : {}),
+          ...(heads ? { arrow: true } : {}),
+          ...(tool === "double" ? { arrowStart: true } : {}),
+          ...(tool === "highlighter" ? { highlight: true } : {}),
         },
       };
     } else {
@@ -874,35 +972,32 @@ export class CanvasView {
       const box = small
         ? { x: a.x - 80, y: a.y - 50, w: 160, h: 100 }
         : { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
-      n = { id: newId(), type: "text", text: "", shape: tool, x: Math.round(box.x), y: Math.round(box.y), width: Math.max(40, Math.round(box.w)), height: Math.max(30, Math.round(box.h)) };
+      n = { id: newId(), type: "text", text: "", shape: this.shapeKind, x: Math.round(box.x), y: Math.round(box.y), width: Math.max(40, Math.round(box.w)), height: Math.max(30, Math.round(box.h)) };
+      if (this.fill) n.fill = this.fill;
     }
     if (this.color) n.color = this.color;
     this.data.nodes.push(n);
     this.world.append(this.card(n));
     this.changed();
-    if (tool === "pen") return; // keep drawing
+    if (tool === "pen" || tool === "highlighter") return; // keep drawing
     this.select([n.id]);
     this.setTool("select");
     if (isShape(n)) requestAnimationFrame(() => this.editLabel(n!.id));
   }
 
-  private drawDraft(tool: ShapeKind | "arrow" | "pen", pts: { x: number; y: number }[]) {
+  private drawDraft(tool: "shape" | StrokeTool, pts: { x: number; y: number }[]) {
     const a = pts[0];
     const b = pts[pts.length - 1];
     const c = colorOf(this.color) ?? "";
     let el: SVGElement;
-    if (tool === "pen") {
-      el = svgEl("path", { d: smooth(pts), class: "ink-draft", "stroke-width": this.penSize });
-    } else if (tool === "arrow") {
-      el = svgEl("path", { d: arrowPath(a, b, 2.5), class: "ink-draft", "stroke-width": 2.5 });
+    if (tool === "pen" || tool === "highlighter") {
+      el = svgEl("path", { d: smooth(pts), class: tool === "highlighter" ? "ink-draft ink-hl" : "ink-draft", "stroke-width": tool === "highlighter" ? Math.max(14, this.penSize * 4) : this.penSize });
+    } else if (tool === "line" || tool === "arrow" || tool === "double") {
+      const d = tool === "line" ? `M${a.x},${a.y} L${b.x},${b.y}` : arrowPath(a, b, 2.5, tool === "double");
+      el = svgEl("path", { d, class: "ink-draft", "stroke-width": 2.5 });
     } else {
       const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y), w = Math.abs(b.x - a.x), hh = Math.abs(b.y - a.y);
-      el =
-        tool === "ellipse"
-          ? svgEl("ellipse", { cx: x + w / 2, cy: y + hh / 2, rx: w / 2, ry: hh / 2, class: "shape-draft" })
-          : tool === "diamond"
-            ? svgEl("polygon", { points: `${x + w / 2},${y} ${x + w},${y + hh / 2} ${x + w / 2},${y + hh} ${x},${y + hh / 2}`, class: "shape-draft" })
-            : svgEl("rect", { x, y, width: w, height: hh, rx: 4, class: "shape-draft" });
+      el = svgEl("path", { d: placePath(shapeDef(this.shapeKind)!.d, x, y, w, hh), class: "shape-draft" });
     }
     if (c) el.style.stroke = c;
     this.draftG.replaceChildren(el);
@@ -966,6 +1061,10 @@ export class CanvasView {
     host.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       const t = e.target as HTMLElement;
+      if (this.shapePop && !t.closest(".cv-shapes, .cv-shape-btn")) {
+        this.shapePop.remove();
+        this.shapePop = null;
+      }
       if (t.closest(".canvas-tools, .canvas-zoom, a")) return;
       host.focus({ preventScroll: true });
       if (this.tool !== "select") {
@@ -1167,6 +1266,11 @@ export class CanvasView {
           this.editLabel(n.id);
         }
       } else if (!mod && !e.altKey) {
+        if (SHAPE_KEYS[key]) {
+          e.preventDefault();
+          this.setShape(SHAPE_KEYS[key]);
+          return;
+        }
         const t = TOOLS.find((x) => x[3].toLowerCase() === key);
         if (t) {
           e.preventDefault();
@@ -1276,12 +1380,15 @@ function smooth(pts: { x: number; y: number }[]): string {
   return d + ` L${last.x},${last.y}`;
 }
 
-/** A straight arrow from a to b, with its head drawn as two short lines. */
-function arrowPath(a: { x: number; y: number }, b: { x: number; y: number }, size: number): string {
-  const ang = Math.atan2(b.y - a.y, b.x - a.x);
+/** A straight arrow from a to b, its head (and with `both`, its tail) drawn as two short lines. */
+function arrowPath(a: { x: number; y: number }, b: { x: number; y: number }, size: number, both = false): string {
   const l = Math.max(12, size * 5);
-  const p = (t: number) => `${b.x - l * Math.cos(ang + t)},${b.y - l * Math.sin(ang + t)}`;
-  return `M${a.x},${a.y} L${b.x},${b.y} M${p(0.45)} L${b.x},${b.y} L${p(-0.45)}`;
+  const head = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+    const ang = Math.atan2(to.y - from.y, to.x - from.x);
+    const p = (t: number) => `${to.x - l * Math.cos(ang + t)},${to.y - l * Math.sin(ang + t)}`;
+    return ` M${p(0.45)} L${to.x},${to.y} L${p(-0.45)}`;
+  };
+  return `M${a.x},${a.y} L${b.x},${b.y}` + head(a, b) + (both ? head(b, a) : "");
 }
 
 function inkPath(ink: Ink): string {
@@ -1292,5 +1399,15 @@ function inkPath(ink: Ink): string {
     .filter((p) => p.length === 2 && p.every(Number.isFinite))
     .map(([x, y]) => ({ x, y }));
   if (pts.length === 0) return "";
-  return ink.arrow && pts.length >= 2 ? arrowPath(pts[0], pts[pts.length - 1], ink.size) : smooth(pts);
+  if ((ink.arrow || ink.arrowStart) && pts.length >= 2) return arrowPath(pts[0], pts[pts.length - 1], ink.size, !!ink.arrowStart);
+  return smooth(pts);
+}
+
+/** A shape, drawn small (for the picker). */
+function shapeIcon(kind: string): SVGElement {
+  const def = shapeDef(kind) ?? SHAPES[0];
+  const svg = svgEl("svg", { class: "cv-shape-icon", viewBox: "-6 -6 112 112", "aria-hidden": "true" });
+  svg.append(svgEl("path", { d: def.d, "vector-effect": "non-scaling-stroke" }));
+  if (def.extra) svg.append(svgEl("path", { d: def.extra, fill: "none", "vector-effect": "non-scaling-stroke" }));
+  return svg;
 }

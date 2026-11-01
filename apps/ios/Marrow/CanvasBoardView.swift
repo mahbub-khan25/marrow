@@ -128,8 +128,10 @@ struct CanvasBoardView: View {
         let isSelected = selected == n.id
         return Group {
             if let ink = n.ink {
-                InkShape(ink: ink).stroke(accent ?? Color.ink, style: StrokeStyle(lineWidth: CGFloat(ink.size), lineCap: .round, lineJoin: .round))
+                InkShape(ink: ink).stroke(ink.highlight ? (accent ?? highlightColor).opacity(0.4) : accent ?? Color.ink, style: StrokeStyle(lineWidth: CGFloat(ink.size), lineCap: .round, lineJoin: .round))
                     .overlay { if isSelected { RoundedRectangle(cornerRadius: 6).stroke(Color.accent, lineWidth: 2) } }
+            } else if !n.shape.isEmpty {
+                ShapeCard(node: n, selected: isSelected)
             } else {
                 CardContent(node: n)
                     .frame(width: CGFloat(n.width), height: CGFloat(n.height), alignment: .topLeading)
@@ -170,7 +172,7 @@ struct CanvasBoardView: View {
         HStack {
             tool("plus.rectangle", "Card") {
                 let c = center()
-                let n = CanvasNode(id: newId(), kind: "text", x: Double(c.x - 120), y: Double(c.y - 60), width: 240, height: 120, text: "", file: "", url: "", label: "", color: "", shape: "", ink: nil, extra: "")
+                let n = CanvasNode(id: newId(), kind: "text", x: Double(c.x - 120), y: Double(c.y - 60), width: 240, height: 120, text: "", file: "", url: "", label: "", color: "", shape: "", fill: "", ink: nil, extra: "")
                 change { $0.nodes.append(n) }
                 selected = n.id
                 editText = ""
@@ -218,7 +220,7 @@ struct CanvasBoardView: View {
 
     private func add(file: String) {
         let c = center()
-        let n = CanvasNode(id: newId(), kind: "file", x: Double(c.x - 150), y: Double(c.y - 100), width: 300, height: 200, text: "", file: file, url: "", label: "", color: "", shape: "", ink: nil, extra: "")
+        let n = CanvasNode(id: newId(), kind: "file", x: Double(c.x - 150), y: Double(c.y - 100), width: 300, height: 200, text: "", file: file, url: "", label: "", color: "", shape: "", fill: "", ink: nil, extra: "")
         change { $0.nodes.append(n) }
         selected = n.id
     }
@@ -291,6 +293,34 @@ private func arrowHead(_ from: CGPoint, _ to: CGPoint) -> Path {
     return p
 }
 
+/// A shape from a drawing: its outline, and its words where the shape keeps them.
+private struct ShapeCard: View {
+    let node: CanvasNode
+    let selected: Bool
+
+    var body: some View {
+        let g = shapeOf(node.shape)
+        let col = colorOf(node.color)
+        let lb = (g?.label.count == 4 ? g?.label : nil) ?? [4, 4, 96, 96]
+        let w = CGFloat(node.width), h = CGFloat(node.height)
+        ZStack(alignment: .topLeading) {
+            Canvas { ctx, size in
+                var c = ctx
+                drawShape(&c, g, fill: node.fill, color: col, in: CGRect(origin: .zero, size: size), width: selected ? 3 : 2, line: selected ? Color.accent : nil)
+            }
+            if !node.text.isEmpty {
+                Text(verbatim: node.text)
+                    .font(.callout)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(node.fill == "solid" ? Color.paper : Color.ink)
+                    .frame(width: w * CGFloat(lb[2] - lb[0]) / 100, height: h * CGFloat(lb[3] - lb[1]) / 100)
+                    .offset(x: w * CGFloat(lb[0]) / 100, y: h * CGFloat(lb[1]) / 100)
+            }
+        }
+        .frame(width: w, height: h)
+    }
+}
+
 /// A pen stroke or free arrow, scaled to its card.
 private struct InkShape: Shape {
     let ink: Ink
@@ -304,10 +334,11 @@ private struct InkShape: Shape {
         }
         var p = Path()
         guard pts.count >= 2 else { return p }
-        if ink.arrow {
+        if ink.arrow || ink.startArrow {
             p.move(to: pts[0])
             p.addLine(to: pts[pts.count - 1])
-            p.addPath(arrowHead(pts[0], pts[pts.count - 1]))
+            if ink.arrow { p.addPath(arrowHead(pts[0], pts[pts.count - 1])) }
+            if ink.startArrow { p.addPath(arrowHead(pts[pts.count - 1], pts[0])) }
             return p
         }
         p.move(to: pts[0])

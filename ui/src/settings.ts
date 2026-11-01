@@ -309,6 +309,22 @@ function render() {
           ]),
         ),
         row(
+          "Icon bar",
+          "The column of icons down the left side.",
+          prefSeg("rail", [
+            [true, "Show"],
+            [false, "Hide"],
+          ]),
+        ),
+        row(
+          "Status bar",
+          "The thin bar along the bottom: the vault's folder, sync and saving.",
+          prefSeg("statusbar", [
+            [true, "Show"],
+            [false, "Hide"],
+          ]),
+        ),
+        row(
           "Links",
           "How links to other notes look when reading.",
           prefSeg("linkStyle", [
@@ -328,6 +344,8 @@ function render() {
       ["Toggle preview / source", kbd("E")],
       ["Graph view", kbd("G")],
       ["Split pane", kbd("\\")],
+      ["Show or hide the sidebar", kbd("[", true)],
+      ["Show or hide the inspector", kbd("]", true)],
       ["Search all notes", kbd("F", true)],
       ["Find in this note", kbd("F")],
       ["Save now", kbd("S")],

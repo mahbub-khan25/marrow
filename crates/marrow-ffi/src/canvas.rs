@@ -16,7 +16,12 @@ pub struct Ink {
     pub size: f64,
     /// x, y, x, y… inside that box.
     pub points: Vec<f64>,
+    /// An arrowhead at the end.
     pub arrow: bool,
+    /// An arrowhead at the start too (a double-headed arrow).
+    pub start_arrow: bool,
+    /// A highlighter stroke: wide and see-through.
+    pub highlight: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
@@ -36,8 +41,11 @@ pub struct CanvasNode {
     pub label: String,
     /// "1"–"6" (red, orange, yellow, green, cyan, purple) or "#rrggbb", or "".
     pub color: String,
-    /// "rect", "ellipse" or "diamond" for a shape, else "".
+    /// A shape's kind ("rect", "ellipse", "diamond", "triangle"… see
+    /// `shape_geometry`), else "".
     pub shape: String,
+    /// How a shape is filled: "" (lightly, see-through), "none" or "solid".
+    pub fill: String,
     pub ink: Option<Ink>,
     /// Other fields, as JSON, kept when saving.
     pub extra: String,
@@ -62,7 +70,7 @@ pub struct Board {
     pub edges: Vec<CanvasEdge>,
 }
 
-const NODE_KEYS: &[&str] = &["id", "type", "x", "y", "width", "height", "text", "file", "url", "label", "color", "shape", "ink"];
+const NODE_KEYS: &[&str] = &["id", "type", "x", "y", "width", "height", "text", "file", "url", "label", "color", "shape", "fill", "ink"];
 const EDGE_KEYS: &[&str] = &["id", "fromNode", "toNode", "fromSide", "toSide", "label", "color"];
 /// What a drawing says in apps that can't show it.
 const INK_TEXT: &str = "✏️ Drawing — open this canvas in Marrow to see it.";
@@ -107,7 +115,8 @@ pub fn parse_canvas(text: &str) -> Result<Board> {
     for o in v.get("nodes").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_object) {
         let ink = o.get("ink").and_then(Value::as_object).and_then(|i| {
             let pts: Vec<f64> = i.get("points")?.as_str()?.split_whitespace().filter_map(|p| p.split_once(',')).filter_map(|(x, y)| Some([x.parse().ok()?, y.parse().ok()?])).flatten().collect();
-            Some(Ink { w: n(i, "w").max(1.0), h: n(i, "h").max(1.0), size: n(i, "size").max(1.0), points: pts, arrow: i.get("arrow").and_then(Value::as_bool).unwrap_or(false) })
+            let flag = |k: &str| i.get(k).and_then(Value::as_bool).unwrap_or(false);
+            Some(Ink { w: n(i, "w").max(1.0), h: n(i, "h").max(1.0), size: n(i, "size").max(1.0), points: pts, arrow: flag("arrow"), start_arrow: flag("arrowStart"), highlight: flag("highlight") })
         });
         c.nodes.push(CanvasNode {
             id: s(o, "id"),
@@ -122,6 +131,7 @@ pub fn parse_canvas(text: &str) -> Result<Board> {
             label: s(o, "label"),
             color: s(o, "color"),
             shape: s(o, "shape"),
+            fill: s(o, "fill"),
             ink,
             extra: extra(o, NODE_KEYS),
         });
@@ -162,11 +172,18 @@ pub fn canvas_json(c: &Board) -> String {
             put(&mut o, "label", &nd.label);
             put(&mut o, "color", &nd.color);
             put(&mut o, "shape", &nd.shape);
+            put(&mut o, "fill", &nd.fill);
             if let Some(i) = &nd.ink {
                 let pts: Vec<String> = i.points.chunks(2).filter(|p| p.len() == 2).map(|p| format!("{},{}", (p[0] * 10.0).round() / 10.0, (p[1] * 10.0).round() / 10.0)).collect();
                 let mut ink = json!({ "w": num(i.w.round()), "h": num(i.h.round()), "size": num(i.size), "points": pts.join(" ") });
                 if i.arrow {
                     ink["arrow"] = true.into();
+                }
+                if i.start_arrow {
+                    ink["arrowStart"] = true.into();
+                }
+                if i.highlight {
+                    ink["highlight"] = true.into();
                 }
                 o.insert("ink".into(), ink);
             }

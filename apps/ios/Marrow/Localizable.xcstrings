@@ -1195,6 +1195,23 @@
         }
       }
     },
+    "Cloud": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cloud"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "মেঘ"
+          }
+        }
+      }
+    },
     "Code": {
       "extractionState": "manual",
       "localizations": {
@@ -1361,6 +1378,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "তৈরি করুন"
+          }
+        }
+      }
+    },
+    "Cylinder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cylinder"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সিলিন্ডার"
           }
         }
       }
@@ -1565,6 +1599,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "সম্পন্ন: %1$@"
+          }
+        }
+      }
+    },
+    "Double arrow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Double arrow"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "দুমুখো তীর"
           }
         }
       }
@@ -2045,6 +2096,23 @@
         }
       }
     },
+    "Hexagon": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hexagon"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ষড়ভুজ"
+          }
+        }
+      }
+    },
     "Hide the sidebar": {
       "extractionState": "manual",
       "localizations": {
@@ -2058,6 +2126,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "সাইডবার লুকান"
+          }
+        }
+      }
+    },
+    "Highlighter": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highlighter"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "হাইলাইটার"
           }
         }
       }
@@ -2449,6 +2534,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "হালকা"
+          }
+        }
+      }
+    },
+    "Line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Line"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "রেখা"
           }
         }
       }
@@ -3390,6 +3492,23 @@
         }
       }
     },
+    "No fill": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No fill"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ভরাট নেই"
+          }
+        }
+      }
+    },
     "No model chosen": {
       "extractionState": "manual",
       "localizations": {
@@ -4036,6 +4155,23 @@
         }
       }
     },
+    "Parallelogram": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parallelogram"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "সামান্তরিক"
+          }
+        }
+      }
+    },
     "Passphrase again": {
       "extractionState": "manual",
       "localizations": {
@@ -4631,6 +4767,23 @@
         }
       }
     },
+    "Rounded rectangle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rounded rectangle"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "গোল কোণের আয়তক্ষেত্র"
+          }
+        }
+      }
+    },
     "Same as the phone": {
       "extractionState": "manual",
       "localizations": {
@@ -4869,6 +5022,23 @@
         }
       }
     },
+    "Shapes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shapes"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "আকার"
+          }
+        }
+      }
+    },
     "Share": {
       "extractionState": "manual",
       "localizations": {
@@ -5090,6 +5260,23 @@
         }
       }
     },
+    "Solid": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solid"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "গাঢ়"
+          }
+        }
+      }
+    },
     "Sort": {
       "extractionState": "manual",
       "localizations": {
@@ -5107,6 +5294,23 @@
         }
       }
     },
+    "Speech bubble": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech bubble"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কথার বুদবুদ"
+          }
+        }
+      }
+    },
     "Star": {
       "extractionState": "manual",
       "localizations": {
@@ -5119,7 +5323,7 @@
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "তারকা দিন"
+            "value": "তারা"
           }
         }
       }
@@ -6089,6 +6293,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "ভল্টের শুরুতে"
+          }
+        }
+      }
+    },
+    "Triangle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Triangle"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ত্রিভুজ"
           }
         }
       }

@@ -12,6 +12,13 @@ export interface Prefs {
   size: 16 | 18 | 20 | 22;
   theme: "system" | "light" | "dark";
   inspector: boolean;
+  /** The icon bar down the left side. */
+  rail: boolean;
+  /** The status bar along the bottom. */
+  statusbar: boolean;
+  /** Widths of the sidebar and the inspector, in pixels (drag their edges). */
+  sideWidth: number;
+  inspWidth: number;
   linkStyle: "underline" | "tint";
   /** Hide Markdown marks in Source except on the line being edited. */
   livePreview: boolean;
@@ -41,6 +48,10 @@ const DEFAULTS: Prefs = {
   size: 18,
   theme: "system",
   inspector: true,
+  rail: true,
+  statusbar: true,
+  sideWidth: 272,
+  inspWidth: 300,
   linkStyle: "underline",
   livePreview: true,
   toolbar: true,
@@ -79,4 +90,16 @@ export function applyPrefs() {
   else root.dataset.readFont = prefs.readFont;
   document.body.classList.toggle("link-tint", prefs.linkStyle === "tint");
   root.dataset.toolbar = prefs.toolbar ? "on" : "off";
+  root.dataset.rail = prefs.rail ? "on" : "off";
+  root.dataset.statusbar = prefs.statusbar ? "on" : "off";
+  root.style.setProperty("--side-w", `${clampWidth("side", prefs.sideWidth)}px`);
+  root.style.setProperty("--insp-w", `${clampWidth("insp", prefs.inspWidth)}px`);
+}
+
+/** The narrowest and widest the sidebar and inspector can be dragged. */
+export const PANEL_LIMITS = { side: [180, 560], insp: [220, 600] } as const;
+export const PANEL_DEFAULTS = { side: 272, insp: 300 } as const;
+export function clampWidth(which: "side" | "insp", w: number): number {
+  const [lo, hi] = PANEL_LIMITS[which];
+  return Number.isFinite(w) ? Math.round(Math.min(hi, Math.max(lo, w))) : PANEL_DEFAULTS[which];
 }

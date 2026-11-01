@@ -90,7 +90,7 @@ import { NotePane, type At } from "./notepane";
 import type { ButtonSpec } from "./preview";
 import { createVaultDialog, setupSyncDialog, syncLine } from "./cloud";
 import { closePalette, initPalette, openPalette, paletteOpen, type Command, type OpenHow } from "./palette";
-import { applyPrefs, onPrefs, prefs, setPref, type Mode } from "./prefs";
+import { applyPrefs, clampWidth, onPrefs, PANEL_DEFAULTS, prefs, setPref, type Mode } from "./prefs";
 import { closeSettings, initSettings, openSettings, settingsOpen, updateSyncLine } from "./settings";
 import { SearchView, TagsView } from "./sidebar";
 import { CalendarView } from "./calendar";
@@ -1312,10 +1312,50 @@ function setSide(v: typeof side, open = true) {
     $(`side-${name}`).hidden = name !== v;
     $(`rail-${name}`).setAttribute("aria-pressed", String(sideOpen && name === v));
   }
+  $("sidebar-btn").setAttribute("aria-pressed", String(sideOpen));
   if (v === "tags" && sideOpen) void tagsView.refresh();
   if (v === "tasks" && sideOpen) void tasksView.refresh();
   if (v === "calendar" && sideOpen) void calendarView.refresh();
   persistSession();
+}
+
+function toggleSidebar() {
+  setSide(side, !sideOpen);
+}
+
+/** Drag the edge of the sidebar or the inspector; double-click puts it back. */
+function bindResizer(id: string, which: "side" | "insp") {
+  const handle = $(id);
+  const key = which === "side" ? "sideWidth" : "inspWidth";
+  const panel = () => $(which === "side" ? "sidebar" : "inspector");
+  handle.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = panel().getBoundingClientRect().width;
+    const root = document.documentElement;
+    let w = startW;
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add("is-dragging");
+    root.classList.add("is-resizing");
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX;
+      w = clampWidth(which, which === "side" ? startW + dx : startW - dx);
+      root.style.setProperty(which === "side" ? "--side-w" : "--insp-w", `${w}px`);
+    };
+    const up = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", up);
+      handle.classList.remove("is-dragging");
+      root.classList.remove("is-resizing");
+      if (Math.round(w) !== Math.round(startW)) setPref(key, w);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", up);
+  });
+  handle.addEventListener("dblclick", () => setPref(key, PANEL_DEFAULTS[which]));
 }
 
 function railSide(v: typeof side) {
@@ -1509,7 +1549,14 @@ function commands(): Command[] {
     cmd("Open canvas", "squares-four", () => void openSomeCanvas()),
     cmd("Toggle split pane", "columns", () => void toggleSplit(), kbd("\\")),
     cmd("Toggle preview / source", "code", () => toggleMode(), kbd("E")),
-    cmd("Toggle inspector", "sidebar-simple", () => toggleInspector()),
+    cmd("Toggle sidebar", "sidebar-simple", () => toggleSidebar(), kbd("[", true)),
+    cmd("Toggle inspector", "sidebar-simple", () => toggleInspector(), kbd("]", true)),
+    cmd("Toggle icon bar", "dots-three-vertical", () => setPref("rail", !prefs.rail)),
+    cmd("Toggle status bar", "rows", () => setPref("statusbar", !prefs.statusbar)),
+    cmd("Reset sidebar and inspector widths", "arrows-out-line-horizontal", () => {
+      setPref("sideWidth", PANEL_DEFAULTS.side);
+      setPref("inspWidth", PANEL_DEFAULTS.insp);
+    }),
     cmd("Focus mode", "arrows-out", () => toggleFocus(), "F11"),
     cmd("Quick capture", "lightning", () => quickCapture(), prefs.captureKey ? prefs.captureKey.replace("CommandOrControl", isMac ? "⌘" : "Ctrl") : ""),
     cmd("Show all tasks", "check-square", () => setSide("tasks")),
@@ -1967,6 +2014,9 @@ function bindKeys() {
       e.preventDefault();
       void fn();
     };
+    // Ctrl+Shift+[ and Ctrl+Shift+]: the panel on that side. (By key position, so any keyboard layout works.)
+    if (e.shiftKey && e.code === "BracketLeft") return run(() => toggleSidebar());
+    if (e.shiftKey && e.code === "BracketRight") return run(() => toggleInspector());
     // In Source the editor handles it (selection or cursor); elsewhere, the whole note.
     if (k === "j" && e.shiftKey) return run(() => askNotes());
     if (k === "j" && !e.shiftKey) return run(() => (activeNote() ? aiAboutNote() : undefined));
@@ -2023,6 +2073,9 @@ function bindChrome() {
   $("jump").addEventListener("click", () => openPalette());
   $("split-btn").addEventListener("click", () => void toggleSplit());
   $("inspector-btn").addEventListener("click", () => toggleInspector());
+  $("sidebar-btn").addEventListener("click", () => toggleSidebar());
+  bindResizer("rs-side", "side");
+  bindResizer("rs-insp", "insp");
   $("start-new").addEventListener("click", () => void newNote());
   $("start-today").addEventListener("click", () => void openToday());
   $("start-search").addEventListener("click", () => openPalette());
@@ -2042,6 +2095,8 @@ function bindChrome() {
     ["rail-settings", `Settings (${kbd(",")})`],
     ["new-note", `New note (${kbd("N")})`],
     ["split-btn", `Split pane (${kbd("\\")})`],
+    ["sidebar-btn", `Sidebar (${kbd("[", true)})`],
+    ["inspector-btn", `Inspector (${kbd("]", true)})`],
   ];
   for (const [id, t] of tips) $(id).title = t;
 
