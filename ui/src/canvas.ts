@@ -400,6 +400,14 @@ export class CanvasView {
       })
       .catch(async (e) => {
         if (String(e) === "CHANGED_ON_DISK") {
+          // Another view of the same drawing may have saved exactly this.
+          const disk = await api.readNote(path).catch(() => null);
+          if (disk !== null && sameBoard(disk, text)) {
+            this.lastSaved = disk;
+            this.unsafe = false;
+            ok = true;
+            return;
+          }
           ok = await this.keepBoth(path, text, rev);
           return;
         }
@@ -1533,4 +1541,14 @@ function shapeIcon(kind: string): SVGElement {
   svg.append(svgEl("path", { d: def.d, "vector-effect": "non-scaling-stroke" }));
   if (def.extra) svg.append(svgEl("path", { d: def.extra, fill: "none", "vector-effect": "non-scaling-stroke" }));
   return svg;
+}
+
+/** The same canvas, however its file is laid out. */
+function sameBoard(a: string, b: string): boolean {
+  if (a === b) return true;
+  try {
+    return JSON.stringify(JSON.parse(a)) === JSON.stringify(JSON.parse(b));
+  } catch {
+    return false;
+  }
 }

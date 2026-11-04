@@ -84,6 +84,18 @@ describe("canvas saving", () => {
     expect(toasts.join()).toContain("Board (my changes)");
   });
 
+  it("makes no copy when the other save wrote the same drawing", async () => {
+    // Two views of one drawing (a note open twice) both save the same thing.
+    disk.set("Board.canvas", empty);
+    await view.load("Board.canvas");
+    addCard("same");
+    const v = view as unknown as { serialize(): string };
+    disk.set("Board.canvas", v.serialize());
+    expect(await view.flush()).toBe(true);
+    expect([...disk.keys()]).toEqual(["Board.canvas"]);
+    expect(toasts).toEqual([]);
+  });
+
   it("stays on a canvas whose changes can't be saved or kept", async () => {
     disk.set("A.canvas", empty);
     disk.set("B.canvas", empty);

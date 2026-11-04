@@ -207,8 +207,16 @@ export class HomeView {
     return h("button.home-btn", { type: "button", onclick: run }, icon(ic), h("span", null, label));
   }
 
-  /** Opens (or creates) the board; again after switching vaults. */
-  async show() {
+  private showing: Promise<void> | null = null;
+
+  /** Opens (or creates) the board; again after switching vaults. Calls that
+   * overlap share one run, so a new vault doesn't get a second "Home 1". */
+  show(): Promise<void> {
+    this.showing ??= this.open().finally(() => (this.showing = null));
+    return this.showing;
+  }
+
+  private async open() {
     if (this.loaded && this.view.path) {
       this.refresh();
       return;
