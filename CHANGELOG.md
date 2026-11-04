@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Support Marrow:** a Support Marrow link in Settings › About on every
+  device, for anyone who wants to help fund its work.
+- **Fixed:** a brand-new vault on a computer could get a second Home board
+  called "Home 1".
+- **Fixed:** opening a note with a drawing on a computer could make an
+  identical "(my changes)" copy of the drawing.
+
 ## 1.8.0
 
 Home: your own board, the way you want it. Plus quicker drawing on phones.
