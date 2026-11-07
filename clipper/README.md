@@ -29,19 +29,29 @@ Settings › Editor › "Keep running for reminders").
 
 ## Installing
 
-Until it's in the browsers' stores, install it from the release:
+It's on its way to the Chrome Web Store, Microsoft Edge Add-ons and Firefox
+Add-ons. Until then, install it from the release:
 
-1. Download `Marrow_Clipper_<version>.zip` from the
+1. Download from the
    [latest release](https://github.com/mahbub-khan25/marrow/releases/latest)
-   and unzip it into a folder you'll keep.
+   `Marrow_Clipper_<version>_chrome.zip` (Chrome, Edge, Brave, Opera) or
+   `Marrow_Clipper_<version>_firefox.zip`, and unzip it into a folder you'll
+   keep.
 2. **Chrome, Edge, Brave:** open `chrome://extensions` (`edge://extensions`),
    turn on **Developer mode**, click **Load unpacked**, and pick the folder.
 3. **Firefox:** open `about:debugging#/runtime/this-firefox`, click **Load
    Temporary Add-on…**, and pick `manifest.json` in the folder (Firefox
-   forgets it when it closes, until the add-on is signed by Mozilla).
+   forgets it when it closes, until it comes from Firefox Add-ons).
+
+## For maintainers
+
+`python3 clipper/pack.py <version> <folder>` makes both packages (the
+release workflow runs it). Store listing text, reviewer notes and images are
+in [`store/`](store/LISTING.md).
 
 ## Privacy
 
 The extension reads a page only when you clip it, and sends it only to
 Marrow on your own computer (`127.0.0.1`). Nothing goes anywhere else.
-Marrow answers only browser extensions, so web sites can't use it.
+Marrow answers only browser extensions, so web sites can't use it. The full
+policy: https://www.cicadama.com/marrow/privacy/

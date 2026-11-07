@@ -202,7 +202,6 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
-          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$version\"/" clipper/manifest.json
-          zip="$PWD/Marrow_Clipper_${version}.zip"
-          (cd clipper && zip -qr "$zip" . -x '*.md')
-          gh release upload "$TAG" "$zip" --clobber
+          # One package for Chrome, Edge, Brave and Opera; one for Firefox.
+          python3 clipper/pack.py "$version" clipper-out
+          gh release upload "$TAG" clipper-out/*.zip --clobber

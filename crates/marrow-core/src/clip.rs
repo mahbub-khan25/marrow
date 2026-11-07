@@ -95,6 +95,7 @@ pub fn file_name(title: &str) -> String {
 
 fn to_markdown(html: &str) -> String {
     let md = htmd::HtmlToMarkdown::builder()
+        .options(htmd::options::Options { bullet_list_marker: htmd::options::BulletListMarker::Dash, ..Default::default() })
         .skip_tags(vec!["script", "style", "noscript", "iframe", "nav", "footer", "form", "button", "svg"])
         .build()
         .convert(html)
@@ -102,12 +103,15 @@ fn to_markdown(html: &str) -> String {
     tidy(&md)
 }
 
-/// No runs of empty lines, no spaces at line ends.
+/// No runs of empty lines, no spaces at line ends, and list items written
+/// the way Marrow writes them (`- item`, `1. item`, not `-   item`).
 fn tidy(md: &str) -> String {
     let mut out = String::with_capacity(md.len());
     let mut blank = 0;
     for line in md.lines() {
         let line = line.trim_end();
+        let tight = tight_item(line);
+        let line = tight.as_deref().unwrap_or(line);
         if line.is_empty() {
             blank += 1;
             if blank > 1 {
@@ -120,6 +124,27 @@ fn tidy(md: &str) -> String {
         out.push('\n');
     }
     out.trim().to_string()
+}
+
+/// `-   item` → `- item`, `1.  item` → `1. item` (indent kept); else None.
+fn tight_item(line: &str) -> Option<String> {
+    let body = line.trim_start();
+    let indent = &line[..line.len() - body.len()];
+    let marker_len = if body.starts_with("- ") || body.starts_with("* ") {
+        1
+    } else {
+        let digits = body.chars().take_while(char::is_ascii_digit).count();
+        if digits == 0 || !body[digits..].starts_with(". ") {
+            return None;
+        }
+        digits + 1
+    };
+    let rest = &body[marker_len..];
+    let text = rest.trim_start();
+    if rest.len() - text.len() < 2 || text.is_empty() {
+        return None;
+    }
+    Some(format!("{indent}{} {text}", &body[..marker_len]))
 }
 
 /// The article often starts with its own title: don't show it twice.
@@ -226,6 +251,15 @@ before you store them somewhere dark and cool.</p></article>
         assert!(!c.text.contains("About"), "{}", c.text);
         // The title isn't repeated under itself.
         assert_eq!(c.text.matches("How to grow potatoes").count(), 1, "{}", c.text);
+    }
+
+    #[test]
+    fn lists_look_like_marrow_lists() {
+        let sel = "<ul><li><b>Basil</b> loves warmth.</li><li>Mint<ul><li>in its own pot</li></ul></li></ul><ol><li>Sow</li><li>Water</li></ol>";
+        let c = clip_html(PAGE, "https://garden.example/guides/potatoes", Some(sel), "2026-10-30");
+        assert!(c.text.contains("\n- **Basil** loves warmth.\n- Mint\n"), "{}", c.text);
+        assert!(c.text.contains("    - in its own pot\n"), "{}", c.text);
+        assert!(c.text.contains("\n1. Sow\n2. Water"), "{}", c.text);
     }
 
     #[test]

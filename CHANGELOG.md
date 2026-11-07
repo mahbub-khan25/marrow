@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Marrow Clipper, ready for the browser stores:** separate packages for
+  Chrome/Edge and Firefox, a store-sized icon, and a privacy page. Lists in
+  clipped pages now look like Marrow's own (`- item`).
 - **Support Marrow:** a Support Marrow link in Settings › About on every
   device, for anyone who wants to help fund its work.
 - **Fixed:** a brand-new vault on a computer could get a second Home board
