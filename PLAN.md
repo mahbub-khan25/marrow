@@ -369,7 +369,7 @@ colours come from the prototype's own source, not from eyeballing.
   right so a late click can't insert. Without a provider it offers setup.
 * **Hyperlume AI** (1.9.0, Linux only): a third protocol, `hyperlume`, built
   to Hyperlume's `hyperlume-ai chat --plain` contract (version 1).
-  * Found with `hyperlume-ai capabilities` (`chat_plain: true`, exit 0),
+  * Found with `hyperlume-ai capabilities` (`api: 1`, `chat_plain: true`, exit 0),
     asked once in the background with a 3 s limit and remembered
     (`ai_hyperlume_available`). Anything else, an older Hyperlume included,
     means it isn't offered. The window also skips the question unless it's a
@@ -380,7 +380,11 @@ colours come from the prototype's own source, not from eyeballing.
     `chunk`s, `{"done"}` is done, and `{"error"}` or a non-zero exit is an
     error showing Hyperlume's sentence (or a plain hint per exit code 1–4).
   * `ai_cancel` sends SIGTERM; the task waits up to 3 s, then kills, and
-    sends no more events.
+    sends no more events. The Test button's 90 s limit stops it the same
+    way. Signals go only through the child Marrow still owns.
+  * A line that isn't UTF-8, is over 1 MiB, or fails to read ends the run
+    with one error; stdout is closed first so the program can't block, and
+    it's always reaped.
   * No key, address or model list. With no provider set up, the window adds
     it once and it becomes the default (`hyperlumeOffered` in `ai.json`
     stops it coming back after it's removed). Settings → AI has a *Use

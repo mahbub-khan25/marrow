@@ -5,7 +5,9 @@
 //! Almost every provider speaks the OpenAI chat-completions protocol; Claude
 //! uses Anthropic's Messages API. Requests are made here, not in the window,
 //! so browser rules (CORS) don't get in the way, and answers stream back as
-//! `ai-event` events.
+//! `ai-event` events. On a Hyperlume desktop there's a third way, Hyperlume
+//! AI: no request over the network from Marrow, but the `hyperlume-ai`
+//! program, which uses whatever AI the person chose in Hyperlume.
 //!
 //! Provider settings live in `ai.json` in the config folder. API keys don't:
 //! they go in Windows Credential Manager or the macOS Keychain. In portable
@@ -645,21 +647,13 @@ fn hyperlume_run(app: AppHandle, id: String, p: Provider, system: String, messag
     let name = p.name.clone();
     tauri::async_runtime::spawn(async move {
         let path = std::env::var_os("PATH").unwrap_or_default();
-        let result = hyperlume::chat(&path, &p.upstream, &p.model, &system, &messages, &cancel, |t| {
-            let _ = app.emit("ai-event", AiEvent { id: id.clone(), kind: "chunk", text: t });
+        hyperlume::run(&path, &p.upstream, &p.model, &system, &messages, &cancel, |kind, text| {
+            let _ = app.emit("ai-event", AiEvent { id: id.clone(), kind, text });
         })
         .await;
         if let Ok(mut r) = hyper_running().lock() {
             r.remove(&id);
         }
-        if cancel.is_cancelled() {
-            return;
-        }
-        let ev = match result {
-            Ok(()) => AiEvent { id, kind: "done", text: String::new() },
-            Err(e) => AiEvent { id, kind: "error", text: e },
-        };
-        let _ = app.emit("ai-event", ev);
     });
     Ok(name)
 }
@@ -675,16 +669,7 @@ const NOT_HERE: &str = "Hyperlume AI works only on a Hyperlume desktop. Pick ano
 #[cfg(target_os = "linux")]
 async fn hyperlume_test(p: &Provider, msgs: &[Msg]) -> CmdResult<String> {
     let path = std::env::var_os("PATH").unwrap_or_default();
-    let cancel = hyperlume::Cancel::default();
-    let mut text = String::new();
-    let asked = hyperlume::chat(&path, &p.upstream, &p.model, "", msgs, &cancel, |t| text.push_str(&t));
-    match tokio::time::timeout(Duration::from_secs(90), asked).await {
-        Ok(r) => r?,
-        Err(_) => {
-            cancel.cancel();
-            return Err("Hyperlume AI took too long to answer.".into());
-        }
-    }
+    let text = hyperlume::ask_with_limit(&path, &p.upstream, &p.model, msgs, Duration::from_secs(90)).await?;
     let text: String = text.trim().chars().take(200).collect();
     Ok(if text.is_empty() { "Connected.".into() } else { text })
 }
@@ -693,7 +678,6 @@ async fn hyperlume_test(p: &Provider, msgs: &[Msg]) -> CmdResult<String> {
 async fn hyperlume_test(_p: &Provider, _msgs: &[Msg]) -> CmdResult<String> {
     Err(NOT_HERE.into())
 }
-
 
 /// Hyperlume AI: on a Hyperlume desktop, the same AI as its terminal helper,
 /// local or cloud, as chosen in Hyperlume's Settings → AI. Marrow runs
@@ -708,10 +692,10 @@ pub(crate) mod hyperlume {
     use std::path::PathBuf;
     use std::process::Stdio;
     use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::{Mutex, OnceLock};
+    use std::sync::OnceLock;
     use std::time::Duration;
-    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-    use tokio::process::Command;
+    use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWriteExt, BufReader};
+    use tokio::process::{Child, Command};
     use tokio::sync::Notify;
 
     pub const BIN: &str = "hyperlume-ai";
@@ -730,7 +714,7 @@ pub(crate) mod hyperlume {
     }
 
     /// Whether this `hyperlume-ai` can answer plain chat requests
-    /// (`capabilities` exits 0 and says `"chat_plain": true`).
+    /// (`capabilities` exits 0 and says `"api": 1, "chat_plain": true`).
     pub async fn probe(path: &OsStr, timeout: Duration) -> bool {
         let Some(bin) = find(path) else { return false };
         let child = Command::new(bin)
@@ -746,7 +730,7 @@ pub(crate) mod hyperlume {
         out.status.success()
             && serde_json::from_slice::<Value>(&out.stdout)
                 .ok()
-                .and_then(|v| v.get("chat_plain")?.as_bool())
+                .and_then(|v| Some(v.get("api")?.as_u64()? == 1 && v.get("chat_plain")?.as_bool()?))
                 .unwrap_or(false)
     }
 
@@ -772,10 +756,10 @@ pub(crate) mod hyperlume {
         a
     }
 
-    /// Stops a running answer: SIGTERM to the program, at once or as soon as it starts.
+    /// Stops a running answer. `chat` itself sends SIGTERM, through the
+    /// child it still owns, so a reaped (and maybe reused) pid is never signalled.
     #[derive(Default)]
     pub struct Cancel {
-        pid: Mutex<Option<u32>>,
         cancelled: AtomicBool,
         notify: Notify,
     }
@@ -784,29 +768,10 @@ pub(crate) mod hyperlume {
         pub fn cancel(&self) {
             self.cancelled.store(true, Ordering::SeqCst);
             self.notify.notify_one();
-            if let Some(pid) = *self.pid.lock().unwrap_or_else(|p| p.into_inner()) {
-                term(pid);
-            }
         }
 
         pub fn is_cancelled(&self) -> bool {
             self.cancelled.load(Ordering::SeqCst)
-        }
-
-        fn started(&self, pid: Option<u32>) {
-            *self.pid.lock().unwrap_or_else(|p| p.into_inner()) = pid;
-            if let Some(pid) = pid.filter(|_| self.is_cancelled()) {
-                term(pid);
-            }
-        }
-    }
-
-    fn term(pid: u32) {
-        if let Ok(pid) = i32::try_from(pid) {
-            // SAFETY: kill() only sends a signal; the pid is our own child, not yet reaped.
-            unsafe {
-                libc::kill(pid, libc::SIGTERM);
-            }
         }
     }
 
@@ -822,54 +787,70 @@ pub(crate) mod hyperlume {
         .to_string()
     }
 
-    /// Asks Hyperlume AI; `on_chunk` gets the answer as it comes. After
-    /// `cancel`, no more text is passed on and the result doesn't matter.
-    pub async fn chat(
-        path: &OsStr,
-        upstream: &str,
-        model: &str,
-        system: &str,
-        messages: &[Msg],
-        cancel: &Cancel,
-        mut on_chunk: impl FnMut(String),
-    ) -> Result<(), String> {
-        let bin = find(path).ok_or(NOT_INSTALLED)?;
-        let mut child = Command::new(bin)
-            .args(args(upstream, model))
-            .env("PATH", path)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .kill_on_drop(true)
-            .spawn()
-            .map_err(|_| NOT_INSTALLED)?;
-        cancel.started(child.id());
+    /// The longest line read; anything longer is an error (1 MiB of text per chunk is plenty).
+    pub const MAX_LINE: usize = 1 << 20;
+    const UNREADABLE: &str = "Marrow couldn't read Hyperlume AI's answer.";
 
-        let mut all = Vec::with_capacity(messages.len() + 1);
-        if !system.is_empty() {
-            all.push(json!({ "role": "system", "content": system }));
-        }
-        all.extend(messages.iter().map(|m| json!({ "role": m.role, "content": m.content })));
-        let body = serde_json::to_vec(&all).map_err(|e| e.to_string())?;
-        // Written on the side, so a program that doesn't read can't hold up the answer.
-        if let Some(mut stdin) = child.stdin.take() {
-            tauri::async_runtime::spawn(async move {
-                let _ = stdin.write_all(&body).await;
-                let _ = stdin.shutdown().await;
-            });
-        }
+    /// How reading the answer ended.
+    #[derive(Debug)]
+    pub enum Read {
+        /// The output ended.
+        End { done: bool, error: Option<String> },
+        Cancelled,
+        /// The output couldn't be read (a read error, text that isn't UTF-8, a line too long).
+        Broken(String),
+    }
 
-        let mut lines = BufReader::new(child.stdout.take().ok_or("No output from Hyperlume AI.")?).lines();
-        let (mut done, mut error) = (false, None::<String>);
+    enum Line {
+        Eof,
+        Full,
+        TooLong,
+    }
+
+    /// Reads one line into `buf` (without the newline), never holding more than MAX_LINE.
+    async fn next_line<R: AsyncBufRead + Unpin>(r: &mut R, buf: &mut Vec<u8>) -> std::io::Result<Line> {
+        buf.clear();
         loop {
-            let line = tokio::select! {
-                l = lines.next_line() => l,
-                _ = cancel.notify.notified() => break,
-            };
-            let Ok(Some(line)) = line else { break };
-            if cancel.is_cancelled() {
-                break;
+            let avail = r.fill_buf().await?;
+            if avail.is_empty() {
+                return Ok(if buf.is_empty() { Line::Eof } else { Line::Full });
             }
+            let (take, end) = match avail.iter().position(|&b| b == b'\n') {
+                Some(i) => (i, true),
+                None => (avail.len(), false),
+            };
+            if buf.len() + take > MAX_LINE {
+                return Ok(Line::TooLong);
+            }
+            buf.extend_from_slice(&avail[..take]);
+            r.consume(take + usize::from(end));
+            if end {
+                return Ok(Line::Full);
+            }
+        }
+    }
+
+    /// Reads the JSON lines of an answer; `on_chunk` gets each piece of text.
+    pub async fn read_answer<R: AsyncBufRead + Unpin>(mut r: R, cancel: &Cancel, mut on_chunk: impl FnMut(String)) -> Read {
+        let (mut done, mut error) = (false, None::<String>);
+        let mut buf = Vec::new();
+        loop {
+            let got = tokio::select! {
+                l = next_line(&mut r, &mut buf) => l,
+                _ = cancel.notify.notified() => return Read::Cancelled,
+            };
+            if cancel.is_cancelled() {
+                return Read::Cancelled;
+            }
+            match got {
+                Ok(Line::Eof) => return Read::End { done, error },
+                Ok(Line::TooLong) => return Read::Broken(format!("{UNREADABLE} A line was too long.")),
+                Err(_) => return Read::Broken(UNREADABLE.into()),
+                Ok(Line::Full) => {}
+            }
+            let Ok(line) = std::str::from_utf8(&buf) else {
+                return Read::Broken(format!("{UNREADABLE} It wasn't UTF-8 text."));
+            };
             let Ok(v) = serde_json::from_str::<Value>(line.trim()) else { continue };
             if let Some(t) = v.get("d").and_then(|d| d.as_str()) {
                 if !t.is_empty() {
@@ -882,22 +863,85 @@ pub(crate) mod hyperlume {
                 done = true;
             }
         }
+    }
 
-        let status = if cancel.is_cancelled() {
-            match tokio::time::timeout(GRACE, child.wait()).await {
-                Ok(s) => s,
-                Err(_) => {
-                    let _ = child.start_kill();
-                    child.wait().await
-                }
+    /// SIGTERM through the child we still own (`id()` is None once it's
+    /// reaped), a grace period, then SIGKILL; always reaps it.
+    async fn stop(child: &mut Child) -> std::io::Result<std::process::ExitStatus> {
+        if let Some(pid) = child.id().and_then(|p| i32::try_from(p).ok()) {
+            // SAFETY: kill() only sends a signal, to our own child that hasn't been reaped.
+            unsafe {
+                libc::kill(pid, libc::SIGTERM);
             }
-        } else {
-            child.wait().await
+        }
+        match tokio::time::timeout(GRACE, child.wait()).await {
+            Ok(s) => s,
+            Err(_) => {
+                let _ = child.start_kill();
+                child.wait().await
+            }
+        }
+    }
+
+    /// Asks Hyperlume AI; `on_chunk` gets the answer as it comes. After
+    /// `cancel`, no more text is passed on and the result doesn't matter.
+    pub async fn chat(
+        path: &OsStr,
+        upstream: &str,
+        model: &str,
+        system: &str,
+        messages: &[Msg],
+        cancel: &Cancel,
+        on_chunk: impl FnMut(String),
+    ) -> Result<(), String> {
+        let bin = find(path).ok_or(NOT_INSTALLED)?;
+        let mut child = Command::new(bin)
+            .args(args(upstream, model))
+            .env("PATH", path)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .spawn()
+            .map_err(|_| NOT_INSTALLED)?;
+
+        let mut all = Vec::with_capacity(messages.len() + 1);
+        if !system.is_empty() {
+            all.push(json!({ "role": "system", "content": system }));
+        }
+        all.extend(messages.iter().map(|m| json!({ "role": m.role, "content": m.content })));
+        let body = serde_json::to_vec(&all).map_err(|e| e.to_string())?;
+        // Written on the side, so a program that doesn't read can't hold up
+        // the answer; stdin is closed when it's written (or the program exits).
+        if let Some(mut stdin) = child.stdin.take() {
+            tauri::async_runtime::spawn(async move {
+                let _ = stdin.write_all(&body).await;
+                let _ = stdin.shutdown().await;
+            });
+        }
+
+        let read = match child.stdout.take() {
+            Some(out) if !cancel.is_cancelled() => read_answer(BufReader::new(out), cancel, on_chunk).await,
+            Some(_) => Read::Cancelled,
+            None => Read::Broken(UNREADABLE.into()),
         };
-        cancel.started(None);
+        // stdout is closed by now, so a program still writing gets EPIPE
+        // instead of blocking. Then it's reaped, in every case.
+        let status = match &read {
+            Read::End { .. } => tokio::select! {
+                s = child.wait() => s,
+                _ = cancel.notify.notified() => stop(&mut child).await,
+            },
+            Read::Cancelled | Read::Broken(_) => stop(&mut child).await,
+        };
         if cancel.is_cancelled() {
             return Ok(());
         }
+        let (done, error) = match read {
+            Read::End { done, error } => (done, error),
+            Read::Broken(e) => return Err(e),
+            Read::Cancelled => return Ok(()),
+        };
         let status = status.map_err(|e| e.to_string())?;
         if let Some(e) = error {
             return Err(e);
@@ -910,23 +954,49 @@ pub(crate) mod hyperlume {
         }
         Ok(())
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    /// Runs a chat and reports it as events: ("chunk", text)…, then exactly
+    /// one ("done", "") or ("error", sentence), or nothing more after a cancel.
+    pub async fn run(
+        path: &OsStr,
+        upstream: &str,
+        model: &str,
+        system: &str,
+        messages: &[Msg],
+        cancel: &Cancel,
+        mut emit: impl FnMut(&'static str, String),
+    ) {
+        let result = chat(path, upstream, model, system, messages, cancel, |t| emit("chunk", t)).await;
+        if cancel.is_cancelled() {
+            return;
+        }
+        match result {
+            Ok(()) => emit("done", String::new()),
+            Err(e) => emit("error", e),
+        }
+    }
 
-    #[test]
-    fn reads_stream_deltas() {
-        let o: Value = serde_json::from_str(r#"{"choices":[{"delta":{"content":"Hel"}}]}"#).unwrap();
-        assert_eq!(delta("openai", &o).as_deref(), Some("Hel"));
-        let a: Value = serde_json::from_str(r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"lo"}}"#).unwrap();
-        assert_eq!(delta("anthropic", &a).as_deref(), Some("lo"));
-        let start: Value = serde_json::from_str(r#"{"type":"message_start"}"#).unwrap();
-        assert_eq!(delta("anthropic", &start), None);
-        let e: Value = serde_json::from_str(r#"{"error":{"message":"bad key"}}"#).unwrap();
-        assert_eq!(stream_error(&e).as_deref(), Some("bad key"));
-        assert_eq!(url("https://api.x.ai/v1/", "models"), "https://api.x.ai/v1/models");
+    /// The whole answer, or an error after `limit`. A late answer is stopped
+    /// the contract's way (SIGTERM, then a kill after the grace period), not dropped.
+    pub async fn ask_with_limit(path: &OsStr, upstream: &str, model: &str, messages: &[Msg], limit: Duration) -> Result<String, String> {
+        let cancel = Cancel::default();
+        let mut text = String::new();
+        let in_time = {
+            let asked = chat(path, upstream, model, "", messages, &cancel, |t| text.push_str(&t));
+            tokio::pin!(asked);
+            tokio::select! {
+                r = &mut asked => Some(r),
+                _ = tokio::time::sleep(limit) => {
+                    cancel.cancel();
+                    let _ = asked.await;
+                    None
+                }
+            }
+        };
+        match in_time {
+            Some(r) => r.map(|()| text),
+            None => Err("Hyperlume AI took too long to answer.".into()),
+        }
     }
 }
 
@@ -949,12 +1019,12 @@ mod hyperlume_tests {
         path_with(dir)
     }
 
-    /// `dir`, then a folder with only `cat` and `sleep`: never the system's
+    /// `dir`, then a folder with only a few basic tools: never the system's
     /// folders, which may hold a real `hyperlume-ai`.
     fn path_with(dir: &Path) -> OsString {
         let tools = dir.join("tools");
         std::fs::create_dir_all(&tools).unwrap();
-        for t in ["cat", "sleep"] {
+        for t in ["cat", "sleep", "head", "tr"] {
             let to = tools.join(t);
             if !to.exists() {
                 let from = ["/usr/bin", "/bin"].iter().map(|d| Path::new(d).join(t)).find(|p| p.exists()).unwrap();
@@ -966,6 +1036,30 @@ mod hyperlume_tests {
 
     fn block<T>(f: impl std::future::Future<Output = T>) -> T {
         tauri::async_runtime::block_on(f)
+    }
+
+    /// One test at a time: writing a script while another thread forks can
+    /// make exec fail with "Text file busy" (rust-lang/rust#114554).
+    fn serial() -> std::sync::MutexGuard<'static, ()> {
+        static M: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        M.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
+    /// Runs to the end through the event path, with a time limit; returns
+    /// the events as (kind, text).
+    fn events(path: &OsString) -> Vec<(&'static str, String)> {
+        let mut ev = Vec::new();
+        let cancel = Cancel::default();
+        let msgs = ask("Hi");
+        let r = block(async {
+            tokio::time::timeout(Duration::from_secs(10), hyperlume::run(path, "", "", "", &msgs, &cancel, |k, t| ev.push((k, t)))).await
+        });
+        assert!(r.is_ok(), "no hang");
+        ev
+    }
+
+    fn errors(ev: &[(&'static str, String)]) -> Vec<String> {
+        ev.iter().filter(|(k, _)| *k == "error").map(|(_, t)| t.clone()).collect()
     }
 
     fn ask(text: &str) -> Vec<Msg> {
@@ -984,6 +1078,7 @@ mod hyperlume_tests {
 
     #[test]
     fn capabilities_present() {
+        let _g = serial();
         let d = tempfile::tempdir().unwrap();
         let path = fake(d.path(), CAPS);
         assert!(hyperlume::find(&path).is_some());
@@ -992,6 +1087,7 @@ mod hyperlume_tests {
 
     #[test]
     fn capabilities_missing() {
+        let _g = serial();
         // No program at all (an older Hyperlume, or not Hyperlume).
         let d = tempfile::tempdir().unwrap();
         let path = path_with(d.path());
@@ -1003,6 +1099,11 @@ mod hyperlume_tests {
         // A program that knows it but can't do plain chat.
         let path = fake(d.path(), r#"echo '{"api": 1, "chat_plain": false}'"#);
         assert!(!block(hyperlume::probe(&path, hyperlume::PROBE_TIMEOUT)));
+        // Another version of the contract, or none stated.
+        let path = fake(d.path(), r#"echo '{"api": 2, "chat_plain": true}'"#);
+        assert!(!block(hyperlume::probe(&path, hyperlume::PROBE_TIMEOUT)));
+        let path = fake(d.path(), r#"echo '{"chat_plain": true}'"#);
+        assert!(!block(hyperlume::probe(&path, hyperlume::PROBE_TIMEOUT)));
         // The right answer, but a failing exit.
         let path = fake(d.path(), r#"echo '{"api": 1, "chat_plain": true}'; exit 2"#);
         assert!(!block(hyperlume::probe(&path, hyperlume::PROBE_TIMEOUT)));
@@ -1010,13 +1111,14 @@ mod hyperlume_tests {
 
     #[test]
     fn capabilities_garbage() {
+        let _g = serial();
         let d = tempfile::tempdir().unwrap();
         for out in ["not json at all", "[1, 2, 3]", r#"{"chat_plain": "yes"}"#, ""] {
             let path = fake(d.path(), &format!("echo '{out}'"));
             assert!(!block(hyperlume::probe(&path, hyperlume::PROBE_TIMEOUT)), "{out}");
         }
         // One that never answers is given up on, without waiting for it.
-        let path = fake(d.path(), "sleep 30");
+        let path = fake(d.path(), "exec sleep 30");
         let t = Instant::now();
         assert!(!block(hyperlume::probe(&path, Duration::from_millis(300))));
         assert!(t.elapsed() < Duration::from_secs(5));
@@ -1024,6 +1126,7 @@ mod hyperlume_tests {
 
     #[test]
     fn streams_an_answer() {
+        let _g = serial();
         let d = tempfile::tempdir().unwrap();
         let path = fake(
             d.path(),
@@ -1058,6 +1161,7 @@ echo '{"done": true}'"#,
 
     #[test]
     fn each_error_exit() {
+        let _g = serial();
         let d = tempfile::tempdir().unwrap();
         for code in 1..=4 {
             // Hyperlume's own sentence is what the person sees.
@@ -1088,10 +1192,11 @@ echo '{"done": true}'"#,
 
     #[test]
     fn cancel_sends_sigterm() {
+        let _g = serial();
         let d = tempfile::tempdir().unwrap();
         let path = fake(
             d.path(),
-            r#"trap 'echo term > "$D/got-term"; exit 143' TERM
+            r#"trap 'echo term > "$D/got-term"; echo '"'"'{"d": "late"}'"'"'; exit 143' TERM
 echo '{"d": "partial"}'
 while :; do sleep 0.05; done"#,
         );
@@ -1114,12 +1219,124 @@ while :; do sleep 0.05; done"#,
         assert!(r.is_ok(), "the chat ends soon after cancel");
         assert!(t.elapsed() < Duration::from_secs(4));
         assert!(d.path().join("got-term").exists(), "the program got SIGTERM");
+        assert!(rx.try_iter().all(|t| t != "late"), "no text after cancel");
         // Cancelling before the program has started stops it straight away.
         let early = Cancel::default();
         early.cancel();
         let t = Instant::now();
         let _ = block(hyperlume::chat(&path, "", "", "", &ask("Hi"), &early, |_| panic!("no text after cancel")));
         assert!(t.elapsed() < Duration::from_secs(4));
+    }
+    #[test]
+    fn invalid_utf8_is_one_error_and_no_hang() {
+        let _g = serial();
+        let d = tempfile::tempdir().unwrap();
+        // A bad line, then far more output than a pipe holds, forever.
+        let path = fake(
+            d.path(),
+            r#"echo '{"d": "a"}'
+printf '{"d": "\377"}\n'
+while :; do echo '{"d": "more"}'; done"#,
+        );
+        let ev = events(&path);
+        assert_eq!(errors(&ev).len(), 1, "{:?}", &ev[ev.len().saturating_sub(3)..]);
+        assert!(errors(&ev)[0].contains("couldn't read"));
+        assert!(!ev.iter().any(|(k, _)| *k == "done"));
+        assert_eq!(ev.last().unwrap().0, "error");
+    }
+
+    #[test]
+    fn oversized_line_is_one_error() {
+        let _g = serial();
+        let d = tempfile::tempdir().unwrap();
+        let path = fake(
+            d.path(),
+            r#"printf '{"d": "'; head -c 3000000 /dev/zero | tr '\0' a; echo '"}'
+echo '{"done": true}'"#,
+        );
+        let ev = events(&path);
+        assert_eq!(errors(&ev).len(), 1);
+        assert!(errors(&ev)[0].contains("too long"));
+        assert!(!ev.iter().any(|(k, _)| *k == "done"));
+        assert!(!ev.iter().any(|(k, _)| *k == "chunk"), "the long line isn't passed on");
+    }
+
+    /// Output that yields `first`, then fails.
+    struct Failing(Option<&'static [u8]>);
+
+    impl tokio::io::AsyncRead for Failing {
+        fn poll_read(
+            mut self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+            buf: &mut tokio::io::ReadBuf<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            std::task::Poll::Ready(match self.0.take() {
+                Some(b) => {
+                    buf.put_slice(b);
+                    Ok(())
+                }
+                None => Err(std::io::Error::other("the pipe broke")),
+            })
+        }
+    }
+
+    #[test]
+    fn read_failure_mid_stream_is_an_error() {
+        let _g = serial();
+        let mut chunks = Vec::new();
+        let cancel = Cancel::default();
+        let failing = tokio::io::BufReader::new(Failing(Some(b"{\"d\": \"a\"}\n{\"d\": \"b")));
+        let r = block(async { tokio::time::timeout(Duration::from_secs(5), hyperlume::read_answer(failing, &cancel, |t| chunks.push(t))).await })
+            .expect("no hang");
+        assert_eq!(chunks, ["a"]);
+        match r {
+            hyperlume::Read::Broken(e) => assert!(e.contains("couldn't read"), "{e}"),
+            other => panic!("expected an error, got {other:?}"),
+        }
+        // And an ending without a newline still counts.
+        let r = block(hyperlume::read_answer(&b"{\"d\": \"x\"}\n{\"done\": true}"[..], &cancel, |_| {}));
+        assert!(matches!(r, hyperlume::Read::End { done: true, error: None }), "{r:?}");
+    }
+
+    #[test]
+    fn test_button_time_limit_sends_sigterm_then_kills() {
+        let _g = serial();
+        let d = tempfile::tempdir().unwrap();
+        let msgs = ask("Hi");
+        // Stops on SIGTERM.
+        let path = fake(
+            d.path(),
+            r#"echo $$ > "$D/pid"
+trap 'echo term > "$D/got-term"; exit 143' TERM
+while :; do sleep 0.05; done"#,
+        );
+        let t = Instant::now();
+        let r = block(hyperlume::ask_with_limit(&path, "", "", &msgs, Duration::from_millis(300)));
+        assert!(r.unwrap_err().contains("too long"));
+        assert!(d.path().join("got-term").exists(), "SIGTERM, not SIGKILL");
+        assert!(t.elapsed() < Duration::from_secs(3));
+        let pid = std::fs::read_to_string(d.path().join("pid")).unwrap();
+        assert!(!Path::new(&format!("/proc/{}", pid.trim())).exists(), "the program was reaped");
+
+        // Ignores SIGTERM: killed after the grace period, and reaped.
+        let path = fake(
+            d.path(),
+            r#"echo $$ > "$D/pid"
+trap '' TERM
+while :; do sleep 0.05; done"#,
+        );
+        let t = Instant::now();
+        let r = block(hyperlume::ask_with_limit(&path, "", "", &msgs, Duration::from_millis(300)));
+        assert!(r.unwrap_err().contains("too long"));
+        let took = t.elapsed();
+        assert!(took >= Duration::from_secs(2), "a grace period first ({took:?})");
+        assert!(took < Duration::from_secs(8), "then a kill ({took:?})");
+        let pid = std::fs::read_to_string(d.path().join("pid")).unwrap();
+        assert!(!Path::new(&format!("/proc/{}", pid.trim())).exists(), "the program was reaped");
+
+        // In time: the answer.
+        let path = fake(d.path(), r#"cat > /dev/null; echo '{"d": "ready"}'; echo '{"done": true}'"#);
+        assert_eq!(block(hyperlume::ask_with_limit(&path, "", "", &msgs, Duration::from_secs(10))), Ok("ready".into()));
     }
 }
 
