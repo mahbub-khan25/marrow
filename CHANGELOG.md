@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Hyperlume AI:** on a Hyperlume desktop, Marrow can use the same AI as
+  Hyperlume's terminal helper, on your computer or in the cloud, whichever
+  you chose in Hyperlume's Settings → AI. There's no key to paste. If you
+  haven't set up another AI yet, Marrow uses it straight away; it never
+  replaces one you chose. It does chat only for now, so search by meaning
+  keeps using your other AIs. Nothing changes on Windows, macOS, phones or
+  tablets.
 - **Marrow Clipper, ready for the browser stores:** separate packages for
   Chrome/Edge and Firefox, a store-sized icon, and a privacy page. Lists in
   clipped pages now look like Marrow's own (`- item`).

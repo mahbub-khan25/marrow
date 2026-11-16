@@ -32,7 +32,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "str
 # Reading WebDAV server replies.
 quick-xml = "0.37"
 futures-util = "0.3"
-tokio = { version = "1", features = ["time"] }
+tokio = { version = "1", features = ["time", "process", "io-util", "sync", "macros"] }
 png = "0.17"
 
 # Desktop only: quick capture from any app, one copy at a time, and pasting
@@ -47,6 +47,10 @@ arboard = { version = "3", default-features = false, features = ["image-data"] }
 tempfile = { workspace = true }
 
 # API keys for AI providers go in the system's credential store.
+# Hyperlume AI: stopping an answer sends SIGTERM to `hyperlume-ai`.
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3", features = ["windows-native"] }
 

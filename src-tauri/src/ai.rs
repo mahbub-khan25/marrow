@@ -32,10 +32,14 @@ pub struct Provider {
     pub preset: String,
     /// What the person calls it.
     pub name: String,
-    /// "openai" (chat completions) or "anthropic" (messages).
+    /// "openai" (chat completions), "anthropic" (messages) or "hyperlume"
+    /// (the `hyperlume-ai` program on a Hyperlume desktop).
     pub protocol: String,
     pub base_url: String,
     pub model: String,
+    /// Hyperlume AI only: which of Hyperlume's providers to use ("local",
+    /// "openai"…). Empty follows Hyperlume's own Settings → AI.
+    pub upstream: String,
     /// Filled in when sent to the window; never stored.
     pub has_key: bool,
 }
@@ -47,6 +51,9 @@ pub struct AiConfig {
     pub default_id: Option<String>,
     /// The model used to search by meaning, if one is set up.
     pub embed: Option<EmbedSetting>,
+    /// Hyperlume AI has been added once, so it isn't added again by itself
+    /// after the person removes it.
+    pub hyperlume_offered: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -86,6 +93,7 @@ pub(crate) fn save(app: &AppHandle, cfg: &AiConfig) -> CmdResult<()> {
         providers: cfg.providers.clone(),
         default_id: cfg.default_id.clone(),
         embed: cfg.embed.clone(),
+        hyperlume_offered: cfg.hyperlume_offered,
     };
     for p in &mut clean.providers {
         p.has_key = false;
@@ -427,6 +435,10 @@ pub fn ai_save_provider(app: AppHandle, mut provider: Provider, key: Option<Stri
     }
     provider.base_url = provider.base_url.trim().trim_end_matches('/').to_string();
     provider.model = provider.model.trim().to_string();
+    provider.upstream = provider.upstream.trim().to_string();
+    if provider.protocol == HYPERLUME {
+        cfg.hyperlume_offered = true;
+    }
     match key.as_deref().map(str::trim) {
         Some("") => keys::set(&app, &provider.id, None)?,
         Some(k) => keys::set(&app, &provider.id, Some(k))?,
@@ -478,6 +490,10 @@ pub(crate) fn key_for(app: &AppHandle, p: &Provider, key: Option<String>) -> Opt
 /// The models a provider offers (for the picker).
 #[tauri::command]
 pub async fn ai_models(app: AppHandle, provider: Provider, key: Option<String>) -> CmdResult<Vec<String>> {
+    if provider.protocol == HYPERLUME {
+        // Hyperlume picks its own model unless the person types one.
+        return Ok(Vec::new());
+    }
     let key = key_for(&app, &provider, key);
     let c = client()?;
     let mut req = c.get(url(&provider.base_url, "models")).timeout(Duration::from_secs(20));
@@ -513,14 +529,17 @@ pub async fn ai_models(app: AppHandle, provider: Provider, key: Option<String>) 
 /// Sends a tiny request and returns the reply, to check the settings work.
 #[tauri::command]
 pub async fn ai_test(app: AppHandle, provider: Provider, key: Option<String>) -> CmdResult<String> {
-    let key = key_for(&app, &provider, key);
-    if provider.model.trim().is_empty() {
-        return Err("Pick a model first.".into());
-    }
     let msgs = [Msg {
         role: "user".into(),
         content: "Reply with just the word: ready".into(),
     }];
+    if provider.protocol == HYPERLUME {
+        return hyperlume_test(&provider, &msgs).await;
+    }
+    let key = key_for(&app, &provider, key);
+    if provider.model.trim().is_empty() {
+        return Err("Pick a model first.".into());
+    }
     let resp = build(&provider, key.as_deref(), "", &msgs, false)?
         .timeout(Duration::from_secs(90))
         .send()
@@ -547,6 +566,9 @@ pub async fn ai_test(app: AppHandle, provider: Provider, key: Option<String>) ->
 #[tauri::command(async)]
 pub fn ai_run(app: AppHandle, id: String, provider_id: Option<String>, system: String, messages: Vec<Msg>) -> CmdResult<String> {
     let p = pick(&app, provider_id.as_deref())?;
+    if p.protocol == HYPERLUME {
+        return hyperlume_run(app, id, p, system, messages);
+    }
     if p.model.is_empty() {
         return Err(format!("{} has no model chosen. Pick one in Settings → AI.", p.name));
     }
@@ -573,10 +595,320 @@ pub fn ai_run(app: AppHandle, id: String, provider_id: Option<String>, system: S
 
 #[tauri::command(async)]
 pub fn ai_cancel(id: String) {
+    // Hyperlume AI is stopped with SIGTERM; its task then ends by itself.
+    #[cfg(target_os = "linux")]
+    if let Some(c) = hyper_running().lock().ok().and_then(|mut r| r.remove(&id)) {
+        c.cancel();
+        return;
+    }
     if let Ok(mut r) = running().lock() {
         if let Some(t) = r.remove(&id) {
             t.abort();
         }
+    }
+}
+
+// ------------------------------------------------------------ Hyperlume AI
+
+/// The protocol of the Hyperlume AI provider.
+pub(crate) const HYPERLUME: &str = "hyperlume";
+
+/// Whether Hyperlume AI can be used here: only on Linux, and only when this
+/// computer's `hyperlume-ai` offers plain chat. Asked once, then remembered.
+#[tauri::command]
+pub async fn ai_hyperlume_available() -> bool {
+    hyperlume_available().await
+}
+
+#[cfg(target_os = "linux")]
+async fn hyperlume_available() -> bool {
+    hyperlume::available().await
+}
+
+#[cfg(not(target_os = "linux"))]
+async fn hyperlume_available() -> bool {
+    false
+}
+
+#[cfg(target_os = "linux")]
+fn hyper_running() -> &'static Mutex<HashMap<String, std::sync::Arc<hyperlume::Cancel>>> {
+    static R: OnceLock<Mutex<HashMap<String, std::sync::Arc<hyperlume::Cancel>>>> = OnceLock::new();
+    R.get_or_init(Default::default)
+}
+
+#[cfg(target_os = "linux")]
+fn hyperlume_run(app: AppHandle, id: String, p: Provider, system: String, messages: Vec<Msg>) -> CmdResult<String> {
+    let cancel = std::sync::Arc::new(hyperlume::Cancel::default());
+    if let Ok(mut r) = hyper_running().lock() {
+        r.insert(id.clone(), cancel.clone());
+    }
+    let name = p.name.clone();
+    tauri::async_runtime::spawn(async move {
+        let path = std::env::var_os("PATH").unwrap_or_default();
+        let result = hyperlume::chat(&path, &p.upstream, &p.model, &system, &messages, &cancel, |t| {
+            let _ = app.emit("ai-event", AiEvent { id: id.clone(), kind: "chunk", text: t });
+        })
+        .await;
+        if let Ok(mut r) = hyper_running().lock() {
+            r.remove(&id);
+        }
+        if cancel.is_cancelled() {
+            return;
+        }
+        let ev = match result {
+            Ok(()) => AiEvent { id, kind: "done", text: String::new() },
+            Err(e) => AiEvent { id, kind: "error", text: e },
+        };
+        let _ = app.emit("ai-event", ev);
+    });
+    Ok(name)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn hyperlume_run(_app: AppHandle, _id: String, _p: Provider, _system: String, _messages: Vec<Msg>) -> CmdResult<String> {
+    Err(NOT_HERE.into())
+}
+
+#[cfg(not(target_os = "linux"))]
+const NOT_HERE: &str = "Hyperlume AI works only on a Hyperlume desktop. Pick another AI in Settings → AI.";
+
+#[cfg(target_os = "linux")]
+async fn hyperlume_test(p: &Provider, msgs: &[Msg]) -> CmdResult<String> {
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    let cancel = hyperlume::Cancel::default();
+    let mut text = String::new();
+    let asked = hyperlume::chat(&path, &p.upstream, &p.model, "", msgs, &cancel, |t| text.push_str(&t));
+    match tokio::time::timeout(Duration::from_secs(90), asked).await {
+        Ok(r) => r?,
+        Err(_) => {
+            cancel.cancel();
+            return Err("Hyperlume AI took too long to answer.".into());
+        }
+    }
+    let text: String = text.trim().chars().take(200).collect();
+    Ok(if text.is_empty() { "Connected.".into() } else { text })
+}
+
+#[cfg(not(target_os = "linux"))]
+async fn hyperlume_test(_p: &Provider, _msgs: &[Msg]) -> CmdResult<String> {
+    Err(NOT_HERE.into())
+}
+
+
+/// Hyperlume AI: on a Hyperlume desktop, the same AI as its terminal helper,
+/// local or cloud, as chosen in Hyperlume's Settings → AI. Marrow runs
+/// `hyperlume-ai chat --plain`, writes the conversation to it as JSON and
+/// reads the answer back as JSON lines. No key or address is needed here.
+#[cfg(target_os = "linux")]
+pub(crate) mod hyperlume {
+    use super::Msg;
+    use serde_json::{json, Value};
+    use std::ffi::OsStr;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::PathBuf;
+    use std::process::Stdio;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Mutex, OnceLock};
+    use std::time::Duration;
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+    use tokio::process::Command;
+    use tokio::sync::Notify;
+
+    pub const BIN: &str = "hyperlume-ai";
+    /// `capabilities` answers within 1 s; this leaves room for a busy computer.
+    pub const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
+    /// After SIGTERM, Hyperlume exits within 2 s; then it's killed.
+    const GRACE: Duration = Duration::from_secs(3);
+
+    const NOT_INSTALLED: &str = "Hyperlume AI isn't installed on this computer.";
+
+    /// The `hyperlume-ai` program on this PATH, if there is one.
+    pub fn find(path: &OsStr) -> Option<PathBuf> {
+        std::env::split_paths(path)
+            .map(|d| d.join(BIN))
+            .find(|f| f.metadata().is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0))
+    }
+
+    /// Whether this `hyperlume-ai` can answer plain chat requests
+    /// (`capabilities` exits 0 and says `"chat_plain": true`).
+    pub async fn probe(path: &OsStr, timeout: Duration) -> bool {
+        let Some(bin) = find(path) else { return false };
+        let child = Command::new(bin)
+            .arg("capabilities")
+            .env("PATH", path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .spawn();
+        let Ok(child) = child else { return false };
+        let Ok(Ok(out)) = tokio::time::timeout(timeout, child.wait_with_output()).await else { return false };
+        out.status.success()
+            && serde_json::from_slice::<Value>(&out.stdout)
+                .ok()
+                .and_then(|v| v.get("chat_plain")?.as_bool())
+                .unwrap_or(false)
+    }
+
+    /// Asked once per run of Marrow, then remembered.
+    pub async fn available() -> bool {
+        static CACHE: OnceLock<bool> = OnceLock::new();
+        if let Some(v) = CACHE.get() {
+            return *v;
+        }
+        let v = probe(&std::env::var_os("PATH").unwrap_or_default(), PROBE_TIMEOUT).await;
+        *CACHE.get_or_init(|| v)
+    }
+
+    /// The command line: the provider and model only when the person picked them.
+    pub fn args(upstream: &str, model: &str) -> Vec<String> {
+        let mut a = vec!["chat".to_string(), "--plain".to_string()];
+        for (flag, v) in [("--provider", upstream.trim()), ("--model", model.trim())] {
+            if !v.is_empty() {
+                a.push(flag.into());
+                a.push(v.into());
+            }
+        }
+        a
+    }
+
+    /// Stops a running answer: SIGTERM to the program, at once or as soon as it starts.
+    #[derive(Default)]
+    pub struct Cancel {
+        pid: Mutex<Option<u32>>,
+        cancelled: AtomicBool,
+        notify: Notify,
+    }
+
+    impl Cancel {
+        pub fn cancel(&self) {
+            self.cancelled.store(true, Ordering::SeqCst);
+            self.notify.notify_one();
+            if let Some(pid) = *self.pid.lock().unwrap_or_else(|p| p.into_inner()) {
+                term(pid);
+            }
+        }
+
+        pub fn is_cancelled(&self) -> bool {
+            self.cancelled.load(Ordering::SeqCst)
+        }
+
+        fn started(&self, pid: Option<u32>) {
+            *self.pid.lock().unwrap_or_else(|p| p.into_inner()) = pid;
+            if let Some(pid) = pid.filter(|_| self.is_cancelled()) {
+                term(pid);
+            }
+        }
+    }
+
+    fn term(pid: u32) {
+        if let Ok(pid) = i32::try_from(pid) {
+            // SAFETY: kill() only sends a signal; the pid is our own child, not yet reaped.
+            unsafe {
+                libc::kill(pid, libc::SIGTERM);
+            }
+        }
+    }
+
+    /// What an exit code means, for when Hyperlume gave no sentence of its own.
+    pub fn exit_hint(code: Option<i32>) -> String {
+        match code {
+            Some(1) => "Hyperlume AI couldn't read the request, or doesn't know the chosen provider.",
+            Some(2) => "Hyperlume AI is off, or no local model is chosen. Turn it on in Hyperlume's Settings → AI.",
+            Some(3) => "There's no key for the cloud AI chosen in Hyperlume. Add it in Hyperlume's Settings → AI.",
+            Some(4) => "Hyperlume AI's engine or provider failed. Try again in a moment.",
+            _ => "Hyperlume AI stopped without answering.",
+        }
+        .to_string()
+    }
+
+    /// Asks Hyperlume AI; `on_chunk` gets the answer as it comes. After
+    /// `cancel`, no more text is passed on and the result doesn't matter.
+    pub async fn chat(
+        path: &OsStr,
+        upstream: &str,
+        model: &str,
+        system: &str,
+        messages: &[Msg],
+        cancel: &Cancel,
+        mut on_chunk: impl FnMut(String),
+    ) -> Result<(), String> {
+        let bin = find(path).ok_or(NOT_INSTALLED)?;
+        let mut child = Command::new(bin)
+            .args(args(upstream, model))
+            .env("PATH", path)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .spawn()
+            .map_err(|_| NOT_INSTALLED)?;
+        cancel.started(child.id());
+
+        let mut all = Vec::with_capacity(messages.len() + 1);
+        if !system.is_empty() {
+            all.push(json!({ "role": "system", "content": system }));
+        }
+        all.extend(messages.iter().map(|m| json!({ "role": m.role, "content": m.content })));
+        let body = serde_json::to_vec(&all).map_err(|e| e.to_string())?;
+        // Written on the side, so a program that doesn't read can't hold up the answer.
+        if let Some(mut stdin) = child.stdin.take() {
+            tauri::async_runtime::spawn(async move {
+                let _ = stdin.write_all(&body).await;
+                let _ = stdin.shutdown().await;
+            });
+        }
+
+        let mut lines = BufReader::new(child.stdout.take().ok_or("No output from Hyperlume AI.")?).lines();
+        let (mut done, mut error) = (false, None::<String>);
+        loop {
+            let line = tokio::select! {
+                l = lines.next_line() => l,
+                _ = cancel.notify.notified() => break,
+            };
+            let Ok(Some(line)) = line else { break };
+            if cancel.is_cancelled() {
+                break;
+            }
+            let Ok(v) = serde_json::from_str::<Value>(line.trim()) else { continue };
+            if let Some(t) = v.get("d").and_then(|d| d.as_str()) {
+                if !t.is_empty() {
+                    on_chunk(t.to_string());
+                }
+            } else if let Some(e) = v.get("error") {
+                let e = e.as_str().map(str::trim).filter(|e| !e.is_empty());
+                error = Some(e.map(str::to_string).unwrap_or_else(|| exit_hint(None)));
+            } else if v.get("done").and_then(|d| d.as_bool()) == Some(true) {
+                done = true;
+            }
+        }
+
+        let status = if cancel.is_cancelled() {
+            match tokio::time::timeout(GRACE, child.wait()).await {
+                Ok(s) => s,
+                Err(_) => {
+                    let _ = child.start_kill();
+                    child.wait().await
+                }
+            }
+        } else {
+            child.wait().await
+        };
+        cancel.started(None);
+        if cancel.is_cancelled() {
+            return Ok(());
+        }
+        let status = status.map_err(|e| e.to_string())?;
+        if let Some(e) = error {
+            return Err(e);
+        }
+        if !status.success() {
+            return Err(exit_hint(status.code()));
+        }
+        if !done {
+            return Err("Hyperlume AI stopped before the answer was finished.".into());
+        }
+        Ok(())
     }
 }
 
@@ -595,5 +927,207 @@ mod tests {
         let e: Value = serde_json::from_str(r#"{"error":{"message":"bad key"}}"#).unwrap();
         assert_eq!(stream_error(&e).as_deref(), Some("bad key"));
         assert_eq!(url("https://api.x.ai/v1/", "models"), "https://api.x.ai/v1/models");
+    }
+}
+
+/// Hyperlume AI, against a fake `hyperlume-ai` script put on a PATH of its own.
+#[cfg(all(test, target_os = "linux"))]
+mod hyperlume_tests {
+    use super::hyperlume::{self, Cancel};
+    use super::Msg;
+    use std::ffi::OsString;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::Path;
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+
+    /// A PATH with the fake `hyperlume-ai` and the few tools its script needs.
+    fn fake(dir: &Path, script: &str) -> OsString {
+        let bin = dir.join("hyperlume-ai");
+        std::fs::write(&bin, format!("#!/bin/sh\nD='{}'\n{script}\n", dir.display())).unwrap();
+        std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+        path_with(dir)
+    }
+
+    /// `dir`, then a folder with only `cat` and `sleep`: never the system's
+    /// folders, which may hold a real `hyperlume-ai`.
+    fn path_with(dir: &Path) -> OsString {
+        let tools = dir.join("tools");
+        std::fs::create_dir_all(&tools).unwrap();
+        for t in ["cat", "sleep"] {
+            let to = tools.join(t);
+            if !to.exists() {
+                let from = ["/usr/bin", "/bin"].iter().map(|d| Path::new(d).join(t)).find(|p| p.exists()).unwrap();
+                std::os::unix::fs::symlink(from, to).unwrap();
+            }
+        }
+        format!("{}:{}", dir.display(), tools.display()).into()
+    }
+
+    fn block<T>(f: impl std::future::Future<Output = T>) -> T {
+        tauri::async_runtime::block_on(f)
+    }
+
+    fn ask(text: &str) -> Vec<Msg> {
+        vec![Msg { role: "user".into(), content: text.into() }]
+    }
+
+    /// Runs a chat to the end; returns the chunks and the result.
+    fn run(path: &OsString, upstream: &str, model: &str) -> (Vec<String>, Result<(), String>) {
+        let mut chunks = Vec::new();
+        let cancel = Cancel::default();
+        let r = block(hyperlume::chat(path, upstream, model, "Be brief.", &ask("Hi"), &cancel, |t| chunks.push(t)));
+        (chunks, r)
+    }
+
+    const CAPS: &str = r#"if [ "$1" = capabilities ]; then echo '{"api": 1, "chat_plain": true, "providers_cmd": true}'; exit 0; fi"#;
+
+    #[test]
+    fn capabilities_present() {
+        let d = tempfile::tempdir().unwrap();
+        let path = fake(d.path(), CAPS);
+        assert!(hyperlume::find(&path).is_some());
+        assert!(block(hyperlume::probe(&path, hyperlume::PROBE_TIMEOUT)));
+    }
+
+    #[test]
+    fn capabilities_missing() {
+        // No program at all (an older Hyperlume, or not Hyperlume).
+        let d = tempfile::tempdir().unwrap();
+        let path = path_with(d.path());
+        assert!(hyperlume::find(&path).is_none());
+        assert!(!block(hyperlume::probe(&path, hyperlume::PROBE_TIMEOUT)));
+        // A program that doesn't know the command.
+        let path = fake(d.path(), "echo 'usage: hyperlume-ai …' >&2; exit 1");
+        assert!(!block(hyperlume::probe(&path, hyperlume::PROBE_TIMEOUT)));
+        // A program that knows it but can't do plain chat.
+        let path = fake(d.path(), r#"echo '{"api": 1, "chat_plain": false}'"#);
+        assert!(!block(hyperlume::probe(&path, hyperlume::PROBE_TIMEOUT)));
+        // The right answer, but a failing exit.
+        let path = fake(d.path(), r#"echo '{"api": 1, "chat_plain": true}'; exit 2"#);
+        assert!(!block(hyperlume::probe(&path, hyperlume::PROBE_TIMEOUT)));
+    }
+
+    #[test]
+    fn capabilities_garbage() {
+        let d = tempfile::tempdir().unwrap();
+        for out in ["not json at all", "[1, 2, 3]", r#"{"chat_plain": "yes"}"#, ""] {
+            let path = fake(d.path(), &format!("echo '{out}'"));
+            assert!(!block(hyperlume::probe(&path, hyperlume::PROBE_TIMEOUT)), "{out}");
+        }
+        // One that never answers is given up on, without waiting for it.
+        let path = fake(d.path(), "sleep 30");
+        let t = Instant::now();
+        assert!(!block(hyperlume::probe(&path, Duration::from_millis(300))));
+        assert!(t.elapsed() < Duration::from_secs(5));
+    }
+
+    #[test]
+    fn streams_an_answer() {
+        let d = tempfile::tempdir().unwrap();
+        let path = fake(
+            d.path(),
+            r#"echo "$@" > "$D/args"
+cat > "$D/stdin.json"
+echo '{"d": "Hel"}'
+echo '{"d": "lo, "}'
+echo 'a stray line'
+echo '{"d": "world ✓"}'
+echo '{"done": true}'"#,
+        );
+        let (chunks, r) = run(&path, "", "");
+        assert_eq!(r, Ok(()));
+        assert_eq!(chunks.concat(), "Hello, world ✓");
+        // Nothing extra on the command line when the person picked nothing.
+        assert_eq!(std::fs::read_to_string(d.path().join("args")).unwrap().trim(), "chat --plain");
+        let sent: serde_json::Value = serde_json::from_slice(&std::fs::read(d.path().join("stdin.json")).unwrap()).unwrap();
+        assert_eq!(
+            sent,
+            serde_json::json!([{"role": "system", "content": "Be brief."}, {"role": "user", "content": "Hi"}])
+        );
+
+        // The provider and model, only when picked.
+        let (_, r) = run(&path, "openai", "gpt-4o-mini");
+        assert_eq!(r, Ok(()));
+        assert_eq!(
+            std::fs::read_to_string(d.path().join("args")).unwrap().trim(),
+            "chat --plain --provider openai --model gpt-4o-mini"
+        );
+        assert_eq!(hyperlume::args("local", ""), ["chat", "--plain", "--provider", "local"]);
+    }
+
+    #[test]
+    fn each_error_exit() {
+        let d = tempfile::tempdir().unwrap();
+        for code in 1..=4 {
+            // Hyperlume's own sentence is what the person sees.
+            let path = fake(d.path(), &format!(r#"cat > /dev/null; echo '{{"d": "par"}}'; echo '{{"error": "Sentence {code}."}}'; exit {code}"#));
+            let (_, r) = run(&path, "", "");
+            assert_eq!(r, Err(format!("Sentence {code}.")));
+            // With no sentence, the exit code says what's wrong.
+            let path = fake(d.path(), &format!("cat > /dev/null; exit {code}"));
+            let (_, r) = run(&path, "", "");
+            let hint = hyperlume::exit_hint(Some(code));
+            assert!(!hint.is_empty());
+            assert_eq!(r, Err(hint));
+        }
+        let hints: std::collections::HashSet<_> = (1..=4).map(|c| hyperlume::exit_hint(Some(c))).collect();
+        assert_eq!(hints.len(), 4, "each exit code has its own hint");
+        assert!(hyperlume::exit_hint(Some(2)).contains("Settings → AI"));
+        assert!(hyperlume::exit_hint(Some(3)).contains("key"));
+        // An error line wins even with exit 0, and a stream that just stops is an error.
+        let path = fake(d.path(), r#"echo '{"error": "No answer."}'"#);
+        assert_eq!(run(&path, "", "").1, Err("No answer.".into()));
+        let path = fake(d.path(), r#"echo '{"d": "half"}'"#);
+        assert!(run(&path, "", "").1.is_err());
+        // Not installed.
+        let empty = tempfile::tempdir().unwrap();
+        let r = run(&path_with(empty.path()), "", "").1;
+        assert!(r.unwrap_err().contains("isn't installed"));
+    }
+
+    #[test]
+    fn cancel_sends_sigterm() {
+        let d = tempfile::tempdir().unwrap();
+        let path = fake(
+            d.path(),
+            r#"trap 'echo term > "$D/got-term"; exit 143' TERM
+echo '{"d": "partial"}'
+while :; do sleep 0.05; done"#,
+        );
+        let cancel = Arc::new(Cancel::default());
+        let (tx, rx) = std::sync::mpsc::channel::<String>();
+        let c2 = cancel.clone();
+        let p2 = path.clone();
+        let task = tauri::async_runtime::spawn(async move {
+            let msgs = ask("Hi");
+            hyperlume::chat(&p2, "", "", "", &msgs, &c2, |t| {
+                let _ = tx.send(t);
+            })
+            .await
+        });
+        assert_eq!(rx.recv_timeout(Duration::from_secs(5)).unwrap(), "partial");
+        let t = Instant::now();
+        cancel.cancel();
+        assert!(cancel.is_cancelled());
+        let r = block(async { tokio::time::timeout(Duration::from_secs(5), task).await });
+        assert!(r.is_ok(), "the chat ends soon after cancel");
+        assert!(t.elapsed() < Duration::from_secs(4));
+        assert!(d.path().join("got-term").exists(), "the program got SIGTERM");
+        // Cancelling before the program has started stops it straight away.
+        let early = Cancel::default();
+        early.cancel();
+        let t = Instant::now();
+        let _ = block(hyperlume::chat(&path, "", "", "", &ask("Hi"), &early, |_| panic!("no text after cancel")));
+        assert!(t.elapsed() < Duration::from_secs(4));
+    }
+}
+
+/// Elsewhere (Windows, macOS, Android, iOS) Hyperlume AI is never offered.
+#[cfg(all(test, not(target_os = "linux")))]
+mod hyperlume_elsewhere {
+    #[test]
+    fn never_available() {
+        assert!(!tauri::async_runtime::block_on(super::ai_hyperlume_available()));
     }
 }

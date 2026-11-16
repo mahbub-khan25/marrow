@@ -7,8 +7,8 @@ import { api, onAiEvent, type AiConfig, type AiEvent, type AiMessage, type AiPro
 export interface Preset {
   id: string;
   name: string;
-  group: "Popular" | "Chinese" | "On this computer" | "Other";
-  protocol: "openai" | "anthropic";
+  group: "Hyperlume" | "Popular" | "Chinese" | "On this computer" | "Other";
+  protocol: "openai" | "anthropic" | "hyperlume";
   baseUrl: string;
   /** Local servers don't need one. */
   needsKey: boolean;
@@ -16,9 +16,12 @@ export interface Preset {
   keyUrl?: string;
   /** Shown under the address (regions and such). */
   hint?: string;
+  /** Only offered on a Hyperlume desktop. */
+  hyperlumeOnly?: boolean;
 }
 
 export const PRESETS: Preset[] = [
+  { id: "hyperlume", name: "Hyperlume AI", group: "Hyperlume", protocol: "hyperlume", baseUrl: "", needsKey: false, hyperlumeOnly: true, hint: "The same AI as Hyperlume's terminal helper, on this computer or in the cloud, as you chose in Hyperlume's Settings → AI. No key needed here." },
   { id: "openai", name: "OpenAI (ChatGPT)", group: "Popular", protocol: "openai", baseUrl: "https://api.openai.com/v1", needsKey: true, keyUrl: "https://platform.openai.com/api-keys" },
   { id: "anthropic", name: "Anthropic Claude", group: "Popular", protocol: "anthropic", baseUrl: "https://api.anthropic.com/v1", needsKey: true, keyUrl: "https://console.anthropic.com/settings/keys" },
   { id: "gemini", name: "Google Gemini", group: "Popular", protocol: "openai", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", needsKey: true, keyUrl: "https://aistudio.google.com/apikey" },
@@ -42,12 +45,63 @@ export const PRESETS: Preset[] = [
 
 export const preset = (id: string): Preset => PRESETS.find((p) => p.id === id) ?? PRESETS[PRESETS.length - 1];
 
+/** The presets to offer: Hyperlume AI only where it answers. */
+export const visiblePresets = (hyperlume: boolean): Preset[] => PRESETS.filter((p) => hyperlume || !p.hyperlumeOnly);
+
+/** Hyperlume is a Linux desktop; Windows, macOS, Android and iOS never ask. */
+export const isLinuxDesktop = () =>
+  /Linux/.test(navigator.platform || navigator.userAgent) && !/Android/.test(navigator.userAgent) && !document.documentElement.hasAttribute("data-mobile");
+
+let hyperlume: Promise<boolean> | null = null;
+let hyperlumeKnown = false;
+
+/** Whether Hyperlume AI can be used here. Asked once, then remembered. */
+export function hyperlumeAvailable(): Promise<boolean> {
+  hyperlume ??= isLinuxDesktop()
+    ? api.aiHyperlumeAvailable().then(
+        (v) => (hyperlumeKnown = v === true),
+        () => (hyperlumeKnown = false),
+      )
+    : Promise.resolve((hyperlumeKnown = false));
+  return hyperlume;
+}
+
+/** The last answer from hyperlumeAvailable (false until it has answered). */
+export const hyperlumeReady = () => hyperlumeKnown;
+
+export function resetHyperlumeForTests() {
+  hyperlume = null;
+  hyperlumeKnown = false;
+  offering = null;
+}
+
+/** Hyperlume AI becomes the default only when no AI is set up, and only once. */
+export const shouldAddHyperlume = (c: AiConfig, available: boolean) => available && c.providers.length === 0 && !c.hyperlumeOffered;
+
+export const hyperlumeProvider = (): AiProvider => ({ id: "", preset: "hyperlume", name: "Hyperlume AI", protocol: "hyperlume", baseUrl: "", model: "", upstream: "", hasKey: false });
+
+let offering: Promise<boolean> | null = null;
+
+/** On a Hyperlume desktop with no AI set up, uses Hyperlume AI. True if it was added. */
+export function ensureHyperlume(): Promise<boolean> {
+  offering ??= (async () => {
+    if (!(await hyperlumeAvailable())) return false;
+    const c = await api.aiConfig().catch(() => null);
+    if (!c || !shouldAddHyperlume(c, true)) return false;
+    setAiConfig(await api.aiSaveProvider(hyperlumeProvider()));
+    return true;
+  })().catch(() => false);
+  return offering;
+}
+
 let config: AiConfig = { providers: [], defaultId: null, embed: null };
 const listeners = new Set<() => void>();
 
 export async function loadAiConfig(): Promise<AiConfig> {
   config = await api.aiConfig().catch(() => config);
   for (const fn of listeners) fn();
+  // On a Hyperlume desktop with no AI yet, Hyperlume AI is set up (once).
+  await ensureHyperlume();
   return config;
 }
 

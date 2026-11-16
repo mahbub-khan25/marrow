@@ -169,6 +169,7 @@ pub fn run() {
             ai::ai_test,
             ai::ai_run,
             ai::ai_cancel,
+            ai::ai_hyperlume_available,
             ai::ai_transcriber,
             ai::ai_transcribe,
             sync::cloud_locations,

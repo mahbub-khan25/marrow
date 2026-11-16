@@ -367,6 +367,27 @@ colours come from the prototype's own source, not from eyeballing.
   * whole note (palette, Ctrl+J in Preview) — Add to the end.
   Streams Markdown, follow-up input keeps the conversation, Stop sits on the
   right so a late click can't insert. Without a provider it offers setup.
+* **Hyperlume AI** (1.9.0, Linux only): a third protocol, `hyperlume`, built
+  to Hyperlume's `hyperlume-ai chat --plain` contract (version 1).
+  * Found with `hyperlume-ai capabilities` (`chat_plain: true`, exit 0),
+    asked once in the background with a 3 s limit and remembered
+    (`ai_hyperlume_available`). Anything else, an older Hyperlume included,
+    means it isn't offered. The window also skips the question unless it's a
+    Linux desktop; on other systems the Rust side always says no (cfg).
+  * `ai_run` spawns `hyperlume-ai chat --plain` with tokio::process, adding
+    `--provider`/`--model` only when set (`Provider.upstream`, `model`).
+    The system prompt and messages go to stdin as JSON; `{"d"}` lines become
+    `chunk`s, `{"done"}` is done, and `{"error"}` or a non-zero exit is an
+    error showing Hyperlume's sentence (or a plain hint per exit code 1–4).
+  * `ai_cancel` sends SIGTERM; the task waits up to 3 s, then kills, and
+    sends no more events.
+  * No key, address or model list. With no provider set up, the window adds
+    it once and it becomes the default (`hyperlumeOffered` in `ai.json`
+    stops it coming back after it's removed). Settings → AI has a *Use
+    Hyperlume AI* button.
+  * Chat only: the contract has no embeddings, so search by meaning and
+    the meaning half of Ask my notes stay on the person's other providers,
+    and Settings says so.
 
 ## Images, link previews, export — what shipped
 
