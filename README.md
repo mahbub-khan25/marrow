@@ -287,6 +287,11 @@ running on your computer:
   the computer.
 * **Other**: any service that works like the OpenAI or Anthropic API
   (paste its address).
+* **Hyperlume AI** (on a Hyperlume desktop only): the same AI as Hyperlume's
+  terminal helper, on your computer or in the cloud, as you chose in
+  Hyperlume's Settings → AI. No key to paste. If you haven't set up another
+  AI, Marrow uses it straight away. It does chat only for now, so search by
+  meaning still needs one of the others.
 
 Pick the provider, paste the key, click **Load models** and pick one, then
 **Test** and **Save**. You can add several and choose which one to use each

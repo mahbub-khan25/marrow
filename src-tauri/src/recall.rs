@@ -64,7 +64,7 @@ fn embed_provider(app: &AppHandle) -> Option<(EmbedSetting, Provider)> {
 
 /// Embeds `texts` with the provider's OpenAI-style /embeddings endpoint.
 async fn embed(app: &AppHandle, p: &Provider, model: &str, texts: &[String]) -> Result<Vec<Vec<f32>>, String> {
-    if p.protocol == "anthropic" {
+    if p.protocol == "anthropic" || p.protocol == ai::HYPERLUME {
         return Err(format!("{} doesn't offer a model for search by meaning. Pick another provider (Ollama, OpenAI, Gemini, Mistral, Qwen…).", p.name));
     }
     let key = ai::key_for(app, p, None);

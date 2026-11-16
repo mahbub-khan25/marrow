@@ -2,7 +2,7 @@
 
 import { openUrl } from "@tauri-apps/plugin-opener";
 
-import { aiConfig, loadAiConfig, preset, PRESETS, setAiConfig, type Preset } from "./ai";
+import { aiConfig, hyperlumeAvailable, hyperlumeProvider, hyperlumeReady, loadAiConfig, preset, setAiConfig, visiblePresets, type Preset } from "./ai";
 import { api, onAiIndex, type AiProvider } from "./api";
 import { h, icon } from "./util";
 
@@ -14,6 +14,7 @@ export function renderAi(body: HTMLElement, rerender: () => void) {
   if (!loaded) {
     loaded = true;
     void loadAiConfig().then(rerender);
+    void hyperlumeAvailable().then((yes) => yes && rerender());
   }
   const box = h("div.set-vault.ai-settings");
   body.append(box);
@@ -33,7 +34,8 @@ export function renderAi(body: HTMLElement, rerender: () => void) {
   }
   for (const p of cfg.providers) {
     const isDefault = p.id === (cfg.defaultId ?? cfg.providers[0]?.id);
-    const local = !preset(p.preset).needsKey && /localhost|127\.0\.0\.1/.test(p.baseUrl);
+    const hyper = p.protocol === "hyperlume";
+    const local = hyper || (!preset(p.preset).needsKey && /localhost|127\.0\.0\.1/.test(p.baseUrl));
     list.append(
       h(
         "div.ai-item",
@@ -43,7 +45,13 @@ export function renderAi(body: HTMLElement, rerender: () => void) {
           "div.ai-item-text",
           null,
           h("div.l", null, p.name, isDefault && cfg.providers.length > 1 ? h("span.badge", null, "Default") : null),
-          h("div.d", null, `${p.model || "No model chosen"} · ${host(p.baseUrl)}${!p.hasKey && preset(p.preset).needsKey ? " · no key" : ""}`),
+          h(
+            "div.d",
+            null,
+            hyper
+              ? `${[p.upstream, p.model].filter(Boolean).join(" · ") || "The AI chosen in Hyperlume's Settings → AI"} · no key needed`
+              : `${p.model || "No model chosen"} · ${host(p.baseUrl)}${!p.hasKey && preset(p.preset).needsKey ? " · no key" : ""}`,
+          ),
         ),
         isDefault || cfg.providers.length < 2
           ? null
@@ -100,6 +108,19 @@ export function renderAi(body: HTMLElement, rerender: () => void) {
         icon("plus"),
         "Add AI",
       ),
+      hyperlumeReady() && !cfg.providers.some((p) => p.protocol === "hyperlume")
+        ? h(
+            "button.btn.btn-secondary",
+            {
+              onclick: async () => {
+                setAiConfig(await api.aiSaveProvider(hyperlumeProvider()));
+                rerender();
+              },
+            },
+            icon("desktop"),
+            "Use Hyperlume AI",
+          )
+        : null,
     ),
     h(
       "div.line.ai-howto",
@@ -145,6 +166,9 @@ function meaningSection(rerender: () => void): HTMLElement {
   const sec = h("div.ai-meaning");
   sec.append(
     h("h3", null, "Search by meaning"),
+    ...(cfg.providers.some((p) => p.protocol === "hyperlume")
+      ? [h("div.ai-hint", null, "Hyperlume AI does chat only for now, so search by meaning uses one of your other AIs, such as Ollama with nomic-embed-text.")]
+      : []),
     h(
       "div.line",
       null,
@@ -240,7 +264,7 @@ function meaningSection(rerender: () => void): HTMLElement {
 
 function fromPreset(id: string): AiProvider {
   const p = preset(id);
-  return { id: "", preset: p.id, name: p.id === "custom" ? "" : p.name, protocol: p.protocol, baseUrl: p.baseUrl, model: "", hasKey: false };
+  return { id: "", preset: p.id, name: p.id === "custom" ? "" : p.name, protocol: p.protocol, baseUrl: p.baseUrl, model: "", upstream: "", hasKey: false };
 }
 
 function host(url: string): string {
@@ -262,11 +286,12 @@ function renderForm(box: HTMLElement, rerender: () => void) {
   };
 
   // Provider, grouped.
-  const groups = [...new Set(PRESETS.map((x) => x.group))];
+  const presets = visiblePresets(hyperlumeReady() || pr.id === "hyperlume");
+  const groups = [...new Set(presets.map((x) => x.group))];
   const pick = h(
     "select.input",
     { "aria-label": "Provider" },
-    ...groups.map((g) => h("optgroup", { label: g }, ...PRESETS.filter((x) => x.group === g).map((x) => h("option", { value: x.id }, x.name)))),
+    ...groups.map((g) => h("optgroup", { label: g }, ...presets.filter((x) => x.group === g).map((x) => h("option", { value: x.id }, x.name)))),
   ) as HTMLSelectElement;
   pick.value = pr.id;
   pick.addEventListener("change", () => {
@@ -355,25 +380,42 @@ function renderForm(box: HTMLElement, rerender: () => void) {
         )
       : null;
 
+  const hyper = pr.protocol === "hyperlume";
+  const upstream = h("input.input", { value: p.upstream ?? "", placeholder: "As in Hyperlume's Settings → AI", spellcheck: false }) as HTMLInputElement;
+  upstream.addEventListener("input", () => (p.upstream = upstream.value.trim()));
+  if (hyper) model.placeholder = "Hyperlume's choice";
+
   box.append(
     h("div.ai-form-title", null, h("button.icon-btn", { title: "Back", "aria-label": "Back", onclick: done }, icon("caret-left")), isNew ? "Add AI" : `Edit ${p.name}`),
-    field("Provider", pick, pr.group === "On this computer" ? pr.hint : null),
-    pr.needsKey || pr.id === "custom" || p.hasKey
-      ? field(pr.needsKey ? "API key" : "API key (if the service needs one)", h("div.ai-row", null, key, showKey), keyHint)
-      : h("div.ai-hint", null, keyHint),
-    field("Model", h("div.ai-row", null, model, loadBtn, models), pr.id === "doubao" ? pr.hint : null),
-    h(
-      "details.ai-more",
-      { open: pr.id === "custom" || undefined },
-      h("summary", null, "More options"),
+    field("Provider", pick, pr.group === "On this computer" || hyper ? pr.hint : null),
+  );
+  if (hyper) {
+    box.append(
+      field("Hyperlume's provider (optional)", upstream, "Leave it empty to follow Hyperlume. Or type one it lists, such as local or openai."),
+      field("Model (optional)", model, "Leave it empty for the model Hyperlume uses."),
+      field("Name", name, "How it's shown in Marrow."),
+    );
+  }
+  if (!hyper)
+    box.append(
+      pr.needsKey || pr.id === "custom" || p.hasKey
+        ? field(pr.needsKey ? "API key" : "API key (if the service needs one)", h("div.ai-row", null, key, showKey), keyHint)
+        : h("div.ai-hint", null, keyHint),
+      field("Model", h("div.ai-row", null, model, loadBtn, models), pr.id === "doubao" ? pr.hint : null),
       h(
-        "div.ai-more-body",
-        null,
-        field("Name", name, "How it's shown in Marrow."),
-        field("Address", base, pr.group !== "On this computer" && pr.id !== "doubao" ? pr.hint : "Change it if the server runs elsewhere."),
-        protocol,
+        "details.ai-more",
+        { open: pr.id === "custom" || undefined },
+        h("summary", null, "More options"),
+        h(
+          "div.ai-more-body",
+          null,
+          field("Name", name, "How it's shown in Marrow."),
+          field("Address", base, pr.group !== "On this computer" && pr.id !== "doubao" ? pr.hint : "Change it if the server runs elsewhere."),
+          protocol,
+        ),
       ),
-    ),
+    );
+  box.append(
     status,
     h(
       "div.acts",
@@ -382,8 +424,8 @@ function renderForm(box: HTMLElement, rerender: () => void) {
         "button.btn",
         {
           onclick: async () => {
-            if (!p.baseUrl) return say("Enter the address.", "error");
-            if (!p.model) return say("Pick a model (Load models lists them).", "error");
+            if (!hyper && !p.baseUrl) return say("Enter the address.", "error");
+            if (!hyper && !p.model) return say("Pick a model (Load models lists them).", "error");
             if (pr.needsKey && !p.hasKey && !ed.key) return say("Paste your API key.", "error");
             try {
               const cfg = await api.aiSaveProvider({ ...p, name: p.name.trim() || pr.name }, keyArg());
@@ -401,11 +443,11 @@ function renderForm(box: HTMLElement, rerender: () => void) {
         "button.btn.btn-secondary",
         {
           onclick: async () => {
-            if (!p.model) return say("Pick a model first.", "error");
+            if (!hyper && !p.model) return say("Pick a model first.", "error");
             say("Sending a short test message…", "busy");
             try {
               const reply = await api.aiTest({ ...p, name: p.name || pr.name }, keyArg());
-              say(`It works. ${p.model} replied: “${reply.trim().slice(0, 60)}”`);
+              say(`It works. ${p.model || p.name || pr.name} replied: “${reply.trim().slice(0, 60)}”`);
             } catch (e) {
               say(String(e), "error");
             }
@@ -419,6 +461,7 @@ function renderForm(box: HTMLElement, rerender: () => void) {
   );
 
   // Local servers need no key, so their models can be listed straight away.
+  // (Hyperlume AI has no address or key, so it never gets here.)
   if (!pr.needsKey && pr.baseUrl && !p.model) void loadModels(true);
   else if (p.hasKey) void loadModels(true);
   (isNew ? pick : model).focus();

@@ -350,6 +350,8 @@ export const api = {
   aiRun: (id: string, system: string, messages: AiMessage[], providerId?: string) =>
     invoke<string>("ai_run", { id, providerId, system, messages }),
   aiCancel: (id: string) => invoke<void>("ai_cancel", { id }),
+  /** Whether this computer is a Hyperlume desktop whose AI Marrow can use (asked once). */
+  aiHyperlumeAvailable: () => invoke<boolean>("ai_hyperlume_available"),
   aiIndexInfo: () => invoke<IndexInfo>("ai_index_info"),
   aiSetEmbedding: (providerId: string | null, model: string | null) => invoke<void>("ai_set_embedding", { providerId, model }),
   aiIndexBuild: () => invoke<void>("ai_index_build"),
@@ -433,9 +435,11 @@ export interface AiProvider {
   id: string;
   preset: string;
   name: string;
-  protocol: "openai" | "anthropic";
+  protocol: "openai" | "anthropic" | "hyperlume";
   baseUrl: string;
   model: string;
+  /** Hyperlume AI only: which of Hyperlume's providers ("local", "openai"…). Empty follows Hyperlume's Settings → AI. */
+  upstream?: string;
   hasKey: boolean;
 }
 
@@ -444,6 +448,8 @@ export interface AiConfig {
   defaultId: string | null;
   /** The model for search by meaning. */
   embed: { providerId: string; model: string } | null;
+  /** Hyperlume AI was added once, so it isn't added again by itself. */
+  hyperlumeOffered?: boolean;
 }
 
 export interface IndexInfo {
