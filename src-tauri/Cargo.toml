@@ -46,11 +46,11 @@ arboard = { version = "3", default-features = false, features = ["image-data"] }
 [dev-dependencies]
 tempfile = { workspace = true }
 
-# API keys for AI providers go in the system's credential store.
 # Hyperlume AI: stopping an answer sends SIGTERM to `hyperlume-ai`.
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
 
+# API keys for AI providers go in the system's credential store.
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3", features = ["windows-native"] }
 
