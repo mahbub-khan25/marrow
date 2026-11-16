@@ -979,6 +979,17 @@ pub(crate) mod hyperlume {
     /// The whole answer, or an error after `limit`. A late answer is stopped
     /// the contract's way (SIGTERM, then a kill after the grace period), not dropped.
     pub async fn ask_with_limit(path: &OsStr, upstream: &str, model: &str, messages: &[Msg], limit: Duration) -> Result<String, String> {
+        ask_until(path, upstream, model, messages, tokio::time::sleep(limit)).await
+    }
+
+    /// The same, with the limit as a future that ends when time is up.
+    pub async fn ask_until(
+        path: &OsStr,
+        upstream: &str,
+        model: &str,
+        messages: &[Msg],
+        deadline: impl std::future::Future<Output = ()>,
+    ) -> Result<String, String> {
         let cancel = Cancel::default();
         let mut text = String::new();
         let in_time = {
@@ -986,7 +997,7 @@ pub(crate) mod hyperlume {
             tokio::pin!(asked);
             tokio::select! {
                 r = &mut asked => Some(r),
-                _ = tokio::time::sleep(limit) => {
+                _ = deadline => {
                     cancel.cancel();
                     let _ = asked.await;
                     None
@@ -997,6 +1008,24 @@ pub(crate) mod hyperlume {
             Some(r) => r.map(|()| text),
             None => Err("Hyperlume AI took too long to answer.".into()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_stream_deltas() {
+        let o: Value = serde_json::from_str(r#"{"choices":[{"delta":{"content":"Hel"}}]}"#).unwrap();
+        assert_eq!(delta("openai", &o).as_deref(), Some("Hel"));
+        let a: Value = serde_json::from_str(r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"lo"}}"#).unwrap();
+        assert_eq!(delta("anthropic", &a).as_deref(), Some("lo"));
+        let start: Value = serde_json::from_str(r#"{"type":"message_start"}"#).unwrap();
+        assert_eq!(delta("anthropic", &start), None);
+        let e: Value = serde_json::from_str(r#"{"error":{"message":"bad key"}}"#).unwrap();
+        assert_eq!(stream_error(&e).as_deref(), Some("bad key"));
+        assert_eq!(url("https://api.x.ai/v1/", "models"), "https://api.x.ai/v1/models");
     }
 }
 
@@ -1227,6 +1256,7 @@ while :; do sleep 0.05; done"#,
         let _ = block(hyperlume::chat(&path, "", "", "", &ask("Hi"), &early, |_| panic!("no text after cancel")));
         assert!(t.elapsed() < Duration::from_secs(4));
     }
+
     #[test]
     fn invalid_utf8_is_one_error_and_no_hang() {
         let _g = serial();
@@ -1303,18 +1333,34 @@ echo '{"done": true}'"#,
         let _g = serial();
         let d = tempfile::tempdir().unwrap();
         let msgs = ask("Hi");
+        let ready = d.path().join("ready");
+        // The time limit, run out as soon as the script has set its trap (a
+        // limit that fired before then would test the shell, not Marrow).
+        let once_ready = || {
+            let _ = std::fs::remove_file(&ready);
+            let ready = ready.clone();
+            async move {
+                let t = Instant::now();
+                while !ready.exists() {
+                    assert!(t.elapsed() < Duration::from_secs(5), "the fake never got ready");
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            }
+        };
+
         // Stops on SIGTERM.
         let path = fake(
             d.path(),
             r#"echo $$ > "$D/pid"
 trap 'echo term > "$D/got-term"; exit 143' TERM
+: > "$D/ready"
 while :; do sleep 0.05; done"#,
         );
         let t = Instant::now();
-        let r = block(hyperlume::ask_with_limit(&path, "", "", &msgs, Duration::from_millis(300)));
+        let r = block(hyperlume::ask_until(&path, "", "", &msgs, once_ready()));
         assert!(r.unwrap_err().contains("too long"));
         assert!(d.path().join("got-term").exists(), "SIGTERM, not SIGKILL");
-        assert!(t.elapsed() < Duration::from_secs(3));
+        assert!(t.elapsed() < Duration::from_secs(8));
         let pid = std::fs::read_to_string(d.path().join("pid")).unwrap();
         assert!(!Path::new(&format!("/proc/{}", pid.trim())).exists(), "the program was reaped");
 
@@ -1323,16 +1369,29 @@ while :; do sleep 0.05; done"#,
             d.path(),
             r#"echo $$ > "$D/pid"
 trap '' TERM
+: > "$D/ready"
 while :; do sleep 0.05; done"#,
         );
-        let t = Instant::now();
-        let r = block(hyperlume::ask_with_limit(&path, "", "", &msgs, Duration::from_millis(300)));
-        assert!(r.unwrap_err().contains("too long"));
-        let took = t.elapsed();
-        assert!(took >= Duration::from_secs(2), "a grace period first ({took:?})");
-        assert!(took < Duration::from_secs(8), "then a kill ({took:?})");
+        let r = block(async {
+            let deadline = once_ready();
+            let t = std::cell::Cell::new(None);
+            let r = hyperlume::ask_until(&path, "", "", &msgs, async {
+                deadline.await;
+                t.set(Some(Instant::now()));
+            })
+            .await;
+            (r, t.get().unwrap().elapsed())
+        });
+        assert!(r.0.unwrap_err().contains("too long"));
+        assert!(r.1 >= Duration::from_secs(2), "a grace period first ({:?})", r.1);
+        assert!(r.1 < Duration::from_secs(8), "then a kill ({:?})", r.1);
         let pid = std::fs::read_to_string(d.path().join("pid")).unwrap();
         assert!(!Path::new(&format!("/proc/{}", pid.trim())).exists(), "the program was reaped");
+
+        // The 90 s limit itself goes through the same path.
+        let path = fake(d.path(), "exec sleep 30");
+        let r = block(hyperlume::ask_with_limit(&path, "", "", &msgs, Duration::from_millis(200)));
+        assert!(r.unwrap_err().contains("too long"));
 
         // In time: the answer.
         let path = fake(d.path(), r#"cat > /dev/null; echo '{"d": "ready"}'; echo '{"done": true}'"#);
