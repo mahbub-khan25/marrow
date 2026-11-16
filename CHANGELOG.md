@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.9.0
+
+Hyperlume AI with no key to paste, and Marrow Clipper ready for the browser stores.
 
 - **Hyperlume AI:** on a Hyperlume desktop, Marrow can use the same AI as
   Hyperlume's terminal helper, on your computer or in the cloud, whichever
