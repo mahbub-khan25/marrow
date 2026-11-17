@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Galaxy Map Styles</title>
+<style>
+  :root { --bg:#f7f7fa; --fg:#1d1f27; --muted:#6b6f80; --card:#ffffff; --line:#e3e4ea; --accent:#5b5bd6; }
+  body.dark { --bg:#0c0d12; --fg:#e9eaf0; --muted:#9295a6; --card:#15161d; --line:#262836; --accent:#8f8fff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; background:var(--bg); color:var(--fg); transition:background .3s,color .3s; }
+  .wrap { max-width:1180px; margin:0 auto; padding:28px 16px 60px; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 18px; }
+  .bar { display:flex; gap:8px; align-items:center; margin-bottom:22px; flex-wrap:wrap; }
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+  .seg button { border:0; background:transparent; color:var(--fg); padding:7px 16px; cursor:pointer; font:inherit; }
+  .seg button.on { background:var(--accent); color:#fff; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; overflow:hidden; margin-bottom:26px; transition:background .3s,border-color .3s; }
+  .card.selected { outline:3px solid var(--accent); outline-offset:2px; }
+  canvas { display:block; width:100%; height:480px; cursor:crosshair; }
+  .meta { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:14px 18px; flex-wrap:wrap; }
+  .meta h3 { margin:0; font-size:17px; }
+  .meta p { margin:2px 0 0; color:var(--muted); font-size:14px; max-width:720px; }
+  .pick { border:1px solid var(--accent); color:var(--accent); background:transparent; border-radius:999px; padding:8px 18px; cursor:pointer; font:inherit; font-weight:600; }
+  .card.selected .pick { background:var(--accent); color:#fff; }
+  .legend { color:var(--muted); font-size:13px; margin-top:-10px; margin-bottom:18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Galaxy map: which style feels right?</h1>
+  <p class="sub">Each folder in the vault is a galaxy. Its notes are planets orbiting it. Subfolders are galaxies linked to their parent, and the whole vault is the Milky Way at the center. Dashed lines are connections <b>you</b> drew between galaxies. Hover a planet to see the note's name.</p>
+  <div class="bar">
+    <div class="seg" role="group" aria-label="Theme">
+      <button id="lightBtn" class="on">☀ Light</button>
+      <button id="darkBtn">☾ Dark</button>
+    </div>
+  </div>
+  <p class="legend">Sample vault: Physics (→ Quantum), Programming (→ Rust, Python), Study Notes, Journal. Your connections: Physics ↔ Programming, Study Notes ↔ Python.</p>
+
+  <div class="card" data-choice="nebula">
+    <canvas id="c-nebula"></canvas>
+    <div class="meta"><div><h3>A · Nebula</h3><p>Rich and cinematic. Spiral galaxies made of glowing star-dust, soft nebula clouds behind them, luminous planets. Light mode is pearl-white with watercolor pastels.</p></div>
+    <button class="pick" data-choice="nebula" onclick="pick(this)">Choose A</button></div>
+  </div>
+
+  <div class="card" data-choice="orbit">
+    <canvas id="c-orbit"></canvas>
+    <div class="meta"><div><h3>B · Orbit</h3><p>Clean and modern. Crisp orbit rings, solid colorful planets, bold labels and plenty of white space. Calm enough to keep open while you work.</p></div>
+    <button class="pick" data-choice="orbit" onclick="pick(this)">Choose B</button></div>
+  </div>
+
+  <div class="card" data-choice="atlas">
+    <canvas id="c-atlas"></canvas>
+    <div class="meta"><div><h3>C · Celestial Atlas</h3><p>An antique star chart. Ink-drawn galaxies with compass ticks, notes joined like constellations, gold for your own connections. Cream paper in light mode, midnight navy in dark.</p></div>
+    <button class="pick" data-choice="atlas" onclick="pick(this)">Choose C</button></div>
+  </div>
+</div>
+
+<script>
+// ---------- sample vault ----------
+const NOTE_NAMES = ["Newton's laws","Entropy","Wave equation","Optics","Momentum","Thermo cheatsheet","Relativity","Fields",
+  "Qubits","Superposition","Bell test","Spin","Ownership","Borrowing","Traits","Async","Lifetimes","NumPy basics","Pandas joins",
+  "Matplotlib","Decorators","Generators","Virtualenvs","Algorithms","Big-O","Graphs","Exam plan","Flashcards","Lecture 4",
+  "Lecture 5","Reading list","Monday","Goals 2027","Travel","Ideas","Gratitude","Inbox","Welcome","Todo","Scratch","Index","Links"];
+let ni = 0; const nextName = () => NOTE_NAMES[(ni++) % NOTE_NAMES.length];
+const VAULT = { name:"My Vault", notes:6, hue:250, children:[
+  { name:"Physics", notes:8, hue:265, children:[{ name:"Quantum", notes:4 }] },
+  { name:"Programming", notes:6, hue:195, children:[{ name:"Rust", notes:5 },{ name:"Python", notes:7 }] },
+  { name:"Study Notes", notes:9, hue:330 },
+  { name:"Journal", notes:5, hue:145 },
+]};
+const USER_LINKS = [["Physics","Programming"],["Study Notes","Python"]];
+
+function rng(seed){ return () => (seed = (seed*16807) % 2147483647, (seed-1)/2147483646); }
+
+function buildModel(w, h){
+  const R = rng(7); ni = 0;
+  const cx = w/2, cy = h/2, R1 = Math.min(w*0.36, h*0.36);
+  const gals = []; const edges = [];
+  function mk(node, x, y, depth, hue){
+    const core = depth===0 ? 34 : depth===1 ? 20 : 13;
+    const g = { name:node.name, x, y, depth, hue, core, planets:[], spin:R()*6.28, dust:[] };
+    for (let i=0;i<node.notes;i++){
+      const ring = core + 12 + (i%4)*(depth===0?11:8) + R()*4;
+      g.planets.push({ name:nextName(), r:ring, a0:R()*6.28, sp:(0.35+R()*0.3)*(30/ring), size:(depth===0?3.2:2.4)+R()*2.6, len:R() });
+    }
+    const arms = depth===0?3:2, nd = depth===0?260:depth===1?150:90, reach = core + (depth===0?52:34);
+    for (let i=0;i<nd;i++){
+      const d = Math.pow(R(),0.7)*reach, arm = i%arms;
+      g.dust.push({ d, a: arm*6.283/arms + d*0.055 + (R()-0.5)*0.55, s: 0.4+R()*1.3, o:0.25+R()*0.6 });
+    }
+    g.reach = reach; gals.push(g); return g;
+  }
+  const root = mk(VAULT, cx, cy, 0, VAULT.hue);
+  VAULT.children.forEach((c, i) => {
+    const a = -Math.PI/2 + i*2*Math.PI/VAULT.children.length + 0.35;
+    const gx = cx + Math.cos(a)*R1*1.25, gy = cy + Math.sin(a)*R1*0.95;
+    const g = mk(c, gx, gy, 1, c.hue); edges.push([root, g]);
+    (c.children||[]).forEach((cc, j, arr) => {
+      const off = (j-(arr.length-1)/2)*0.75;
+      const ga = a + off, d2 = 82;
+      const sg = mk(cc, gx + Math.cos(ga)*d2*1.25, gy + Math.sin(ga)*d2, 2, c.hue + 25 + j*20);
+      edges.push([g, sg]);
+    });
+  });
+  const byName = Object.fromEntries(gals.map(g => [g.name, g]));
+  const links = USER_LINKS.map(([a,b]) => [byName[a], byName[b]]);
+  const stars = Array.from({length:260}, () => ({ x:R()*w, y:R()*h, s:R()*1.3+0.2, tw:R()*6.28 }));
+  const clouds = Array.from({length:7}, () => ({ x:R()*w, y:R()*h, r:120+R()*220, h:[265,195,330,145,220][Math.floor(R()*5)] }));
+  return { gals, edges, links, stars, clouds, root, w, h };
+}
+
+// ---------- palettes ----------
+const PAL = {
+  nebula: {
+    light:{ bg0:"#fdfbff", bg1:"#efe9fb", star:"rgba(90,80,140,", cloudA:0.28, cloudL:82, edge:"rgba(120,110,170,0.35)", link:"rgba(214,80,150,0.9)", label:"#2a2440", sub:"#6a6385", dustL:58, coreL:70, planetL:60, tip:"rgba(255,255,255,0.95)", tipFg:"#2a2440" },
+    dark:{ bg0:"#0d0a24", bg1:"#04030c", star:"rgba(255,255,255,", cloudA:0.16, cloudL:45, edge:"rgba(170,160,255,0.28)", link:"rgba(255,120,200,0.95)", label:"#f1eeff", sub:"#a9a3c8", dustL:72, coreL:80, planetL:70, tip:"rgba(20,16,40,0.92)", tipFg:"#f1eeff" } },
+  orbit: {
+    light:{ bg0:"#ffffff", bg1:"#ffffff", grid:"rgba(30,35,60,0.06)", ring:"rgba(30,35,60,0.12)", edge:"rgba(30,35,60,0.22)", link:"#5b5bd6", label:"#1d1f27", sub:"#7a7e90", planetL:55, coreL:56, tip:"#1d1f27", tipFg:"#ffffff" },
+    dark:{ bg0:"#0d0f14", bg1:"#0d0f14", grid:"rgba(255,255,255,0.05)", ring:"rgba(255,255,255,0.12)", edge:"rgba(255,255,255,0.22)", link:"#8f8fff", label:"#eef0f6", sub:"#8d91a3", planetL:64, coreL:62, tip:"#eef0f6", tipFg:"#0d0f14" } },
+  atlas: {
+    light:{ bg0:"#f7f1e3", bg1:"#efe5cf", ink:"#22304d", inkSoft:"rgba(34,48,77,0.35)", grat:"rgba(34,48,77,0.10)", gold:"#b5852f", label:"#22304d", sub:"#6b6250", tip:"#22304d", tipFg:"#f7f1e3" },
+    dark:{ bg0:"#0f1c36", bg1:"#091224", ink:"#eadfc4", inkSoft:"rgba(234,223,196,0.35)", grat:"rgba(234,223,196,0.08)", gold:"#dcb66b", label:"#eadfc4", sub:"#a79e88", tip:"#eadfc4", tipFg:"#0f1c36" } },
+};
+
+// ---------- helpers ----------
+function planetPos(g, p, t){ const a = p.a0 + t*p.sp*0.25; return [g.x + Math.cos(a)*p.r, g.y + Math.sin(a)*p.r*0.82]; }
+function curve(ctx, a, b, bend){
+  const mx=(a.x+b.x)/2, my=(a.y+b.y)/2, dx=b.x-a.x, dy=b.y-a.y;
+  ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.quadraticCurveTo(mx - dy*bend, my + dx*bend, b.x, b.y);
+}
+function labelText(ctx, g, P, font, color){
+  ctx.font = font; ctx.fillStyle = color; ctx.textAlign = "center";
+  ctx.fillText(g.name, g.x, g.y + g.reach*0.62 + (g.depth===0?26:20));
+}
+
+// ---------- style A: nebula ----------
+function drawNebula(ctx, M, t, mode){
+  const P = PAL.nebula[mode], {w,h} = M;
+  const bg = ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,Math.max(w,h)*0.75);
+  bg.addColorStop(0,P.bg0); bg.addColorStop(1,P.bg1); ctx.fillStyle=bg; ctx.fillRect(0,0,w,h);
+  for (const c of M.clouds){
+    const g = ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,c.r);
+    g.addColorStop(0,`hsla(${c.h},80%,${P.cloudL}%,${P.cloudA})`); g.addColorStop(1,`hsla(${c.h},80%,${P.cloudL}%,0)`);
+    ctx.fillStyle=g; ctx.fillRect(c.x-c.r,c.y-c.r,c.r*2,c.r*2);
+  }
+  for (const s of M.stars){ const o = 0.35+0.35*Math.sin(t*1.3+s.tw); ctx.fillStyle=P.star+(o*(mode==="light"?0.45:1))+")"; ctx.fillRect(s.x,s.y,s.s,s.s); }
+  ctx.lineWidth=1.4; ctx.strokeStyle=P.edge;
+  for (const [a,b] of M.edges){ curve(ctx,a,b,0.12); ctx.stroke(); }
+  ctx.save(); ctx.setLineDash([6,7]); ctx.lineDashOffset = -t*12; ctx.lineWidth=2; ctx.strokeStyle=P.link; ctx.shadowColor=P.link; ctx.shadowBlur=mode==="dark"?12:4;
+  for (const [a,b] of M.links){ curve(ctx,a,b,-0.22); ctx.stroke(); } ctx.restore();
+  for (const g of M.gals){
+    const rot = g.spin + t*0.06*(g.depth===0?0.6:1);
+    ctx.save(); ctx.translate(g.x,g.y); ctx.scale(1,0.82);
+    ctx.globalCompositeOperation = mode==="dark" ? "lighter" : "source-over";
+    for (const d of g.dust){
+      const a = d.a + rot; ctx.fillStyle=`hsla(${g.hue + d.d*0.6},85%,${P.dustL}%,${d.o*(mode==="dark"?0.7:0.55)})`;
+      ctx.beginPath(); ctx.arc(Math.cos(a)*d.d, Math.sin(a)*d.d, d.s, 0, 6.283); ctx.fill();
+    }
+    const core = ctx.createRadialGradient(0,0,0,0,0,g.core*1.6);
+    core.addColorStop(0, mode==="dark"?"rgba(255,255,255,0.95)":`hsla(${g.hue},90%,96%,1)`);
+    core.addColorStop(0.35,`hsla(${g.hue},90%,${P.coreL}%,0.85)`); core.addColorStop(1,`hsla(${g.hue},90%,${P.coreL}%,0)`);
+    ctx.fillStyle=core; ctx.beginPath(); ctx.arc(0,0,g.core*1.6,0,6.283); ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalCompositeOperation="source-over";
+  const pts=[];
+  for (const g of M.gals) for (const p of g.planets){
+    const [x,y]=planetPos(g,p,t); pts.push({x,y,name:p.name,g:g.name});
+    const gr = ctx.createRadialGradient(x-p.size*0.35,y-p.size*0.35,0,x,y,p.size*2.6);
+    gr.addColorStop(0,"#ffffff"); gr.addColorStop(0.3,`hsl(${g.hue+40*p.len},85%,${P.planetL}%)`); gr.addColorStop(1,`hsla(${g.hue+40*p.len},85%,${P.planetL}%,0)`);
+    ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(x,y,p.size*2.6,0,6.283); ctx.fill();
+  }
+  for (const g of M.gals) labelText(ctx,g,P, g.depth===0?"600 16px system-ui":"600 13px system-ui", g.depth===0?P.label:P.sub);
+  ctx.font="600 11px system-ui"; ctx.fillStyle=P.label; ctx.textAlign="center"; ctx.fillText("✦ MILKY WAY", M.root.x, M.root.y - M.root.reach*0.82 - 8);
+  return { pts, P };
+}
+
+// ---------- style B: orbit ----------
+function drawOrbit(ctx, M, t, mode){
+  const P = PAL.orbit[mode], {w,h} = M;
+  ctx.fillStyle=P.bg0; ctx.fillRect(0,0,w,h);
+  ctx.fillStyle=P.grid; for (let x=12;x<w;x+=24) for (let y=12;y<h;y+=24) ctx.fillRect(x,y,1.5,1.5);
+  ctx.lineWidth=1.2; ctx.strokeStyle=P.edge;
+  for (const [a,b] of M.edges){ ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
+  ctx.save(); ctx.setLineDash([5,6]); ctx.lineWidth=2; ctx.strokeStyle=P.link;
+  for (const [a,b] of M.links){ curve(ctx,a,b,-0.18); ctx.stroke(); } ctx.restore();
+  for (const g of M.gals){
+    const rings = [...new Set(g.planets.map(p=>Math.round(p.r)))];
+    ctx.strokeStyle=P.ring; ctx.lineWidth=1;
+    for (const r of rings){ ctx.beginPath(); ctx.ellipse(g.x,g.y,r,r*0.82,0,0,6.283); ctx.stroke(); }
+    ctx.fillStyle=P.bg0; ctx.beginPath(); ctx.arc(g.x,g.y,g.core*0.62+4,0,6.283); ctx.fill();
+    ctx.fillStyle=`hsl(${g.hue},70%,${P.coreL}%)`; ctx.beginPath(); ctx.arc(g.x,g.y,g.core*0.62,0,6.283); ctx.fill();
+    ctx.fillStyle=`hsla(${g.hue},70%,${P.coreL}%,0.14)`; ctx.beginPath(); ctx.arc(g.x,g.y,g.core*0.62+9,0,6.283); ctx.fill();
+  }
+  const pts=[];
+  for (const g of M.gals) for (const p of g.planets){
+    const [x,y]=planetPos(g,p,t); pts.push({x,y,name:p.name,g:g.name});
+    ctx.fillStyle=P.bg0; ctx.beginPath(); ctx.arc(x,y,p.size+2,0,6.283); ctx.fill();
+    ctx.fillStyle=`hsl(${g.hue+50*p.len},75%,${P.planetL}%)`; ctx.beginPath(); ctx.arc(x,y,p.size,0,6.283); ctx.fill();
+  }
+  for (const g of M.gals){
+    ctx.font = g.depth===0?"700 16px system-ui":"600 13px system-ui"; ctx.fillStyle=P.label; ctx.textAlign="center";
+    const y = g.y + (g.planets.reduce((m,p)=>Math.max(m,p.r),0))*0.82 + 22;
+    ctx.fillText(g.name, g.x, y);
+    ctx.font="12px system-ui"; ctx.fillStyle=P.sub; ctx.fillText(`${g.planets.length} notes`, g.x, y+15);
+  }
+  return { pts, P };
+}
+
+// ---------- style C: atlas ----------
+function drawAtlas(ctx, M, t, mode){
+  const P = PAL.atlas[mode], {w,h} = M, R=M.root;
+  const bg = ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,Math.max(w,h)*0.7);
+  bg.addColorStop(0,P.bg0); bg.addColorStop(1,P.bg1); ctx.fillStyle=bg; ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle=P.grat; ctx.lineWidth=1;
+  for (let r=60;r<Math.max(w,h);r+=60){ ctx.beginPath(); ctx.ellipse(R.x,R.y,r,r*0.82,0,0,6.283); ctx.stroke(); }
+  for (let a=0;a<12;a++){ const an=a*Math.PI/6; ctx.beginPath(); ctx.moveTo(R.x,R.y); ctx.lineTo(R.x+Math.cos(an)*w, R.y+Math.sin(an)*w*0.82); ctx.stroke(); }
+  ctx.strokeStyle=P.inkSoft; ctx.lineWidth=1.1;
+  for (const [a,b] of M.edges){ curve(ctx,a,b,0.1); ctx.stroke(); }
+  ctx.save(); ctx.setLineDash([2,5]); ctx.lineCap="round"; ctx.lineWidth=2.2; ctx.strokeStyle=P.gold;
+  for (const [a,b] of M.links){ curve(ctx,a,b,-0.2); ctx.stroke(); } ctx.restore();
+  const pts=[];
+  for (const g of M.gals){
+    const rr = g.core*0.9;
+    ctx.strokeStyle=P.ink; ctx.lineWidth=1.3; ctx.beginPath(); ctx.arc(g.x,g.y,rr,0,6.283); ctx.stroke();
+    ctx.lineWidth=0.7; ctx.beginPath(); ctx.arc(g.x,g.y,rr+4,0,6.283); ctx.stroke();
+    for (let k=0;k<24;k++){ const an=k*Math.PI/12 + t*0.03, l = k%6===0?6:3;
+      ctx.beginPath(); ctx.moveTo(g.x+Math.cos(an)*(rr+4), g.y+Math.sin(an)*(rr+4)); ctx.lineTo(g.x+Math.cos(an)*(rr+4+l), g.y+Math.sin(an)*(rr+4+l)); ctx.stroke(); }
+    star(ctx, g.x, g.y, g.depth===0?9:6, P.gold);
+    const gp = g.planets.map(p => planetPos(g,p,t));
+    ctx.strokeStyle=P.inkSoft; ctx.lineWidth=0.8; ctx.beginPath();
+    gp.forEach(([x,y],i) => i ? ctx.lineTo(x,y) : ctx.moveTo(x,y)); ctx.stroke();
+    g.planets.forEach((p,i) => { const [x,y]=gp[i]; pts.push({x,y,name:p.name,g:g.name}); star(ctx,x,y,p.size*0.95+1,P.ink); });
+  }
+  for (const g of M.gals){
+    ctx.font = g.depth===0 ? "italic 600 18px Georgia,serif" : "italic 14px Georgia,serif";
+    ctx.fillStyle=P.label; ctx.textAlign="center"; ctx.fillText(g.name, g.x, g.y + g.reach*0.62 + 22);
+  }
+  ctx.font="11px Georgia,serif"; ctx.fillStyle=P.sub; ctx.textAlign="left"; ctx.fillText("ATLAS OF MY VAULT · MMXXVI", 16, h-16);
+  return { pts, P };
+}
+function star(ctx,x,y,r,c){ ctx.fillStyle=c; ctx.beginPath();
+  for (let i=0;i<8;i++){ const a=i*Math.PI/4, rr = i%2? r*0.32 : r; ctx.lineTo(x+Math.cos(a-Math.PI/2)*rr, y+Math.sin(a-Math.PI/2)*rr); }
+  ctx.closePath(); ctx.fill(); }
+
+// ---------- runtime ----------
+let MODE = "light";
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const views = [["c-nebula",drawNebula],["c-orbit",drawOrbit],["c-atlas",drawAtlas]].map(([id,fn]) => {
+  const cv = document.getElementById(id); const v = { cv, fn, ctx:cv.getContext("2d"), mouse:null, M:null };
+  cv.addEventListener("mousemove", e => { const r=cv.getBoundingClientRect(); v.mouse=[e.clientX-r.left, e.clientY-r.top]; });
+  cv.addEventListener("mouseleave", () => v.mouse=null);
+  return v;
+});
+function resize(){ const dpr = devicePixelRatio||1;
+  for (const v of views){ const w=v.cv.clientWidth, h=v.cv.clientHeight; v.cv.width=w*dpr; v.cv.height=h*dpr; v.ctx.setTransform(dpr,0,0,dpr,0,0); v.M=buildModel(w,h); } }
+addEventListener("resize", resize); resize();
+function frame(ms){
+  const t = reduce ? 0 : ms/1000;
+  for (const v of views){
+    const { pts, P } = v.fn(v.ctx, v.M, t, MODE);
+    if (v.mouse){ let best=null, bd=14*14;
+      for (const p of pts){ const d=(p.x-v.mouse[0])**2+(p.y-v.mouse[1])**2; if (d<bd){bd=d;best=p;} }
+      if (best){ const c=v.ctx, txt=`${best.name}  ·  ${best.g}`; c.font="600 12px system-ui"; const tw=c.measureText(txt).width+18;
+        c.fillStyle=P.tip; roundRect(c,best.x+10,best.y-30,tw,24,12); c.fill(); c.fillStyle=P.tipFg; c.textAlign="left"; c.fillText(txt,best.x+19,best.y-14); }
+    }
+  }
+  requestAnimationFrame(frame);
+}
+function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+requestAnimationFrame(frame);
+document.getElementById("lightBtn").onclick = () => setMode("light");
+document.getElementById("darkBtn").onclick = () => setMode("dark");
+function setMode(m){ MODE=m; document.body.classList.toggle("dark", m==="dark");
+  document.getElementById("lightBtn").classList.toggle("on", m==="light"); document.getElementById("darkBtn").classList.toggle("on", m==="dark"); }
+function pick(btn){ document.querySelectorAll(".card").forEach(c => c.classList.toggle("selected", c.dataset.choice===btn.dataset.choice));
+  if (window.toggleSelect) { try { toggleSelect(btn.closest(".card")); } catch(e){} } }
+</script>
+</body>
+</html>
