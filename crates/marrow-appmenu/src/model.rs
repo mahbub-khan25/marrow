@@ -2,9 +2,9 @@
 //! written out in dbusmenu's shape.
 //!
 //! The labels here are English, with `_` before the mnemonic letter. The window
-//! translates them (Bangla lives with the rest of the interface's words, in
-//! `ui/src/i18n-bn.ts`) and sends the result back with [`Menu::update`], along
-//! with which toggles are on and which items can be used just now.
+//! translates them (the menu's Bangla is all in `ui/src/i18n-bn-menu.ts`) and
+//! sends the result back with [`Menu::update`], along with which toggles are on
+//! and which items can be used just now.
 
 use std::collections::HashMap;
 
@@ -231,7 +231,7 @@ fn marrow_menu() -> Vec<Entry> {
                 item(Save, "_Save", &["Control", "S"]),
                 item(CloseTab, "_Close tab", &["Control", "W"]),
                 Separator,
-                item(Quit, "_Quit Marrow", &[]),
+                item(Quit, "_Quit Marrow", &["Control", "Q"]),
             ],
         ),
         Menu(
@@ -267,9 +267,9 @@ fn marrow_menu() -> Vec<Entry> {
                 check(StatusBar, "Status _bar", &[]),
                 check(DarkMode, "_Dark mode", &[]),
                 Separator,
-                item(TextBigger, "Bigg_er text", &[]),
-                item(TextSmaller, "S_maller text", &[]),
-                item(TextDefault, "_Normal text size", &[]),
+                item(TextBigger, "Bigg_er text", &["Control", "="]),
+                item(TextSmaller, "S_maller text", &["Control", "-"]),
+                item(TextDefault, "_Normal text size", &["Control", "0"]),
                 Separator,
                 item(Graph, "_Graph view", &["Control", "G"]),
                 item(Canvas, "C_anvas", &[]),
@@ -775,7 +775,11 @@ mod tests {
         assert_eq!(keys(Action::FocusMode), "F11");
         assert_eq!(keys(Action::SearchAll), "Control+Shift+F");
         assert_eq!(keys(Action::Ask), "Control+Shift+J");
-        assert_eq!(keys(Action::Quit), "");
+        assert_eq!(keys(Action::Quit), "Control+Q");
+        assert_eq!(keys(Action::TextBigger), "Control+=");
+        assert_eq!(keys(Action::TextSmaller), "Control+-");
+        assert_eq!(keys(Action::TextDefault), "Control+0");
+        assert_eq!(keys(Action::Today), "Control+D");
     }
 
     #[test]

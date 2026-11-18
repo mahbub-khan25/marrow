@@ -99,7 +99,7 @@ import { saveFiles } from "./attach";
 import { type DailyLayout, dailyIndex as indexDaily, dailyPathFor, misplaced as misplacedDaily } from "./daily";
 import { Tree } from "./tree";
 import { HOME_FILE, HomeView } from "./home";
-import { $, h, icon, isMac, isoDay, kbd, longDate, storage, store, wordCount } from "./util";
+import { $, h, icon, isMac, isoDay, kbd, longDate, storage, store, textSizeKey, wordCount } from "./util";
 
 // ------------------------------------------------------------------ state
 
@@ -2002,13 +2002,17 @@ function bindKeys() {
       return;
     }
     const mod = e.ctrlKey || e.metaKey;
-    if (!mod || $("app").hidden || e.altKey) return;
-    if (e.defaultPrevented) return;
+    if (!mod || e.altKey || e.defaultPrevented) return;
     const k = e.key.toLowerCase();
     const run = (fn: () => unknown) => {
       e.preventDefault();
       void fn();
     };
+    // With or without a vault: quit, and the size of note text.
+    if (k === "q" && !e.shiftKey) return run(() => quitMarrow());
+    const size = textSizeKey(e);
+    if (size !== null) return run(() => (size === 0 ? setPref("size", 18) : stepTextSize(size)));
+    if ($("app").hidden) return;
     // Ctrl+Shift+[ and Ctrl+Shift+]: the panel on that side. (By key position, so any keyboard layout works.)
     if (e.shiftKey && e.code === "BracketLeft") return run(() => toggleSidebar());
     if (e.shiftKey && e.code === "BracketRight") return run(() => toggleInspector());
@@ -2066,8 +2070,8 @@ function sourceView() {
   return pane.doc && pane.mode === "source" ? pane.view : null;
 }
 
-/** Quit from the menu: like closing the window, but Marrow stops (even when it keeps running for reminders). */
-async function quitFromMenu() {
+/** Ctrl+Q or Quit in the menu: like closing the window, but Marrow stops (even when it keeps running for reminders). */
+async function quitMarrow() {
   if (!(await settleEdits("Quit Marrow"))) return;
   writeSession();
   await quitApp();
@@ -2089,7 +2093,7 @@ function menuActions(): MenuActions {
     print: inVault(() => exportNote("print")),
     save: inVault(() => primary.doc && forceSave(primary.doc)),
     "close-tab": inVault(() => active >= 0 && closeTab(active)),
-    quit: () => quitFromMenu(),
+    quit: () => quitMarrow(),
     undo: edit("undo"),
     redo: edit("redo"),
     "select-all": edit("select-all"),
@@ -2124,14 +2128,15 @@ function menuActions(): MenuActions {
     tasks: inVault(() => setSide("tasks")),
     ask: inVault(() => askNotes()),
     help: () => openHelp(),
-    shortcuts: inVault(() => openSettings("hotkeys")),
-    about: inVault(() => openSettings("about")),
+    // These two need no vault (Settings shows only them then).
+    shortcuts: () => openSettings("hotkeys"),
+    about: () => openSettings("about"),
   };
 }
 
 const VAULT_ITEMS = [
   ...["new-note", "new-canvas", "new-folder", "import", "find", "search-all", "replace-all", "settings", "sidebar", "inspector"],
-  ...["graph", "canvas", "home", "today", "palette", "open-in-tab", "calendar", "tasks", "ask", "shortcuts", "about"],
+  ...["graph", "canvas", "home", "today", "palette", "open-in-tab", "calendar", "tasks", "ask"],
 ];
 
 /** What the global menu shows as on, and what can't be used just now. */
@@ -2150,7 +2155,7 @@ function menuState(): MenuState {
       "status-bar": prefs.statusbar,
       "dark-mode": isDark(),
     },
-    // Without a vault (the welcome screen) only opening one, Help, the look and Quit are left.
+    // Without a vault (the welcome screen) only opening one, Help, About, the keys, the look and Quit are left.
     enabled: {
       ...usable(VAULT_ITEMS, vault),
       ...usable(["save", "export-pdf", "export-html", "print", "split", "reading-view", "focus-mode"], note),
@@ -2428,6 +2433,7 @@ async function boot() {
   });
 
   initSettings({
+    hasVault: () => !$("app").hidden,
     vaultName: () => vaultName,
     vaultRoot: () => vaultRoot,
     folders: () => tree.folders(),

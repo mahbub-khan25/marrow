@@ -5,6 +5,7 @@
 // anything marked translate="no" (note names, search results…) are skipped.
 
 import { BN, BN_PATTERNS } from "./i18n-bn";
+import { BN_MENU } from "./i18n-bn-menu";
 
 export type Lang = "en" | "bn";
 
@@ -32,7 +33,8 @@ export const bnDigits = (s: string) => s.replace(/[0-9]/g, (d) => DIGITS[Number(
 export function translate(s: string): string | null {
   const key = s.trim();
   if (!key) return null;
-  const hit = BN[key];
+  // The global menu's words are kept apart (i18n-bn-menu.ts) but serve everywhere.
+  const hit = BN[key] ?? BN_MENU[key];
   if (hit) return s.replace(key, hit);
   for (const [re, to] of BN_PATTERNS) {
     if (re.test(key)) return s.replace(key, bnDigits(key.replace(re, to)));

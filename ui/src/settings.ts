@@ -12,6 +12,8 @@ import { prefs, setPref, type Prefs } from "./prefs";
 import { $, h, icon, isMac, kbd } from "./util";
 
 export interface SettingsApp {
+  /** False on the welcome screen: then only Hotkeys and About are shown. */
+  hasVault(): boolean;
   vaultName(): string;
   vaultRoot(): string;
   folders(): string[];
@@ -139,11 +141,18 @@ function prefSeg<K extends keyof Prefs>(k: K, opts: [Prefs[K], string][]) {
   return seg(opts, prefs[k], (v) => setPref(k, v));
 }
 
+/** The sections there are now: without a vault, only the two that need none. */
+export function shownTabs(hasVault: boolean): Tab[] {
+  return TABS.map((t) => t[0]).filter((k) => hasVault || k === "hotkeys" || k === "about");
+}
+
 function render() {
+  const shown = shownTabs(app.hasVault());
+  if (!shown.includes(tab)) tab = shown[0];
   const nav = $("settings-nav");
   nav.replaceChildren(
     h("div.h", null, "Settings"),
-    ...TABS.map(([k, label, ic]) =>
+    ...TABS.filter(([k]) => shown.includes(k)).map(([k, label, ic]) =>
       h(
         "button",
         {
@@ -354,6 +363,10 @@ function render() {
       ["Next / previous tab", `${kbd("Tab")}  /  ${kbd("Tab", true)}`],
       ["Settings", kbd(",")],
       ["Focus mode", "F11"],
+      ["Bigger text", `${kbd("=")}  or  ${kbd("+")}`],
+      ["Smaller text", kbd("-")],
+      ["Normal text size", kbd("0")],
+      ["Quit Marrow", kbd("Q")],
       ["AI: edit selection or write (source)", kbd("J")],
       ["Follow link (source)", `${kbd("click")}  or  ${kbd("Enter")}`],
       ["Open link in split", `${kbd("click")} in preview`],

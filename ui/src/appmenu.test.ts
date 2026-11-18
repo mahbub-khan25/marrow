@@ -26,7 +26,8 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { history } from "@codemirror/commands";
 import { editCommand, initAppMenu, menuLabels, runMenuAction, syncAppMenu, type MenuState } from "./appmenu";
-import { setLanguage } from "./i18n";
+import { setLanguage, translate } from "./i18n";
+import { textSizeKey } from "./util";
 import model from "../../crates/marrow-appmenu/src/model.rs?raw";
 import main from "./main.ts?raw";
 
@@ -52,10 +53,29 @@ describe("the global menu", () => {
     }
   });
 
-  it("has every label in Bangla", async () => {
+  it("has every label's Bangla in one place, i18n-bn-menu.ts", async () => {
     const { BN } = await import("./i18n-bn");
+    const { BN_MENU } = await import("./i18n-bn-menu");
     expect(rustLabels.length).toBeGreaterThan(45);
-    for (const l of rustLabels) expect(BN[l], l).toBeTruthy();
+    for (const l of rustLabels) expect(BN_MENU[l], l).toBeTruthy();
+    // Nothing else in the file, and nowhere else: one word, one place.
+    expect(Object.keys(BN_MENU).sort()).toEqual([...rustLabels].sort());
+    for (const l of rustLabels) expect(BN[l], `${l} is also in i18n-bn.ts`).toBeUndefined();
+    // The rest of the interface uses the same words.
+    expect(translate("Close tab")).toBe(BN_MENU["Close tab"]);
+  });
+
+  it("knows the text size keys", () => {
+    const k = (key: string, code: string) => textSizeKey({ key, code });
+    expect(k("=", "Equal")).toBe(1);
+    expect(k("+", "Equal")).toBe(1); // Ctrl+Shift+=
+    expect(k("+", "NumpadAdd")).toBe(1);
+    expect(k("-", "Minus")).toBe(-1);
+    expect(k("-", "NumpadSubtract")).toBe(-1);
+    expect(k("0", "Digit0")).toBe(0);
+    expect(k("০", "Digit0")).toBe(0); // a Bangla layout
+    expect(k("k", "KeyK")).toBeNull();
+    expect(k("9", "Digit9")).toBeNull();
   });
 
   it("translates the labels only for Bangla", () => {

@@ -12,7 +12,8 @@
 //! action (`ui/src/appmenu.ts` runs it the way its shortcut or button would),
 //! except Cut, Copy and Paste, which WebKit does itself on whatever has the
 //! focus. The window tells the menu its labels (translated), which toggles are
-//! on and what can be used, through `app_menu_sync`.
+//! on and what can be used, through `app_menu_sync`. Quit goes through the
+//! window too (it saves first), then `quit_app`.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -172,10 +173,4 @@ pub async fn app_menu_sync(
         }
     }
     english
-}
-
-/// Quit from the global menu, after the window has saved everything.
-#[tauri::command]
-pub fn app_menu_quit(app: AppHandle) {
-    app.exit(0);
 }

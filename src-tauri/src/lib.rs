@@ -102,6 +102,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::last_vault,
             commands::app_platform,
+            commands::quit_app,
             commands::default_vault,
             commands::open_vault,
             commands::tree,
@@ -203,8 +204,6 @@ pub fn run() {
             reminders::set_background,
             #[cfg(target_os = "linux")]
             appmenu::app_menu_sync,
-            #[cfg(target_os = "linux")]
-            appmenu::app_menu_quit,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Marrow");

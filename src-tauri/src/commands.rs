@@ -140,6 +140,14 @@ pub fn app_platform() -> AppPlatform {
     AppPlatform { os: std::env::consts::OS, mobile: cfg!(mobile) }
 }
 
+/// Quit (Ctrl+Q, or Quit in the global menu), once the window has saved
+/// everything. Unlike closing the window, this stops Marrow even when it
+/// keeps running for reminders.
+#[tauri::command]
+pub fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
 /// On phones and tablets: the "Marrow" folder in the app's documents, made if
 /// needed. (iOS shows it in the Files app under On My iPhone/iPad › Marrow.)
 #[tauri::command(async)]

@@ -44,6 +44,17 @@ export function kbd(key: string, shift = false): string {
   return `Ctrl+${shift ? "Shift+" : ""}${key}`;
 }
 
+/**
+ * Ctrl+= (or Ctrl++, Ctrl+Shift+=, the keypad's +): 1, bigger text. Ctrl+-: -1,
+ * smaller. Ctrl+0: 0, the normal size. By key position too, for other layouts.
+ */
+export function textSizeKey(e: Pick<KeyboardEvent, "key" | "code">): 1 | -1 | 0 | null {
+  if (e.key === "=" || e.key === "+" || e.code === "Equal" || e.code === "NumpadAdd") return 1;
+  if (e.key === "-" || e.key === "_" || e.code === "Minus" || e.code === "NumpadSubtract") return -1;
+  if (e.key === "0" || e.code === "Digit0" || e.code === "Numpad0") return 0;
+  return null;
+}
+
 export function ago(ms: number): string {
   const m = Math.round((Date.now() - ms) / 60000);
   if (m < 1) return "just now";

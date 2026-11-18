@@ -10,7 +10,8 @@ import { listen } from "@tauri-apps/api/event";
 import { redo, selectAll, undo } from "@codemirror/commands";
 import { openSearchPanel } from "@codemirror/search";
 import { EditorView } from "@codemirror/view";
-import { currentLang, translate } from "./i18n";
+import { currentLang } from "./i18n";
+import { BN_MENU } from "./i18n-bn-menu";
 
 /** What each menu item does, by the action's name (`Action::name` in Rust). */
 export type MenuActions = Record<string, () => unknown>;
@@ -51,13 +52,13 @@ export function syncAppMenu() {
   });
 }
 
-/** The menu's labels in the interface language; none in English. */
+/** The menu's labels in the interface language (all from i18n-bn-menu.ts); none in English. */
 export function menuLabels(en: [string, string][], lang: string): Record<string, string> {
   const out: Record<string, string> = {};
-  if (lang === "en") return out;
+  if (lang !== "bn") return out;
   for (const [key, label] of en) {
-    const t = translate(label);
-    if (t !== null && t !== label) out[key] = t;
+    const t = BN_MENU[label];
+    if (t && t !== label) out[key] = t;
   }
   return out;
 }
@@ -82,9 +83,9 @@ async function send() {
   }
 }
 
-/** Quits from the menu (the window has saved everything first). */
+/** Quits Marrow (the window has saved everything first). */
 export function quitApp(): Promise<void> {
-  return invoke("app_menu_quit");
+  return invoke("quit_app");
 }
 
 /** The editor that has the focus (or holds it, the focus being in its search box). */
