@@ -301,7 +301,8 @@ function showStage() {
   $("rail-graph").setAttribute("aria-pressed", String(view === "graph"));
   $("rail-home").setAttribute("aria-pressed", String(view === "start"));
   $("rail-canvas").setAttribute("aria-pressed", String(view === "canvas"));
-  if (view === "start") void renderStart();
+  // Home is the vault's own board: nothing to show on the welcome screen.
+  if (view === "start" && !$("app").hidden) void renderStart();
   const title = t?.kind === "note" ? t.doc.name : t?.kind === "canvas" ? displayName(t.path) : t?.kind === "graph" ? "Graph" : "";
   if (!platform.mobile) void getCurrentWindow().setTitle(title ? `${title} — Marrow` : vaultName ? `${vaultName} — Marrow` : "Marrow").catch(() => {});
   tree?.markActive();
