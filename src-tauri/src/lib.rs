@@ -2,6 +2,8 @@
 //! app (main.rs) and the iOS and Android apps.
 
 mod ai;
+#[cfg(target_os = "linux")]
+mod appmenu;
 mod capture;
 mod clipper;
 mod import;
@@ -75,6 +77,11 @@ pub fn run() {
                 win = win.visible(!quiet);
                 win.build()?;
                 tray(app.handle())?;
+                // Linux: the menus in the desktop's global menu bar, where there is one.
+                #[cfg(target_os = "linux")]
+                if let Some(main) = app.get_webview_window("main") {
+                    appmenu::start(&main);
+                }
             }
             reminders::start(app.handle());
             #[cfg(desktop)]
@@ -194,6 +201,10 @@ pub fn run() {
             reminders::reminder_of,
             reminders::background_enabled,
             reminders::set_background,
+            #[cfg(target_os = "linux")]
+            appmenu::app_menu_sync,
+            #[cfg(target_os = "linux")]
+            appmenu::app_menu_quit,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Marrow");

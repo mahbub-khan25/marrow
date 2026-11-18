@@ -47,8 +47,14 @@ arboard = { version = "3", default-features = false, features = ["image-data"] }
 tempfile = { workspace = true }
 
 # Hyperlume AI: stopping an answer sends SIGTERM to `hyperlume-ai`.
+# The global menu: the menu on D-Bus and the Wayland protocol (marrow-appmenu),
+# and the window's GTK, Wayland and WebKit handles (the versions Tauri uses).
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
+marrow-appmenu = { path = "../crates/marrow-appmenu" }
+gtk = "0.18"
+gdkwayland-sys = "0.18"
+webkit2gtk = "2.0"
 
 # API keys for AI providers go in the system's credential store.
 [target.'cfg(windows)'.dependencies]

@@ -2855,9 +2855,12 @@ dependencies = [
  "chrono",
  "dunce",
  "futures-util",
+ "gdkwayland-sys",
+ "gtk",
  "keyring",
  "libc",
  "log",
+ "marrow-appmenu",
  "marrow-cloud",
  "marrow-core",
  "marrow-webdav",
@@ -2877,6 +2880,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tempfile",
  "tokio",
+ "webkit2gtk",
 ]
 
 [[package]]
