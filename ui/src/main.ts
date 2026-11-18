@@ -86,6 +86,7 @@ import { Inspector } from "./inspector";
 import { setLivePreview } from "./livepreview";
 import { applyWriting, onVimWrite } from "./writing";
 import { hideMenu } from "./menu";
+import { editCommand, initAppMenu, quitApp, syncAppMenu, type MenuActions, type MenuState } from "./appmenu";
 import { NotePane, type At } from "./notepane";
 import type { ButtonSpec } from "./preview";
 import { createVaultDialog, setupSyncDialog, syncLine } from "./cloud";
@@ -184,6 +185,7 @@ function toggleFocus(on = !focusOn) {
   document.documentElement.toggleAttribute("data-focus", on);
   $("focus-bar").hidden = !on;
   updateStatus();
+  syncAppMenu();
   if (on) {
     const pane = focusedPane();
     if (pane.mode === "source") pane.view.focus();
@@ -272,6 +274,7 @@ function toast(text: string, kind: "info" | "error" = "info") {
 
 /** Shows whatever the active tab is, and everything that depends on it. */
 function showStage() {
+  syncAppMenu();
   const t = activeTab();
   const view = !t ? "start" : t.kind;
   $("start").hidden = view !== "start";
@@ -1303,6 +1306,7 @@ function setSide(v: typeof side, open = true) {
   if (v === "tasks" && sideOpen) void tasksView.refresh();
   if (v === "calendar" && sideOpen) void calendarView.refresh();
   persistSession();
+  syncAppMenu();
 }
 
 function toggleSidebar() {
@@ -1601,7 +1605,7 @@ function commands(): Command[] {
         tree.reveal(p);
       }
     }),
-    cmd("Toggle dark mode", "moon", () => setPref("theme", document.documentElement.dataset.theme === "dark" || (prefs.theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches) ? "light" : "dark")),
+    cmd("Toggle dark mode", "moon", () => setPref("theme", isDark() ? "light" : "dark")),
     cmd("Import from Notion, Evernote, OneNote…", "tray-arrow-down", () => importNotes()),
     cmd("Move from Notion (step by step)…", "notion-logo", () => moveFrom("notion")),
     cmd("Move from Evernote (step by step)…", "notebook", () => moveFrom("evernote")),
@@ -1967,6 +1971,7 @@ async function openVault(path: string) {
 
 function showWelcome(error?: string) {
   $("app").hidden = true;
+  syncAppMenu();
   $("welcome").hidden = false;
   const el = $("welcome-error");
   el.hidden = !error;
@@ -2018,20 +2023,140 @@ function bindKeys() {
     else if (k === "g") run(() => openGraph());
     else if (k === "\\") run(() => toggleSplit());
     else if (k === ",") run(() => (settingsOpen() ? closeSettings() : openSettings()));
-    else if (k === "f" && e.shiftKey) {
-      run(() => {
-        setSide("search");
-        const v = primary.view;
-        const sel = primary.mode === "source" ? v.state.sliceDoc(v.state.selection.main.from, v.state.selection.main.to) : String(window.getSelection() ?? "");
-        searchView.focus(sel && !sel.includes("\n") ? sel : undefined);
-      });
-    } else if (k === "w") run(() => active >= 0 && closeTab(active));
+    else if (k === "f" && e.shiftKey) run(() => searchAllNotes());
+    else if (k === "w") run(() => active >= 0 && closeTab(active));
     else if ((e.code === "Tab" || k === "tab" || k === "pageup" || k === "pagedown") && tabs.length > 1) {
       // Ctrl+Tab / Ctrl+PageDown: next tab. Ctrl+Shift+Tab / Ctrl+PageUp: previous.
       const step = k === "pageup" || (k !== "pagedown" && e.shiftKey) ? -1 : 1;
-      run(() => activateTab((active + step + tabs.length) % tabs.length));
+      run(() => stepTab(step));
     }
   });
+}
+
+/** Ctrl+Shift+F: the search panel, with the selected words if there are some. */
+function searchAllNotes() {
+  setSide("search");
+  const v = primary.view;
+  const sel = primary.mode === "source" ? v.state.sliceDoc(v.state.selection.main.from, v.state.selection.main.to) : String(window.getSelection() ?? "");
+  searchView.focus(sel && !sel.includes("\n") ? sel : undefined);
+}
+
+/** The next (1) or previous (-1) tab. */
+function stepTab(step: number) {
+  if (tabs.length > 1) return activateTab((active + step + tabs.length) % tabs.length);
+}
+
+const TEXT_SIZES = [16, 18, 20, 22] as const;
+
+/** Bigger (1) or smaller (-1) note text, through the sizes Settings offers. */
+function stepTextSize(step: number) {
+  const i = TEXT_SIZES.indexOf(prefs.size);
+  const next = TEXT_SIZES[Math.max(0, Math.min(TEXT_SIZES.length - 1, (i < 0 ? 1 : i) + step))];
+  if (next !== prefs.size) setPref("size", next);
+}
+
+const isDark = () => document.documentElement.dataset.theme === "dark" || (prefs.theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+
+// ----------------------------------------------------- the global menu bar
+
+/** The note being written, for the menu's Undo, Redo, Select all and Find when the focus is elsewhere. */
+function sourceView() {
+  const pane = focusedPane();
+  return pane.doc && pane.mode === "source" ? pane.view : null;
+}
+
+/** Quit from the menu: like closing the window, but Marrow stops (even when it keeps running for reminders). */
+async function quitFromMenu() {
+  if (!(await settleEdits("Quit Marrow"))) return;
+  writeSession();
+  await quitApp();
+}
+
+/** What each item of the global menu does: what its shortcut or button does. */
+function menuActions(): MenuActions {
+  const inVault = (run: () => unknown) => () => ($("app").hidden ? undefined : run());
+  const edit = (kind: Parameters<typeof editCommand>[0]) => () => editCommand(kind, sourceView);
+  return {
+    "new-note": inVault(() => newNote()),
+    "new-canvas": inVault(() => newCanvas()),
+    "new-folder": inVault(() => newFolder(newNoteFolder())),
+    "open-vault": () => chooseVault(),
+    "create-vault": () => createVaultDialog(openVault),
+    import: inVault(() => importNotes()),
+    "export-pdf": inVault(() => exportNote("pdf")),
+    "export-html": inVault(() => exportNote("html")),
+    print: inVault(() => exportNote("print")),
+    save: inVault(() => primary.doc && forceSave(primary.doc)),
+    "close-tab": inVault(() => active >= 0 && closeTab(active)),
+    quit: () => quitFromMenu(),
+    undo: edit("undo"),
+    redo: edit("redo"),
+    "select-all": edit("select-all"),
+    find: inVault(() => editCommand("find", sourceView) || searchAllNotes()),
+    "search-all": inVault(() => searchAllNotes()),
+    "replace-all": inVault(() => {
+      setSide("search");
+      searchView.showReplace(true);
+      searchView.focus();
+    }),
+    settings: inVault(() => openSettings()),
+    sidebar: inVault(() => toggleSidebar()),
+    inspector: inVault(() => toggleInspector()),
+    split: inVault(() => toggleSplit()),
+    "reading-view": inVault(() => toggleMode()),
+    "focus-mode": inVault(() => toggleFocus()),
+    "icon-bar": () => setPref("rail", !prefs.rail),
+    "status-bar": () => setPref("statusbar", !prefs.statusbar),
+    "dark-mode": () => setPref("theme", isDark() ? "light" : "dark"),
+    "text-bigger": () => stepTextSize(1),
+    "text-smaller": () => stepTextSize(-1),
+    "text-default": () => setPref("size", 18),
+    graph: inVault(() => openGraph()),
+    canvas: inVault(() => openSomeCanvas()),
+    home: inVault(() => goHome()),
+    today: inVault(() => openToday()),
+    palette: inVault(() => openPalette()),
+    "open-in-tab": inVault(() => openPalette({ newTab: true })),
+    "next-tab": inVault(() => stepTab(1)),
+    "prev-tab": inVault(() => stepTab(-1)),
+    calendar: inVault(() => setSide("calendar", true)),
+    tasks: inVault(() => setSide("tasks")),
+    ask: inVault(() => askNotes()),
+    help: () => openHelp(),
+    shortcuts: inVault(() => openSettings("hotkeys")),
+    about: inVault(() => openSettings("about")),
+  };
+}
+
+const VAULT_ITEMS = [
+  ...["new-note", "new-canvas", "new-folder", "import", "find", "search-all", "replace-all", "settings", "sidebar", "inspector"],
+  ...["graph", "canvas", "home", "today", "palette", "open-in-tab", "calendar", "tasks", "ask", "shortcuts", "about"],
+];
+
+/** What the global menu shows as on, and what can't be used just now. */
+function menuState(): MenuState {
+  const vault = !$("app").hidden;
+  const note = vault && !!activeNote();
+  const usable = (names: string[], yes: boolean) => Object.fromEntries(names.map((n) => [n, yes]));
+  return {
+    checked: {
+      sidebar: vault && sideOpen,
+      inspector: vault && (inspectorCovers() ? inspectorOnPhone : prefs.inspector),
+      split: vault && split !== null,
+      "reading-view": note && primary.mode === "preview",
+      "focus-mode": focusOn,
+      "icon-bar": prefs.rail,
+      "status-bar": prefs.statusbar,
+      "dark-mode": isDark(),
+    },
+    // Without a vault (the welcome screen) only opening one, Help, the look and Quit are left.
+    enabled: {
+      ...usable(VAULT_ITEMS, vault),
+      ...usable(["save", "export-pdf", "export-html", "print", "split", "reading-view", "focus-mode"], note),
+      "close-tab": vault && active >= 0,
+      ...usable(["next-tab", "prev-tab"], vault && tabs.length > 1),
+    },
+  };
 }
 
 function bindChrome() {
@@ -2210,6 +2335,7 @@ async function boot() {
         if (t) t.mode = pane.mode;
       } else if (split) split.mode = pane.mode;
       persistSession();
+      syncAppMenu();
     },
     onCursor: () => persistSession(),
     onInfo: (pane: NotePane) => {
@@ -2354,11 +2480,14 @@ async function boot() {
     }
     showStage();
     graphPanel?.restyle();
+    syncAppMenu();
   });
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => graphPanel?.restyle());
 
   bindChrome();
   bindKeys();
+  // Linux: the menus in the desktop's global menu bar, where there is one.
+  if (platform.os === "linux" && !platform.mobile) void initAppMenu(menuActions(), menuState);
 
   // Save when the window loses focus and before it closes.
   window.addEventListener("blur", () => {
