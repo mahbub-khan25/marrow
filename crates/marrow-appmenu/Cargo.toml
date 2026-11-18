@@ -1,0 +1,24 @@
+[package]
+name = "marrow-appmenu"
+description = "Marrow's menus in the Linux desktop's global menu bar (com.canonical.dbusmenu and the KDE appmenu Wayland protocol)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+# Linux only: on other systems the crate is empty and pulls in nothing.
+[target.'cfg(target_os = "linux")'.dependencies]
+log = "0.4"
+# Already in Marrow's tree (the notification, opener and single-instance plugins).
+# Its default async-io runtime runs its own executor thread, so the futures can be
+# awaited from Tauri's tokio runtime without turning on zbus's `tokio` feature for
+# every crate that shares it.
+zbus = "5"
+futures-lite = "2"
+wayland-client = "0.31"
+wayland-backend = { version = "0.3", features = ["client_system"] }
+wayland-scanner = "0.31"
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros", "time", "sync"] }
+wayland-server = "0.31"
