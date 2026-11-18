@@ -3,7 +3,7 @@
   "name": "__MSG_name__",
   "short_name": "Marrow Clipper",
   "description": "__MSG_description__",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "default_locale": "en",
   "homepage_url": "https://www.cicadama.com/marrow/",
   "icons": {

@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.10.0
+
+Marrow's menus in the desktop's menu bar on Linux, and keys to quit and size the text.
+
+- **Menus in the menu bar:** on a Linux desktop with a global menu bar
+  (Hyperlume, KDE Plasma), Marrow's File, Edit, View, Go and Help menus
+  appear in the bar at the top of the screen, with every item's shortcut.
+  Nothing changes inside Marrow's window, or on Windows, macOS, phones or
+  tablets.
+- **New keys:** Ctrl+Q quits Marrow (saving everything first), and Ctrl+=,
+  Ctrl+- and Ctrl+0 make the text bigger, smaller or normal again. They're
+  listed in Settings › Hotkeys.
+- **Before a vault is open:** Settings › About and Hotkeys can be opened
+  from the welcome screen.
+- **Fixed:** changing the look (dark mode, the icon bar, the text size) on
+  the welcome screen no longer shows "Couldn't open Home".
+
 ## 1.9.0
 
 Hyperlume AI with no key to paste, and Marrow Clipper ready for the browser stores.
